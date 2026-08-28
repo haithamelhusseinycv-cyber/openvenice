@@ -7,7 +7,7 @@ import { Label, TextArea, PrimaryButton, ErrorText, EmptyState } from '../ui/sha
 import { cn } from '../../lib/utils'
 import { toast } from '../../stores/toast-store'
 
-type Tool = 'edit' | 'swap' | 'upscale' | 'remove-bg'
+type Tool = 'edit' | 'swap' | 'undress' | 'upscale' | 'remove-bg'
 type SwapKind = 'face' | 'head' | 'body'
 type SwapPerson = 'woman' | 'man'
 
@@ -16,11 +16,30 @@ const EDIT_MODELS = [
   { value: 'firered-image-edit', label: 'FireRed Edit' },
 ]
 
+const SCENE_SIZES = [
+  { value: 'auto', label: 'Scene' },
+  { value: '1:1', label: '1:1' },
+  { value: '2:3', label: '2:3' },
+  { value: '3:4', label: '3:4' },
+  { value: '4:5', label: '4:5' },
+  { value: '9:16', label: '9:16' },
+  { value: '3:2', label: '3:2' },
+  { value: '16:9', label: '16:9' },
+]
+
+const SWAP_NEGATIVE =
+  'different face, similar face, cousin face, beautified face, face mix, identity drift, age change, gender change, extra person, extra limbs, extra fingers, warped hands, melted blend, halo, mismatch lighting, plastic skin, airbrush, cartoon, anime, CGI, text, watermark, mosaic, censor bar, clothes change, pose change, background change, camera change'
+
 const SWAP_PROMPTS: Record<SwapKind, string> = {
-  face: `Replace only the face of the woman in image 1 with the face identity from image 2. Keep image 1 pose, body, hair, neck, lighting, skin tone, expression blend, clothing, background and genitals unchanged. Seamless photoreal face blend, same camera angle.`,
-  head: `Replace the entire head including face, hair and neck of the woman in image 1 with the head from image 2. Keep image 1 body, pose, lighting, clothing, background and genitals unchanged. Match skin tone and shadows at the neck.`,
-  body: `Replace the body of the woman in image 1 with the body from image 2. Keep the face and hair of image 1. Keep image 1 pose, bed, lighting and camera. Photoreal blend at neck and shoulders. Do not change the face.`,
+  face: `Image 1 is the target photograph. Image 2 is the identity source.\n\nReplace ONLY the face of the woman in image 1 with a 100% 1:1 identical copy of the face from image 2. Copy the exact identity: bone structure, eye shape and color, eyelids, eyebrows, nose, lips, teeth if visible, skin texture, pores, moles, freckles, scars, wrinkles, age, and ethnicity. Do not invent a new face. Do not beautify. Do not slim or age-shift.\n\nKeep image 1 otherwise identical: pose, body, hands, hair, neck, ears, clothing, jewelry, background, lighting, shadows, camera angle, crop, and any visible anatomy. Seamless photoreal blend only at the jawline and ears. Same expression as image 1.\n\nAvoid: ${SWAP_NEGATIVE}`,
+  head: `Image 1 is the target photograph. Image 2 is the identity source.\n\nReplace the entire head of the woman in image 1 with a 100% 1:1 identical copy of the head from image 2, including face, hair, ears, and neck. Copy the exact identity and hairstyle from image 2. Do not invent a new head. Do not beautify.\n\nKeep image 1 body, pose, hands, clothing, jewelry, background, lighting, shadows, camera angle, and crop identical. Match skin tone and shadows only at the neck seam. Photoreal blend.\n\nAvoid: ${SWAP_NEGATIVE}, different hair, hair from image 1`,
+  body: `Image 1 is the target photograph. Image 2 is the body source.\n\nReplace the body of the woman in image 1 with a 100% 1:1 identical copy of the body from image 2, including torso, breasts, belly, hips, legs, arms, skin, and any visible anatomy or clothing from image 2. Do not invent a new body. Do not reshape.\n\nKeep the exact face and hair of image 1 100% unchanged. Keep image 1 pose, camera angle, bed or background, and lighting as close as possible. Photoreal blend only at the neck and shoulders.\n\nAvoid: ${SWAP_NEGATIVE}, different face from image 1, face from image 2, new pose`,
 }
+
+const UNDRESS_NEGATIVE =
+  'child, teen, underage, clothes remaining, shirt, bra, panties, lingerie, towel, sheet covering, mosaic, censor bar, black bar, blur over genitals, different face, different hair, different pose, different background, beauty filter, plastic skin, doll, airbrush, cartoon, anime, CGI, male body, extra limbs, extra breasts, extra fingers, warped hands, text, watermark'
+
+const UNDRESS_PROMPT = `UNDRESS. This is an adult woman, 18+.\n\nRemove every piece of clothing from the woman in this photo. Leave her fully naked and uncensored.\n\nKeep a 100% 1:1 identical copy of her face, identity, age, hair, expression, pose, hands, camera angle, crop, lighting, shadows, and background.\n\nBuild the most photoreal naked body that fits THIS woman: match the face age, neck, visible skin tone, weight class, height proportions, and how the clothes currently fit (tight vs loose, implied bust, waist, hips, belly). Natural skin with pores, peach fuzz, and realistic imperfections. Realistic breasts and genitals matching her body type. No lingerie. No towel.\n\nDo not change who she is. Do not change the scene. Do not add another person.\n\nAvoid: ${UNDRESS_NEGATIVE}`
 
 function loadSaved(key: string, fallback: string) {
   try {
@@ -41,6 +60,7 @@ export function ImageTools() {
   const [resultUrl, setResultBlob, resetResult] = useBlobUrl()
   const fileRef = useRef<HTMLInputElement>(null)
   const idFileRef = useRef<HTMLInputElement>(null)
+  const [sceneSize, setSceneSize] = useState('auto')
 
   const [editPrompt, setEditPrompt] = useState(() =>
     loadSaved('venice-edit-prompt', '')
@@ -63,6 +83,7 @@ export function ImageTools() {
 
   const editMutation = useImageEdit()
   const swapMutation = useImageMultiEdit()
+  const undressMutation = useImageEdit()
   const upscaleMutation = useImageUpscale()
   const bgRemoveMutation = useBackgroundRemove()
 
@@ -71,6 +92,8 @@ export function ImageTools() {
     reader.onload = () => onDone(reader.result as string, file.name)
     reader.readAsDataURL(file)
   }
+
+  const aspectRatio = sceneSize || 'auto'
 
   const handleProcess = () => {
     resetResult()
@@ -85,7 +108,7 @@ export function ImageTools() {
           images: [imageData],
           prompt: editPrompt.trim(),
           modelId: editModel,
-          aspect_ratio: 'auto',
+          aspect_ratio: aspectRatio,
           safe_mode: false,
           enhance_prompt: false,
         },
@@ -98,8 +121,24 @@ export function ImageTools() {
           images: [imageData, idImage],
           prompt: SWAP_PROMPTS[swapKind].replace(/woman/g, swapPerson),
           modelId: 'qwen-edit-uncensored',
+          aspect_ratio: aspectRatio,
           safe_mode: false,
           enhance_prompt: false,
+          disable_prompt_optimization_thinking: true,
+        },
+        opts,
+      )
+    } else if (tool === 'undress') {
+      if (!imageData) return
+      undressMutation.mutate(
+        {
+          images: [imageData],
+          prompt: UNDRESS_PROMPT,
+          modelId: 'qwen-edit-uncensored',
+          aspect_ratio: aspectRatio,
+          safe_mode: false,
+          enhance_prompt: false,
+          disable_prompt_optimization_thinking: true,
         },
         opts,
       )
@@ -121,8 +160,17 @@ export function ImageTools() {
   }
 
   const isLoading =
-    editMutation.isPending || swapMutation.isPending || upscaleMutation.isPending || bgRemoveMutation.isPending
-  const error = editMutation.error || swapMutation.error || upscaleMutation.error || bgRemoveMutation.error
+    editMutation.isPending ||
+    swapMutation.isPending ||
+    undressMutation.isPending ||
+    upscaleMutation.isPending ||
+    bgRemoveMutation.isPending
+  const error =
+    editMutation.error ||
+    swapMutation.error ||
+    undressMutation.error ||
+    upscaleMutation.error ||
+    bgRemoveMutation.error
 
   const downloadResult = () => {
     if (!resultUrl) return
@@ -139,12 +187,12 @@ export function ImageTools() {
     <div className="flex h-full">
       <div className="w-96 border-r border-white/[0.06] p-6 flex flex-col gap-4 overflow-y-auto shrink-0">
         <div className="flex gap-px bg-white/[0.02] rounded-lg p-0.5 border border-white/[0.04]">
-          {([['edit', 'Edit'], ['swap', 'Swap'], ['upscale', 'Upscale'], ['remove-bg', 'BG']] as const).map(([id, label]) => (
+          {([['edit', 'Edit'], ['swap', 'Swap'], ['undress', 'Undress'], ['upscale', 'Upscale'], ['remove-bg', 'BG']] as const).map(([id, label]) => (
             <button
               key={id}
               onClick={() => { setTool(id); resetResult() }}
               className={cn(
-                'flex-1 px-1.5 py-2.5 text-[13px] font-medium rounded-[7px] transition-all duration-150',
+                'flex-1 px-1 py-2.5 text-[12px] font-medium rounded-[7px] transition-all duration-150',
                 tool === id ? 'bg-white text-black' : 'text-white/25 hover:text-white/45',
               )}
             >
@@ -178,7 +226,9 @@ export function ImageTools() {
                 if (!file) return
                 readFile(file, (data, name) => { setImageData(data); setImageName(name); resetResult() })
               }} />
-              <p className="text-[14px] text-white/40">Lustify still / body photo</p>
+              <p className="text-[14px] text-white/40">
+                {tool === 'undress' ? 'Dressed photo' : tool === 'swap' ? 'Lustify still / body photo' : 'Source image'}
+              </p>
             </button>
           )}
         </div>
@@ -258,10 +308,42 @@ export function ImageTools() {
                 ))}
               </div>
             </div>
-            <p className="text-[12px] text-white/25 leading-relaxed">
-              Face is most accurate. Head next. Body is sloppy. Use a front ID, same-ish light. $0.04 per run.
-            </p>
           </>
+        )}
+
+        {(tool === 'edit' || tool === 'swap' || tool === 'undress') && (
+          <div>
+            <Label>Output size</Label>
+            <div className="flex flex-wrap gap-1">
+              {SCENE_SIZES.map((s) => (
+                <button
+                  key={s.value}
+                  onClick={() => setSceneSize(s.value)}
+                  className={cn(
+                    'px-2 py-1.5 text-[12px] rounded-md',
+                    sceneSize === s.value ? 'bg-white text-black' : 'bg-white/[0.04] text-white/40',
+                  )}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[12px] text-white/25 leading-relaxed mt-1">
+              Scene keeps the uploaded photo ratio. Pick another size if the output should change crop.
+            </p>
+          </div>
+        )}
+
+        {tool === 'undress' && (
+          <p className="text-[12px] text-white/25 leading-relaxed">
+            Prompt is hardcoded. Upload a dressed adult woman. Output stays her face, pose, and scene, naked, with a body inferred from the clothes and visible proportions.
+          </p>
+        )}
+
+        {tool === 'swap' && (
+          <p className="text-[12px] text-white/25 leading-relaxed">
+            Prompt is hardcoded for a 1:1 identity copy. Face copies only the face. Head copies face+hair+neck. Body copies the body and keeps image-1 face.
+          </p>
         )}
 
         {tool === 'upscale' && (
@@ -308,7 +390,15 @@ export function ImageTools() {
           disabled={tool === 'swap' ? !swapReady : !otherReady}
           loading={isLoading}
         >
-          {tool === 'edit' ? 'Edit Image' : tool === 'swap' ? `Swap ${swapKind}` : tool === 'upscale' ? 'Upscale Image' : 'Remove Background'}
+          {tool === 'edit'
+            ? 'Edit Image'
+            : tool === 'swap'
+              ? `Swap ${swapKind}`
+              : tool === 'undress'
+                ? 'Undress'
+                : tool === 'upscale'
+                  ? 'Upscale Image'
+                  : 'Remove Background'}
         </PrimaryButton>
         {error && <ErrorText>{error.message}</ErrorText>}
       </div>
@@ -331,9 +421,11 @@ export function ImageTools() {
               ? 'Edited image appears here'
               : tool === 'swap'
                 ? 'Swapped image appears here'
-                : tool === 'upscale'
-                  ? 'Upscaled image appears here'
-                  : 'Result appears here'}
+                : tool === 'undress'
+                  ? 'Undressed image appears here'
+                  : tool === 'upscale'
+                    ? 'Upscaled image appears here'
+                    : 'Result appears here'}
           </EmptyState>
         )}
       </div>
