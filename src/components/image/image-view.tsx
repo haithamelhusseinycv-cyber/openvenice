@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useSettingsStore } from '../../stores/settings-store'
 import { useModels } from '../../hooks/use-models'
 import { useStyles } from '../../hooks/use-styles'
@@ -39,7 +39,15 @@ export function ImageView() {
   const selectedModel = useSettingsStore((s) => s.selectedModels.image)
   const { data: models } = useModels('image')
   const { data: styles } = useStyles()
-  const model = selectedModel || models?.[0]?.id || 'z-image-turbo'
+  const allowedImageModels = models?.filter((m) =>
+  ['lustify-v8', 'lustify-v7', 'lustify-sdxl'].includes(m.id.toLowerCase())
+)
+
+const model =
+  selectedModel &&
+  allowedImageModels?.some((m) => m.id === selectedModel)
+    ? selectedModel
+    : allowedImageModels?.[0]?.id || 'lustify-v8'
 
   // Get constraints for the selected model
   const modelData = models?.find((m) => m.id === model)
@@ -58,10 +66,13 @@ export function ImageView() {
   const [style, setStyle] = useState('')
   const [steps, setSteps] = useState(defaultSteps)
   const [variants, setVariants] = useState(1)
-  const [hideWatermark] = useState(true)
   const [images, setImages] = useState<string[]>([])
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
-
+useEffect(() => {
+  setSteps(defaultSteps)
+  setAspectRatio('')
+  setResolution('')
+}, [model, defaultSteps])
   // Build aspect ratio options from model constraints
   const aspectOptions = useMemo(() => {
     if (!hasAspectRatios) return []
@@ -92,16 +103,16 @@ export function ImageView() {
     const size = DEFAULT_SIZE_MAP[Number(sizeIdx)]
 
     const req: Record<string, unknown> = {
-      prompt: prompt.trim(),
-      negative_prompt: negativePrompt.trim() || undefined,
-      model,
-      style_preset: style || undefined,
-      variants,
-      hide_watermark: true,
-      safe_mode: false,
-      enhance_prompt: false,
-      steps,
-    }
+  prompt: prompt.trim(),
+  negative_prompt: negativePrompt.trim() || undefined,
+  model,
+  style_preset: style || undefined,
+  variants,
+  hide_watermark: true,
+  safe_mode: false,
+  enhance_prompt: false,
+  steps,
+}
 
     // Use aspect_ratio for models that support it, otherwise use width/height
     if (hasAspectRatios && aspectRatio) {
