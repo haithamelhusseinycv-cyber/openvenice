@@ -26,7 +26,11 @@ jobs:
       - name: Install
         run: npm ci
 
+      - name: Integrity
+        run: npm run check:integrity 2>&1 | tee integrity.log
+
       - name: Lint
+        if: always()
         run: npm run lint 2>&1 | tee lint.log
 
       - name: Build
@@ -39,6 +43,7 @@ jobs:
         with:
           name: ci-diagnostics-${{ github.run_id }}
           path: |
+            integrity.log
             lint.log
             build.log
           if-no-files-found: ignore
