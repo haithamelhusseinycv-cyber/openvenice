@@ -35,8 +35,10 @@ const inputCls = 'nodrag w-full bg-white/[0.03] border border-white/[0.06] round
 
 type WorkflowNode = Node<VeniceNodeData>
 
-function ModelSelect({ nodeType, value, onChange }: { nodeType: 'chat' | 'imageGen'; value: string; onChange: (v: string) => void }) {
-  const { data: models } = useModels(nodeType === 'chat' ? 'text' : 'image')
+function ModelSelect({ nodeType, value, onChange }: { nodeType: VeniceNodeType; value: string; onChange: (v: string) => void }) {
+  const enabled = nodeType === 'chat' || nodeType === 'imageGen'
+  const modelType = nodeType === 'chat' ? 'text' : nodeType === 'imageGen' ? 'image' : undefined
+  const { data: models } = useModels(modelType, enabled)
   const options = models?.map((model) => ({ value: model.id, label: model.model_spec?.name || model.id })) ?? []
 
   return (
