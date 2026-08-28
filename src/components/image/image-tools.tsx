@@ -113,6 +113,7 @@ export function ImageTools() {
 
   const [swapKind, setSwapKind] = useState<SwapKind>('face')
   const [swapPerson, setSwapPerson] = useState<SwapPerson>('woman')
+  const [swapConfirmed, setSwapConfirmed] = useState(false)
   const [undressConfirmed, setUndressConfirmed] = useState(false)
   const [scale, setScale] = useState(2)
   const [enhance, setEnhance] = useState(false)
@@ -135,6 +136,7 @@ export function ImageTools() {
 
   const selectTool = (nextTool: Tool) => {
     setTool(nextTool)
+    setSwapConfirmed(false)
     setUndressConfirmed(false)
     resetResult()
     resetMutations()
@@ -163,6 +165,8 @@ export function ImageTools() {
 
   const handleProcess = async () => {
     if (!imageData) return
+    if (tool === 'swap' && !swapConfirmed) return
+    if (tool === 'undress' && !undressConfirmed) return
 
     try {
       await validateImageDataUrl(imageData)
@@ -211,7 +215,6 @@ export function ImageTools() {
         opts,
       )
     } else if (tool === 'undress') {
-      if (!undressConfirmed) return
       undressMutation.mutate(
         {
           images: [imageData],
@@ -262,7 +265,7 @@ export function ImageTools() {
     anchor.click()
   }
 
-  const swapReady = !!(imageData && idImage && apiKey && !isLoading)
+  const swapReady = !!(imageData && idImage && apiKey && swapConfirmed && !isLoading)
   const otherReady = !!(
     imageData &&
     apiKey &&
@@ -274,6 +277,7 @@ export function ImageTools() {
   const removeSource = () => {
     setImageData(null)
     setImageName('')
+    setSwapConfirmed(false)
     setUndressConfirmed(false)
     resetResult()
     resetMutations()
@@ -283,6 +287,7 @@ export function ImageTools() {
   const removeId = () => {
     setIdImage(null)
     setIdName('')
+    setSwapConfirmed(false)
     resetResult()
     resetMutations()
     clearFileInput(idFileRef.current)
@@ -329,7 +334,7 @@ export function ImageTools() {
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0]
-                  if (file) readFile(file, (data, name) => { setImageData(data); setImageName(name); setUndressConfirmed(false); resetResult() })
+                  if (file) readFile(file, (data, name) => { setImageData(data); setImageName(name); setSwapConfirmed(false); setUndressConfirmed(false); resetResult() })
                   clearFileInput(e.target)
                 }}
               />
@@ -361,7 +366,7 @@ export function ImageTools() {
                   className="hidden"
                   onChange={(e) => {
                     const file = e.target.files?.[0]
-                    if (file) readFile(file, (data, name) => { setIdImage(data); setIdName(name); resetResult() })
+                    if (file) readFile(file, (data, name) => { setIdImage(data); setIdName(name); setSwapConfirmed(false); resetResult() })
                     clearFileInput(e.target)
                   }}
                 />
@@ -423,7 +428,13 @@ export function ImageTools() {
         )}
 
         {tool === 'swap' && (
-          <p className="text-[12px] text-white/30 leading-relaxed">Face copies only the face. Head copies face + hair + neck. Body copies the selected body source while preserving image-1 face and hair.</p>
+          <div className="rounded-lg border border-white/[0.07] bg-white/[0.02] p-3">
+            <p className="text-[12px] text-white/40 leading-relaxed">Face copies only the face. Head copies face + hair + neck. Body copies the selected body source while preserving image-1 face and hair.</p>
+            <label className="mt-3 flex items-start gap-2 text-[12px] text-white/60 cursor-pointer">
+              <input type="checkbox" checked={swapConfirmed} onChange={(e) => setSwapConfirmed(e.target.checked)} className="mt-0.5 accent-white" />
+              <span>I confirm I have the right or permission to use both images for this identity or body swap.</span>
+            </label>
+          </div>
         )}
 
         {tool === 'upscale' && (
