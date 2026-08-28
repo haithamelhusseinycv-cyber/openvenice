@@ -61,7 +61,7 @@ export function ImageTools() {
     aspect_ratio: 'auto',
     safe_mode: false,
   },
-  opts
+  opts,
 )
     } else if (tool === 'upscale') {
       upscaleMutation.mutate(
