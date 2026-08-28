@@ -11,10 +11,10 @@ import { generateId } from '../../lib/utils'
 import { cn } from '../../lib/utils'
 
 const STARTER_PROMPTS = [
-  'Build a workflow that makes a 9:16 reel using web search to research the topic, then writes a script and generates the video',
-  'Research a topic with web search, summarize into 5 bullets, and narrate it as audio',
-  'Turn a concept into a vivid image prompt, then generate the image',
-  'Write a short song with lyrics, then generate it as music',
+  'Research a topic with web search, summarize the key facts, then turn them into a strong image-generation prompt and generate the image',
+  'Turn a rough character idea into a detailed photoreal portrait prompt, then generate the portrait',
+  'Build a workflow that takes a scene concept, improves composition, camera, lighting, and texture details, then generates the image',
+  'Create two branches from one input: one concise written summary and one refined image prompt that generates a matching image',
 ]
 
 function summarizeStep(step: RunStep): PlaygroundActivity {
