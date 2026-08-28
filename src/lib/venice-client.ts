@@ -7,6 +7,7 @@ const BASE_URL = VENICE_BASE_URL
 
 const RETRY_STATUSES = new Set([408, 425, 500, 502, 503, 504])
 const MAX_READ_RETRIES = 2
+const MAX_RETRY_DELAY_MS = 30_000
 
 const PAID_PATH = /\/(image\/(generate|multi-edit|edit|upscale|background-remove)|chat\/completions|audio\/|video\/|embeddings)/
 
@@ -32,21 +33,36 @@ function getApiKey(): string {
   return key
 }
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+function retryAfterDelay(value?: string | null): number | null {
+  if (!value) return null
+
+  const seconds = Number(value)
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.min(seconds * 1000, MAX_RETRY_DELAY_MS)
+  }
+
+  const date = Date.parse(value)
+  if (Number.isFinite(date)) {
+    return Math.min(Math.max(0, date - Date.now()), MAX_RETRY_DELAY_MS)
+  }
+
+  return null
+}
 
 function backoffDelay(attempt: number, retryAfter?: string | null): number {
-  if (retryAfter) {
-    const secs = Number(retryAfter)
-    if (Number.isFinite(secs) && secs > 0) return Math.min(secs * 1000, 30_000)
-  }
+  const serverDelay = retryAfterDelay(retryAfter)
+  if (serverDelay !== null) return serverDelay
+
   const base = 500 * 2 ** attempt
-  return base + Math.random() * base * 0.25
+  return Math.min(base + Math.random() * base * 0.25, MAX_RETRY_DELAY_MS)
 }
 
 function defaultRetries(method: string | undefined, path: string, explicit?: number): number {
   if (explicit !== undefined) return explicit
-  const m = (method || 'GET').toUpperCase()
-  if (m === 'GET' || m === 'HEAD') return MAX_READ_RETRIES
+  const normalizedMethod = (method || 'GET').toUpperCase()
+  if (normalizedMethod === 'GET' || normalizedMethod === 'HEAD') return MAX_READ_RETRIES
   if (PAID_PATH.test(path)) return 0
   return 0
 }
@@ -80,9 +96,9 @@ export async function parseVeniceErrorPayload(raw: string, status: number): Prom
   return new VeniceAPIError(message, status, code, suggestedPrompt, details)
 }
 
-async function parseError(res: Response): Promise<VeniceAPIError> {
-  const raw = await res.text()
-  return parseVeniceErrorPayload(raw, res.status)
+async function parseError(response: Response): Promise<VeniceAPIError> {
+  const raw = await response.text()
+  return parseVeniceErrorPayload(raw, response.status)
 }
 
 interface VeniceFetchOptions extends RequestInit {
@@ -93,7 +109,7 @@ interface VeniceFetchOptions extends RequestInit {
 
 async function veniceFetch(path: string, options: VeniceFetchOptions): Promise<Response> {
   const method = options.method || (options.body ? 'POST' : 'GET')
-  const { stream, noAuth, retries: explicitRetries, ...fetchOptions } = options
+  const { stream: _stream, noAuth, retries: explicitRetries, ...fetchOptions } = options
   const retries = defaultRetries(method, path, explicitRetries)
   const headers = new Headers(fetchOptions.headers)
   if (!noAuth) headers.set('Authorization', `Bearer ${getApiKey()}`)
@@ -101,55 +117,54 @@ async function veniceFetch(path: string, options: VeniceFetchOptions): Promise<R
     headers.set('Content-Type', 'application/json')
   }
 
-  let lastErr: unknown
+  let lastError: unknown
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const res = await fetch(`${BASE_URL}${path}`, { ...fetchOptions, method, headers })
-      if (res.ok) return res
+      const response = await fetch(`${BASE_URL}${path}`, { ...fetchOptions, method, headers })
+      if (response.ok) return response
 
-      if (res.status === 429) {
-        const err = await parseError(res)
-        err.message = err.message || 'Rate limited. Wait and retry manually.'
-        throw err
+      if (response.status === 429) {
+        const error = await parseError(response)
+        error.message = error.message || 'Rate limited. Wait and retry manually.'
+        throw error
       }
 
-      if (!RETRY_STATUSES.has(res.status) || attempt === retries) throw await parseError(res)
+      if (!RETRY_STATUSES.has(response.status) || attempt === retries) throw await parseError(response)
 
-      try { await res.arrayBuffer() } catch { /* noop */ }
-      await sleep(backoffDelay(attempt, res.headers.get('Retry-After')))
+      try { await response.arrayBuffer() } catch { /* noop */ }
+      await sleep(backoffDelay(attempt, response.headers.get('Retry-After')))
       continue
     } catch (err) {
-      lastErr = err
+      lastError = err
       if (err instanceof VeniceAPIError) throw err
       if (err instanceof DOMException && err.name === 'AbortError') throw err
       if (attempt === retries) break
       await sleep(backoffDelay(attempt))
     }
-    void stream
   }
-  throw lastErr instanceof Error ? lastErr : new VeniceAPIError('Network error', 0)
+  throw lastError instanceof Error ? lastError : new VeniceAPIError('Network error', 0)
 }
 
 export async function venice<T>(path: string, options: VeniceFetchOptions = {}): Promise<T> {
-  const res = await veniceFetch(path, options)
-  if (options.stream) return res.body as unknown as T
-  return res.json() as Promise<T>
+  const response = await veniceFetch(path, options)
+  if (options.stream) return response.body as unknown as T
+  return response.json() as Promise<T>
 }
 
 export async function veniceFormData<T>(path: string, formData: FormData, init: { signal?: AbortSignal } = {}): Promise<T> {
-  const res = await veniceFetch(path, {
+  const response = await veniceFetch(path, {
     method: 'POST',
     body: formData,
     signal: init.signal,
   })
-  return res.json() as Promise<T>
+  return response.json() as Promise<T>
 }
 
 export async function veniceBlob(path: string, body: object, init: { signal?: AbortSignal } = {}): Promise<Blob> {
-  const res = await veniceFetch(path, {
+  const response = await veniceFetch(path, {
     method: 'POST',
     body: JSON.stringify(body),
     signal: init.signal,
   })
-  return res.blob()
+  return response.blob()
 }
