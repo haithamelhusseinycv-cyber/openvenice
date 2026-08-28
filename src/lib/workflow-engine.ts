@@ -24,17 +24,17 @@ export class WorkflowExecutionError extends Error {
 function topoLevels(nodes: Node<VeniceNodeData>[], edges: Edge[]): string[][] | null {
   const inDegree = new Map<string, number>()
   const adj = new Map<string, string[]>()
-  for (const n of nodes) {
-    inDegree.set(n.id, 0)
-    adj.set(n.id, [])
+  for (const node of nodes) {
+    inDegree.set(node.id, 0)
+    adj.set(node.id, [])
   }
-  for (const e of edges) {
-    if (!inDegree.has(e.source) || !inDegree.has(e.target)) continue
-    adj.get(e.source)!.push(e.target)
-    inDegree.set(e.target, (inDegree.get(e.target) ?? 0) + 1)
+  for (const edge of edges) {
+    if (!inDegree.has(edge.source) || !inDegree.has(edge.target)) continue
+    adj.get(edge.source)!.push(edge.target)
+    inDegree.set(edge.target, (inDegree.get(edge.target) ?? 0) + 1)
   }
   const levels: string[][] = []
-  let frontier = nodes.filter((n) => (inDegree.get(n.id) ?? 0) === 0).map((n) => n.id)
+  let frontier = nodes.filter((node) => (inDegree.get(node.id) ?? 0) === 0).map((node) => node.id)
   let visited = 0
   while (frontier.length > 0) {
     levels.push(frontier)
@@ -42,9 +42,9 @@ function topoLevels(nodes: Node<VeniceNodeData>[], edges: Edge[]): string[][] | 
     const next: string[] = []
     for (const id of frontier) {
       for (const child of adj.get(id) ?? []) {
-        const d = (inDegree.get(child) ?? 1) - 1
-        inDegree.set(child, d)
-        if (d === 0) next.push(child)
+        const degree = (inDegree.get(child) ?? 1) - 1
+        inDegree.set(child, degree)
+        if (degree === 0) next.push(child)
       }
     }
     frontier = next
@@ -53,8 +53,8 @@ function topoLevels(nodes: Node<VeniceNodeData>[], edges: Edge[]): string[][] | 
 }
 
 function getInputs(nodeId: string, edges: Edge[], outputs: Map<string, string>): string {
-  const parentEdges = edges.filter((e) => e.target === nodeId)
-  const inputs = parentEdges.map((e) => outputs.get(e.source) ?? '').filter(Boolean)
+  const parentEdges = edges.filter((edge) => edge.target === nodeId)
+  const inputs = parentEdges.map((edge) => outputs.get(edge.source) ?? '').filter(Boolean)
   return inputs.join('\n\n')
 }
 
@@ -79,7 +79,7 @@ async function executeNode(
 
     case 'chat': {
       const prompt = resolvePrompt(data.prompt, input)
-      const resp = await venice<ChatCompletionResponse>('/chat/completions', {
+      const response = await venice<ChatCompletionResponse>('/chat/completions', {
         method: 'POST',
         body: JSON.stringify({
           model: resolveChatModel(data.model || DEFAULT_CHAT_MODEL_ID),
@@ -90,7 +90,11 @@ async function executeNode(
         }),
         signal,
       })
-      return resp.choices[0]?.message?.content ?? ''
+      const content = response.choices[0]?.message?.content
+      if (typeof content !== 'string') {
+        throw new WorkflowExecutionError('Chat model returned no usable text response.', node.id)
+      }
+      return content
     }
 
     case 'imageGen': {
@@ -100,20 +104,33 @@ async function executeNode(
         prompt,
         negative_prompt: data.negativePrompt || undefined,
         steps: data.steps ?? 20,
-        width: data.width ?? 1024,
-        height: data.height ?? 1024,
         hide_watermark: data.hideWatermark ?? true,
         safe_mode: false,
         enhance_prompt: false,
       }
-      if (data.aspectRatio) body.aspect_ratio = data.aspectRatio
-      const resp = await venice<ImageGenerateResponse>('/image/generate', {
+
+      // Venice image generation should receive either aspect_ratio or explicit
+      // dimensions, not conflicting sizing instructions from a legacy workflow.
+      if (data.aspectRatio) {
+        body.aspect_ratio = data.aspectRatio
+      } else {
+        body.width = data.width ?? 1024
+        body.height = data.height ?? 1024
+      }
+
+      const response = await venice<ImageGenerateResponse>('/image/generate', {
         method: 'POST',
         body: JSON.stringify(body),
         signal,
       })
-      const img = resp.images[0]
-      const b64 = typeof img === 'string' ? img : img.b64_json
+      const image = response.images?.[0]
+      if (!image) {
+        throw new WorkflowExecutionError('Image model returned no image.', node.id)
+      }
+      const b64 = typeof image === 'string' ? image : image.b64_json
+      if (!b64) {
+        throw new WorkflowExecutionError('Image model returned an empty image payload.', node.id)
+      }
       const mime = b64.startsWith('/9j/') ? 'image/jpeg'
         : b64.startsWith('iVBOR') ? 'image/png'
         : b64.startsWith('UklGR') ? 'image/webp'
@@ -154,10 +171,10 @@ export async function executeWorkflow(
   if (!levels) throw new WorkflowExecutionError('Workflow contains a cycle.')
 
   const outputs = new Map<string, string>()
-  const nodeMap = new Map(nodes.map((n) => [n.id, n]))
+  const nodeMap = new Map(nodes.map((node) => [node.id, node]))
 
   for (const level of levels) {
-    if (signal?.aborted) return
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
     await Promise.all(level.map(async (nodeId) => {
       const node = nodeMap.get(nodeId)
       if (!node) return
