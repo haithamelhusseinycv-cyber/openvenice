@@ -10,16 +10,8 @@ import { toast } from '../../stores/toast-store'
 type Tool = 'edit' | 'upscale' | 'remove-bg'
 
 const EDIT_MODELS = [
-  { value: 'qwen-edit', label: 'Qwen Edit' },
-  { value: 'qwen-image-2-edit', label: 'Qwen Image 2 Edit' },
-  { value: 'qwen-image-2-pro-edit', label: 'Qwen Image 2 Pro Edit' },
-  { value: 'flux-2-max-edit', label: 'Flux 2 Max Edit' },
-  { value: 'gpt-image-1-5-edit', label: 'GPT Image 1.5 Edit' },
-  { value: 'grok-imagine-edit', label: 'Grok Imagine Edit' },
-  { value: 'nano-banana-2-edit', label: 'Nano Banana 2 Edit' },
-  { value: 'nano-banana-pro-edit', label: 'Nano Banana Pro Edit' },
-  { value: 'seedream-v4-edit', label: 'Seedream V4 Edit' },
-  { value: 'seedream-v5-lite-edit', label: 'Seedream V5 Lite Edit' },
+  { value: 'qwen-edit-uncensored', label: 'Qwen Edit Uncensored' },
+  { value: 'firered-image-edit', label: 'FireRed Edit' },
 ]
 
 export function ImageTools() {
@@ -32,7 +24,7 @@ export function ImageTools() {
 
   // Edit state
   const [editPrompt, setEditPrompt] = useState('')
-  const [editModel, setEditModel] = useState('qwen-edit')
+  const [editModel, setEditModel] = useState('qwen-edit-uncensored')
 
   // Upscale state
   const [scale, setScale] = useState(2)
@@ -62,7 +54,16 @@ export function ImageTools() {
       onError: (err: unknown) => toast.fromError(err, 'Image tool failed'),
     }
     if (tool === 'edit') {
-      editMutation.mutate({ image: imageData, prompt: editPrompt.trim(), modelId: editModel }, opts)
+      editMutation.mutate(
+  {
+    images: [imageData],
+    prompt: editPrompt.trim(),
+    modelId: editModel,
+    aspect_ratio: 'auto',
+    safe_mode: false,
+  },
+  opts
+)
     } else if (tool === 'upscale') {
       upscaleMutation.mutate(
         { image: imageData, scale, enhance, enhanceCreativity: enhance ? enhanceCreativity : undefined, enhancePrompt: enhance && enhancePrompt.trim() ? enhancePrompt.trim() : undefined },
