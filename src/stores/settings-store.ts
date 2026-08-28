@@ -13,10 +13,9 @@ import {
 export type Tab = 'chat' | 'image' | 'audio' | 'music' | 'video' | 'embeddings' | 'workflows' | 'playground'
 
 export function sanitizeSelectedModels(selected: Record<string, string> | undefined): Record<string, string> {
-  const next = { ...(selected || {}) }
-  if (!isAllowedChatModel(next.chat)) next.chat = DEFAULT_CHAT_MODEL_ID
-  if (!isAllowedImageModel(next.image)) next.image = DEFAULT_IMAGE_MODEL_ID
-  return next
+  const chat = isAllowedChatModel(selected?.chat) ? selected!.chat : DEFAULT_CHAT_MODEL_ID
+  const image = isAllowedImageModel(selected?.image) ? selected!.image : DEFAULT_IMAGE_MODEL_ID
+  return { chat, image }
 }
 
 export function sanitizeActiveTab(tab: unknown): Tab {
@@ -42,29 +41,29 @@ export const useSettingsStore = create<SettingsState>()(
       setActiveTab: (tab) => set({ activeTab: sanitizeActiveTab(tab) }),
       sidebarOpen: true,
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
-      toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
+      toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
       selectedModels: {
         chat: DEFAULT_CHAT_MODEL_ID,
         image: DEFAULT_IMAGE_MODEL_ID,
       },
       setSelectedModel: (tab, modelId) =>
-        set((s) => ({
-          selectedModels: sanitizeSelectedModels({ ...s.selectedModels, [tab]: modelId }),
+        set((state) => ({
+          selectedModels: sanitizeSelectedModels({ ...state.selectedModels, [tab]: modelId }),
         })),
       playgroundAgentModel: DEFAULT_CHAT_MODEL_ID,
       setPlaygroundAgentModel: (modelId) => set({ playgroundAgentModel: resolveChatModel(modelId) }),
     }),
     {
       name: 'venice-settings',
-      version: 3,
+      version: 4,
       storage: createJSONStorage(() => createSafeStorage()),
       migrate: (persisted) => {
         if (!persisted || typeof persisted !== 'object') return persisted as SettingsState
-        const s = persisted as Partial<SettingsState>
-        s.selectedModels = sanitizeSelectedModels(s.selectedModels)
-        s.activeTab = sanitizeActiveTab(s.activeTab)
-        s.playgroundAgentModel = resolveChatModel(s.playgroundAgentModel)
-        return s as SettingsState
+        const state = persisted as Partial<SettingsState>
+        state.selectedModels = sanitizeSelectedModels(state.selectedModels)
+        state.activeTab = sanitizeActiveTab(state.activeTab)
+        state.playgroundAgentModel = resolveChatModel(state.playgroundAgentModel)
+        return state as SettingsState
       },
     },
   ),
