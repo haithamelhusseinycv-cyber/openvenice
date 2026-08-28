@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
+import type { ImageToolId } from '../../stores/image-workspace-store'
 import { useSettingsStore } from '../../stores/settings-store'
 import { useModels } from '../../hooks/use-models'
 import { useImageGenerate } from '../../hooks/use-image'
@@ -79,11 +80,14 @@ const model =
   const [variants, setVariants] = useState(1)
   const [images, setImages] = useState<string[]>([])
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
-useEffect(() => {
-  setSteps(defaultSteps)
-  setAspectRatio('')
-  setResolution('')
-}, [model, defaultSteps])
+  const modelResetKey = `${model}:${defaultSteps}`
+  const [boundModelKey, setBoundModelKey] = useState(modelResetKey)
+  if (boundModelKey !== modelResetKey) {
+    setBoundModelKey(modelResetKey)
+    setSteps(defaultSteps)
+    setAspectRatio('')
+    setResolution('')
+  }
 
   useEffect(() => {
     try {
@@ -106,10 +110,21 @@ useEffect(() => {
     return constraints!.resolutions!.map((r) => ({ value: r, label: r }))
   }, [constraints, hasResolutions])
 
-  const sendToEdit = useImageWorkspace((s) => s.sendToEdit)
+  const sendToTool = useImageWorkspace((s) => s.sendToTool)
+  const [undressTarget, setUndressTarget] = useState<{ src: string; name: string } | null>(null)
 
-  const editGenerated = (b64: string, index?: number) => {
-    sendToEdit(toImageSrc(b64), `generated${index !== undefined ? `-${index + 1}` : ''}.png`)
+  const fileName = (index?: number) =>
+    `generated${index !== undefined ? `-${index + 1}` : ''}.png`
+
+  const sendGenerated = (tool: ImageToolId, b64: string, index?: number) => {
+    sendToTool(tool, toImageSrc(b64), fileName(index))
+  }
+
+  const confirmUndress = () => {
+    if (!undressTarget) return
+    sendToTool('undress', undressTarget.src, undressTarget.name)
+    setUndressTarget(null)
+    setSelectedImage(null)
   }
 
   const downloadImage = (b64: string, index?: number) => {
@@ -199,8 +214,14 @@ useEffect(() => {
           <div className="relative" onClick={(e) => e.stopPropagation()}>
             <img src={toImageSrc(selectedImage)} alt="Generated" className="max-w-[90vw] max-h-[90vh] rounded-xl shadow-2xl" />
             <div className="absolute top-3 right-3 flex gap-1.5">
-              <button onClick={() => editGenerated(selectedImage)} aria-label="Send to Edit" className="px-2 py-2 bg-black/60 hover:bg-black/80 rounded-lg text-[12px] text-white/80 hover:text-white transition-colors backdrop-blur-sm">
+              <button onClick={() => sendGenerated('edit', selectedImage)} aria-label="Send to Edit" className="px-2 py-2 bg-black/60 hover:bg-black/80 rounded-lg text-[12px] text-white/80 hover:text-white transition-colors backdrop-blur-sm">
                 Edit
+              </button>
+              <button onClick={() => sendGenerated('swap', selectedImage)} aria-label="Send to Swap" className="px-2 py-2 bg-black/60 hover:bg-black/80 rounded-lg text-[12px] text-white/80 hover:text-white transition-colors backdrop-blur-sm">
+                Swap
+              </button>
+              <button onClick={() => setUndressTarget({ src: toImageSrc(selectedImage), name: fileName() })} aria-label="Send to Undress" className="px-2 py-2 bg-black/60 hover:bg-black/80 rounded-lg text-[12px] text-white/80 hover:text-white transition-colors backdrop-blur-sm">
+                Undress
               </button>
               <button onClick={() => downloadImage(selectedImage)} aria-label="Download" className="p-2 bg-black/60 hover:bg-black/80 rounded-lg text-white/70 hover:text-white transition-colors backdrop-blur-sm">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
@@ -236,12 +257,28 @@ useEffect(() => {
               />
               <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
               <button
-                onClick={(e) => { e.stopPropagation(); editGenerated(img, i) }}
+                onClick={(e) => { e.stopPropagation(); sendGenerated('edit', img, i) }}
                 aria-label="Send to Edit"
                 className="px-1.5 py-1 bg-black/60 hover:bg-black/85 rounded-lg text-[11px] text-white/80 hover:text-white backdrop-blur-sm"
                 title="Send to Edit"
               >
                 Edit
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); sendGenerated('swap', img, i) }}
+                aria-label="Send to Swap"
+                className="px-1.5 py-1 bg-black/60 hover:bg-black/85 rounded-lg text-[11px] text-white/80 hover:text-white backdrop-blur-sm"
+                title="Send to Swap"
+              >
+                Swap
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setUndressTarget({ src: toImageSrc(img), name: fileName(i) }) }}
+                aria-label="Send to Undress"
+                className="px-1.5 py-1 bg-black/60 hover:bg-black/85 rounded-lg text-[11px] text-white/80 hover:text-white backdrop-blur-sm"
+                title="Send to Undress"
+              >
+                Undress
               </button>
               <button
                 onClick={(e) => { e.stopPropagation(); downloadImage(img, i) }}
@@ -259,5 +296,27 @@ useEffect(() => {
     </>
   )
 
-  return <GenerationView controls={controls} output={output} />
+  return (
+    <>
+      {undressTarget && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm px-4" onClick={() => setUndressTarget(null)}>
+          <div className="w-full max-w-sm rounded-xl border border-white/[0.08] bg-[#121214] p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="text-[15px] font-semibold text-white/90">Adult confirmation</div>
+            <p className="mt-2 text-[13px] leading-relaxed text-white/55">
+              Undress is adult-only image editing. Confirm you are 18 or older and that you want to send this generated image to the Undress tool.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" onClick={() => setUndressTarget(null)} className="px-3 py-1.5 rounded-lg text-[13px] text-white/50 hover:text-white/80">
+                Cancel
+              </button>
+              <button type="button" onClick={confirmUndress} className="px-3 py-1.5 rounded-lg bg-white text-black text-[13px] font-medium">
+                I am 18+ / send to Undress
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <GenerationView controls={controls} output={output} />
+    </>
+  )
 }
