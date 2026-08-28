@@ -1,6 +1,6 @@
 import type { Node, Edge } from '@xyflow/react'
 import type { VeniceNodeData } from '../stores/workflow-store'
-import { NODE_SCHEMAS, isInputCompatible, isIdealMatch } from './workflow-schema'
+import { NODE_SCHEMAS, NODE_TYPES, isInputCompatible, isIdealMatch } from './workflow-schema'
 
 export type ValidationSeverity = 'error' | 'warning'
 
@@ -65,6 +65,14 @@ export function validateWorkflow({ nodes, edges }: WFGraph): ValidationResult {
     const schema = NODE_SCHEMAS[n.data?.nodeType]
     if (!schema) {
       errors.push({ severity: 'error', nodeId: n.id, message: `Unknown node type: ${String(n.data?.nodeType)}` })
+      continue
+    }
+    if (!(NODE_TYPES as readonly string[]).includes(n.data.nodeType)) {
+      errors.push({
+        severity: 'error',
+        nodeId: n.id,
+        message: `${schema.label} nodes are disabled in this build. Use Chat and Image Gen only.`,
+      })
       continue
     }
 

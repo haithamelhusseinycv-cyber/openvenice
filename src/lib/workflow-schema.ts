@@ -1,4 +1,10 @@
 import type { VeniceNodeType } from '../stores/workflow-store'
+import {
+  DEFAULT_CHAT_MAX_TOKENS,
+  DEFAULT_CHAT_MODEL_ID,
+  DEFAULT_IMAGE_MODEL_ID,
+  ENABLED_WORKFLOW_NODE_TYPES,
+} from './allowed-models'
 
 export type IOKind = 'text' | 'image' | 'audio' | 'video' | 'none'
 
@@ -56,10 +62,10 @@ export const NODE_SCHEMAS: Record<VeniceNodeType, NodeSchema> = {
     input: 'text',
     output: 'text',
     params: [
-      { name: 'model', type: 'string', description: 'Venice chat model id.', required: true, default: 'llama-3.3-70b' },
+      { name: 'model', type: 'string', description: 'Venice chat model id.', required: true, default: DEFAULT_CHAT_MODEL_ID },
       { name: 'prompt', type: 'text', description: 'Instruction. Use {{input}} to position upstream text, or leave empty to append.', required: true, default: '' },
       { name: 'temperature', type: 'number', description: 'Sampling temperature.', default: 0.7, min: 0, max: 2 },
-      { name: 'maxTokens', type: 'number', description: 'Max output tokens.', default: 4096, min: 64, max: 32768 },
+      { name: 'maxTokens', type: 'number', description: 'Max output tokens.', default: DEFAULT_CHAT_MAX_TOKENS, min: 64, max: 32768 },
       { name: 'webSearch', type: 'enum', description: 'Enable Venice web search.', default: 'off', enumValues: WEB_SEARCH_VALUES },
     ],
   },
@@ -70,13 +76,12 @@ export const NODE_SCHEMAS: Record<VeniceNodeType, NodeSchema> = {
     input: 'text',
     output: 'image',
     params: [
-      { name: 'model', type: 'string', description: 'Venice image model id.', required: true, default: 'z-image-turbo' },
+      { name: 'model', type: 'string', description: 'Venice image model id.', required: true, default: DEFAULT_IMAGE_MODEL_ID },
       { name: 'prompt', type: 'text', description: 'Image prompt. Use {{input}} to position upstream text.', required: true, default: '' },
       { name: 'negativePrompt', type: 'string', description: 'What to avoid.', default: '' },
       { name: 'steps', type: 'number', description: 'Denoising steps.', default: 20, min: 1, max: 50 },
       { name: 'width', type: 'number', description: 'Image width in pixels.', default: 1024, min: 256, max: 2048 },
       { name: 'height', type: 'number', description: 'Image height in pixels.', default: 1024, min: 256, max: 2048 },
-      { name: 'style', type: 'string', description: 'Style preset name.', default: '' },
       { name: 'hideWatermark', type: 'boolean', description: 'Omit watermark if allowed.', default: true },
     ],
   },
@@ -124,7 +129,7 @@ export const NODE_SCHEMAS: Record<VeniceNodeType, NodeSchema> = {
   },
 }
 
-export const NODE_TYPES: readonly VeniceNodeType[] = Object.keys(NODE_SCHEMAS) as VeniceNodeType[]
+export const NODE_TYPES: readonly VeniceNodeType[] = ENABLED_WORKFLOW_NODE_TYPES
 
 export function getNodeSchema(type: VeniceNodeType): NodeSchema {
   return NODE_SCHEMAS[type]
