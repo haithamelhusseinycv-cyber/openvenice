@@ -1,5 +1,6 @@
 import { useQueries } from '@tanstack/react-query'
 import { venice } from '../lib/venice-client'
+import { useAuthStore } from '../stores/auth-store'
 import type { ModelsResponse } from '../types/venice'
 import {
   ALLOWED_CHAT_MODEL_IDS,
@@ -25,10 +26,12 @@ function extractAllowed(resp: ModelsResponse | undefined, allowed: readonly stri
 }
 
 export function useModelCatalog() {
+  const hasApiKey = useAuthStore((state) => state.apiKey !== null)
   const queries = useQueries({
     queries: (['text', 'image'] as const).map((type) => ({
       queryKey: ['models', type],
-      queryFn: () => venice<ModelsResponse>(`/models?type=${type}`, { noAuth: true }),
+      queryFn: () => venice<ModelsResponse>(`/models?type=${type}`),
+      enabled: hasApiKey,
       staleTime: 10 * 60 * 1000,
     })),
   })
@@ -41,6 +44,6 @@ export function useModelCatalog() {
     video: [],
   }
 
-  const isLoading = queries.some((q) => q.isLoading)
+  const isLoading = hasApiKey && queries.some((q) => q.isLoading)
   return { catalog, isLoading }
 }
