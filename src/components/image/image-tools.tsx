@@ -69,10 +69,13 @@ function clearFileInput(input: HTMLInputElement | null) {
 
 export function ImageTools() {
   const apiKey = useAuthStore((s) => s.apiKey)
-  const [pending] = useState(() => useImageWorkspace.getState().consumePendingSource())
+  const [pending] = useState(() => useImageWorkspace.getState().pendingSource)
   const [tool, setTool] = useState<Tool>(pending?.tool ?? 'edit')
   const [imageData, setImageData] = useState<string | null>(pending?.data ?? null)
   const [imageName, setImageName] = useState(pending?.name ?? '')
+  useEffect(() => {
+    if (pending) useImageWorkspace.getState().clearPendingSource()
+  }, [pending])
   const [idImage, setIdImage] = useState<string | null>(null)
   const [idName, setIdName] = useState('')
   const [resultUrl, setResultBlob, resetResult] = useBlobUrl()
