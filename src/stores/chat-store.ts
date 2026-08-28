@@ -2,7 +2,8 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import type { ChatMessage, Conversation, VeniceParameters } from '../types/venice'
 import { generateId } from '../lib/utils'
-import { createSafeStorage } from '../lib/safe-storage'
+import { createIndexedDBStorage } from '../lib/indexeddb-storage'
+import { DEFAULT_CHAT_MAX_TOKENS, resolveChatModel } from '../lib/allowed-models'
 
 interface ChatState {
   conversations: Conversation[]
@@ -30,6 +31,14 @@ interface ChatState {
   getActiveConversation: () => Conversation | undefined
 }
 
+function sanitizeConversations(conversations: Conversation[] | undefined): Conversation[] {
+  if (!Array.isArray(conversations)) return []
+  return conversations.slice(0, 50).map((conversation) => ({
+    ...conversation,
+    model: resolveChatModel(conversation.model),
+  }))
+}
+
 export const useChatStore = create<ChatState>()(
   persist(
     (set, get) => ({
@@ -43,19 +52,19 @@ export const useChatStore = create<ChatState>()(
       systemPrompt: '',
       temperature: 0.7,
       topP: 1,
-      maxTokens: 1024,
+      maxTokens: DEFAULT_CHAT_MAX_TOKENS,
 
       createConversation: (model) => {
         const id = generateId()
-        const conv: Conversation = {
+        const conversation: Conversation = {
           id,
           title: 'New Chat',
           messages: [],
-          model,
+          model: resolveChatModel(model),
           createdAt: Date.now(),
         }
-        set((s) => ({
-          conversations: [conv, ...s.conversations],
+        set((state) => ({
+          conversations: [conversation, ...state.conversations],
           activeConversationId: id,
         }))
         return id
@@ -64,21 +73,19 @@ export const useChatStore = create<ChatState>()(
       setActiveConversation: (id) => set({ activeConversationId: id }),
 
       deleteConversation: (id) =>
-        set((s) => ({
-          conversations: s.conversations.filter((c) => c.id !== id),
-          activeConversationId:
-            s.activeConversationId === id ? null : s.activeConversationId,
+        set((state) => ({
+          conversations: state.conversations.filter((conversation) => conversation.id !== id),
+          activeConversationId: state.activeConversationId === id ? null : state.activeConversationId,
         })),
 
       addMessage: (conversationId, message) =>
-        set((s) => ({
-          conversations: s.conversations.map((c) => {
-            if (c.id !== conversationId) return c
-            const updated = { ...c, messages: [...c.messages, message] }
-            // Auto-title from first user message
+        set((state) => ({
+          conversations: state.conversations.map((conversation) => {
+            if (conversation.id !== conversationId) return conversation
+            const updated = { ...conversation, messages: [...conversation.messages, message] }
             if (
               message.role === 'user' &&
-              c.messages.length === 0 &&
+              conversation.messages.length === 0 &&
               typeof message.content === 'string'
             ) {
               updated.title = message.content.slice(0, 50) || 'New Chat'
@@ -88,76 +95,75 @@ export const useChatStore = create<ChatState>()(
         })),
 
       appendToLastAssistant: (conversationId, token) =>
-        set((s) => ({
-          conversations: s.conversations.map((c) => {
-            if (c.id !== conversationId) return c
-            const msgs = [...c.messages]
-            const last = msgs[msgs.length - 1]
+        set((state) => ({
+          conversations: state.conversations.map((conversation) => {
+            if (conversation.id !== conversationId) return conversation
+            const messages = [...conversation.messages]
+            const last = messages[messages.length - 1]
             if (last?.role === 'assistant' && typeof last.content === 'string') {
-              msgs[msgs.length - 1] = { ...last, content: last.content + token }
+              messages[messages.length - 1] = { ...last, content: last.content + token }
             }
-            return { ...c, messages: msgs }
+            return { ...conversation, messages }
           }),
         })),
 
       appendReasoningToLastAssistant: (conversationId, token) =>
-        set((s) => ({
-          conversations: s.conversations.map((c) => {
-            if (c.id !== conversationId) return c
-            const msgs = [...c.messages]
-            const last = msgs[msgs.length - 1]
+        set((state) => ({
+          conversations: state.conversations.map((conversation) => {
+            if (conversation.id !== conversationId) return conversation
+            const messages = [...conversation.messages]
+            const last = messages[messages.length - 1]
             if (last?.role === 'assistant') {
-              msgs[msgs.length - 1] = { ...last, reasoning_content: (last.reasoning_content || '') + token }
+              messages[messages.length - 1] = {
+                ...last,
+                reasoning_content: (last.reasoning_content || '') + token,
+              }
             }
-            return { ...c, messages: msgs }
+            return { ...conversation, messages }
           }),
         })),
 
       deleteMessage: (conversationId, index) =>
-        set((s) => ({
-          conversations: s.conversations.map((c) => {
-            if (c.id !== conversationId) return c
-            const msgs = c.messages.filter((_, i) => i !== index)
-            return { ...c, messages: msgs }
-          }),
+        set((state) => ({
+          conversations: state.conversations.map((conversation) =>
+            conversation.id === conversationId
+              ? { ...conversation, messages: conversation.messages.filter((_, messageIndex) => messageIndex !== index) }
+              : conversation,
+          ),
         })),
 
       setStreaming: (streaming) => set({ isStreaming: streaming }),
-
-      setVeniceParams: (params) =>
-        set((s) => ({ veniceParams: { ...s.veniceParams, ...params } })),
-
+      setVeniceParams: (params) => set((state) => ({ veniceParams: { ...state.veniceParams, ...params } })),
       setSystemPrompt: (prompt) => set({ systemPrompt: prompt }),
-      setTemperature: (t) => set({ temperature: t }),
-      setTopP: (p) => set({ topP: p }),
-      setMaxTokens: (t) => set({ maxTokens: t }),
+      setTemperature: (temperature) => set({ temperature }),
+      setTopP: (topP) => set({ topP }),
+      setMaxTokens: (maxTokens) => set({ maxTokens }),
 
       getActiveConversation: () => {
         const { conversations, activeConversationId } = get()
-        return conversations.find((c) => c.id === activeConversationId)
+        return conversations.find((conversation) => conversation.id === activeConversationId)
       },
     }),
     {
       name: 'venice-chat',
-      version: 3,
-      storage: createJSONStorage(() => createSafeStorage()),
+      version: 4,
+      storage: createJSONStorage(() => createIndexedDBStorage()),
       migrate: (persisted, version) => {
-        // v1 → v2: trim conversations to 50, ensure veniceParams shape
         if (!persisted || typeof persisted !== 'object') return persisted as ChatState
-        const s = persisted as Partial<ChatState>
-        if (Array.isArray(s.conversations)) s.conversations = s.conversations.slice(0, 50)
-        if (!s.veniceParams || typeof s.veniceParams !== 'object') {
-          s.veniceParams = { include_venice_system_prompt: false, enable_web_search: 'off' }
+        const state = persisted as Partial<ChatState>
+        state.conversations = sanitizeConversations(state.conversations)
+        if (!state.veniceParams || typeof state.veniceParams !== 'object') {
+          state.veniceParams = { include_venice_system_prompt: false, enable_web_search: 'off' }
         }
-        if (version < 2) {
-          delete (s as Record<string, unknown>).isStreaming
+        if (version < 2) delete (state as Record<string, unknown>).isStreaming
+        if (version < 3 && (state.maxTokens === undefined || state.maxTokens === 4096)) {
+          state.maxTokens = DEFAULT_CHAT_MAX_TOKENS
         }
-        if (version < 3) {
-          if (s.maxTokens === undefined || s.maxTokens === 4096) {
-            s.maxTokens = 1024
-          }
+        if (state.maxTokens === undefined) state.maxTokens = DEFAULT_CHAT_MAX_TOKENS
+        if (state.activeConversationId && !state.conversations.some((conversation) => conversation.id === state.activeConversationId)) {
+          state.activeConversationId = null
         }
-        return s as ChatState
+        return state as ChatState
       },
       partialize: (state) => ({
         conversations: state.conversations.slice(0, 50),
