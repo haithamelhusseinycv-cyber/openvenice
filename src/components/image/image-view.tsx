@@ -222,7 +222,7 @@ export function ImageView() {
               <button onClick={() => sendGenerated('swap', selectedImage)} aria-label="Send to Swap" className="px-2 py-2 bg-black/60 hover:bg-black/80 rounded-lg text-[12px] text-white/80 hover:text-white transition-colors backdrop-blur-sm">Swap</button>
               <button onClick={() => setUndressTarget({ src: toImageSrc(selectedImage), name: handoffName() })} aria-label="Send to Undress" className="px-2 py-2 bg-black/60 hover:bg-black/80 rounded-lg text-[12px] text-white/80 hover:text-white transition-colors backdrop-blur-sm">Undress</button>
               <button onClick={() => downloadImage(selectedImage)} aria-label="Download" className="p-2 bg-black/60 hover:bg-black/80 rounded-lg text-white/70 hover:text-white transition-colors backdrop-blur-sm">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 012-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
               </button>
               <button onClick={() => setSelectedImage(null)} aria-label="Close" className="p-2 bg-black/60 hover:bg-black/80 rounded-lg text-white/70 hover:text-white transition-colors backdrop-blur-sm">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
@@ -270,7 +270,7 @@ export function ImageView() {
                   <button onClick={(e) => { e.stopPropagation(); sendGenerated('swap', image, index) }} aria-label="Send to Swap" className="px-1.5 py-1 bg-black/70 hover:bg-black/90 rounded-lg text-[11px] text-white/80 hover:text-white backdrop-blur-sm">Swap</button>
                   <button onClick={(e) => { e.stopPropagation(); setUndressTarget({ src: toImageSrc(image), name: handoffName(index) }) }} aria-label="Send to Undress" className="px-1.5 py-1 bg-black/70 hover:bg-black/90 rounded-lg text-[11px] text-white/80 hover:text-white backdrop-blur-sm">Undress</button>
                   <button onClick={(e) => { e.stopPropagation(); downloadImage(image, index) }} aria-label="Download" className="p-1.5 bg-black/70 hover:bg-black/90 rounded-lg text-white/70 hover:text-white backdrop-blur-sm">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 012-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
                   </button>
                 </div>
               </div>
