@@ -9,15 +9,24 @@ export class VeniceAuthCheckError extends Error {
 
 /**
  * Venice's API-key guide recommends GET /models as the low-risk authenticated
- * request for verifying a bearer key. This helper deliberately avoids the normal
- * client because the candidate key has not been stored yet.
+ * request for verifying a bearer key. Restrict the response to text models and
+ * bypass browser caching so every Connect attempt checks the candidate key.
+ * This deliberately avoids the normal client because the key is not stored yet.
  */
 export async function validateVeniceApiKey(key: string, signal?: AbortSignal): Promise<void> {
+  const candidate = key.trim()
+  if (!candidate) throw new VeniceAuthCheckError('Enter a Venice API key.')
+
   let response: Response
   try {
-    response = await fetch(`${VENICE_BASE_URL}/models`, {
+    response = await fetch(`${VENICE_BASE_URL}/models?type=text`, {
       method: 'GET',
-      headers: { Authorization: `Bearer ${key.trim()}` },
+      headers: {
+        Authorization: `Bearer ${candidate}`,
+        Accept: 'application/json',
+      },
+      cache: 'no-store',
+      credentials: 'omit',
       signal,
     })
   } catch (err) {
