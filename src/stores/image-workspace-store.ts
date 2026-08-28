@@ -15,6 +15,7 @@ interface ImageWorkspaceState {
   pendingSource: PendingSource | null
   sendToTool: (tool: ImageToolId, data: string, name?: string) => void
   sendToEdit: (data: string, name?: string) => void
+  clearPendingSource: () => void
   consumePendingSource: () => PendingSource | null
 }
 
@@ -29,6 +30,7 @@ export const useImageWorkspace = create<ImageWorkspaceState>((set, get) => ({
     }),
   sendToEdit: (data, name = 'generated.png') =>
     get().sendToTool('edit', data, name),
+  clearPendingSource: () => set({ pendingSource: null }),
   consumePendingSource: () => {
     const pending = get().pendingSource
     if (pending) set({ pendingSource: null })
