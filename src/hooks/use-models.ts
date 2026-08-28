@@ -78,7 +78,7 @@ const PRIORITY: Record<VeniceType, string[]> = {
     'Venice Role Play Uncensored',
     'qwen-3-6-plus',
     'Qwen 3.6 Plus Uncensored',
-    'olafangensn-glm-4-7-flash-heretic',
+    'olafangensan-glm-4-7-flash-heretic',
     'GLM 4.7 Flash Heretic',
   ],
 }
