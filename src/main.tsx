@@ -11,11 +11,13 @@ const queryClient = new QueryClient({
       retry: 1,
       refetchOnWindowFocus: false,
     },
+    mutations: {
+      retry: 0,
+    },
   },
 })
 
 window.addEventListener('unhandledrejection', (e) => {
-  // Surface promise rejections in dev; don't crash the app.
   console.error('[unhandledrejection]', e.reason)
 })
 
