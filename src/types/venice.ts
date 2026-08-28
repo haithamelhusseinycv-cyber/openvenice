@@ -150,6 +150,7 @@ export interface ImageGenerateRequest {
   format?: 'jpeg' | 'png' | 'webp'
   variants?: number
   safe_mode?: boolean
+  enhance_prompt?: boolean
   hide_watermark?: boolean
   aspect_ratio?: string
   resolution?: string
