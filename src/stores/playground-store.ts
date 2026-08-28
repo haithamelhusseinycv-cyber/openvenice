@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import type { Node, Edge } from '@xyflow/react'
 import type { VeniceNodeData, NodeResult } from './workflow-store'
+import { sanitizeWorkflowNodes } from './workflow-store'
 import { applyPatches, type WorkflowPatch, type PatchResult } from '../lib/workflow-mutations'
 import { createSafeStorage } from '../lib/safe-storage'
 
@@ -22,9 +23,11 @@ export interface PlaygroundMessage {
   pending?: boolean
 }
 
+type PlaygroundDraft = { nodes: Node<VeniceNodeData>[]; edges: Edge[] }
+
 interface PlaygroundState {
   messages: PlaygroundMessage[]
-  draft: { nodes: Node<VeniceNodeData>[]; edges: Edge[] }
+  draft: PlaygroundDraft
   linkedWorkflowId: string | null
   isThinking: boolean
   runResults: Record<string, NodeResult>
@@ -44,6 +47,15 @@ interface PlaygroundState {
   unlinkWorkflow: () => void
 }
 
+function sanitizeDraft(draft: PlaygroundDraft): PlaygroundDraft {
+  const nodes = sanitizeWorkflowNodes(Array.isArray(draft.nodes) ? draft.nodes : [])
+  const ids = new Set(nodes.map((node) => node.id))
+  const edges = (Array.isArray(draft.edges) ? draft.edges : []).filter(
+    (edge) => ids.has(edge.source) && ids.has(edge.target),
+  )
+  return { nodes, edges }
+}
+
 export const usePlaygroundStore = create<PlaygroundState>()(
   persist(
     (set, get) => ({
@@ -54,29 +66,31 @@ export const usePlaygroundStore = create<PlaygroundState>()(
       runResults: {},
       isRunning: false,
 
-      addMessage: (msg) => set((s) => ({ messages: [...s.messages, msg] })),
+      addMessage: (msg) => set((state) => ({ messages: [...state.messages, msg] })),
       updateMessage: (id, updates) =>
-        set((s) => ({
-          messages: s.messages.map((m) => (m.id === id ? { ...m, ...updates } : m)),
+        set((state) => ({
+          messages: state.messages.map((message) => (message.id === id ? { ...message, ...updates } : message)),
         })),
-      setThinking: (v) => set({ isThinking: v }),
+      setThinking: (value) => set({ isThinking: value }),
       applyAgentPatches: (patches) => {
-        const { nodes, edges } = get().draft
-        const result = applyPatches({ nodes, edges }, patches)
-        set({ draft: { nodes: result.nodes, edges: result.edges }, runResults: {} })
-        return result
+        const draft = sanitizeDraft(get().draft)
+        const result = applyPatches(draft, patches)
+        const nodes = sanitizeWorkflowNodes(result.nodes)
+        const next = { nodes, edges: result.edges }
+        set({ draft: next, runResults: {} })
+        return { ...result, nodes }
       },
       resetDraft: () => set({ draft: { nodes: [], edges: [] }, runResults: {}, linkedWorkflowId: null }),
       clearConversation: () => set({ messages: [], draft: { nodes: [], edges: [] }, runResults: {}, linkedWorkflowId: null }),
       setRunResults: (results) => set({ runResults: results }),
       updateRunNode: (nodeId, result) =>
-        set((s) => ({
-          runResults: { ...s.runResults, [nodeId]: { ...s.runResults[nodeId], ...result } as NodeResult },
+        set((state) => ({
+          runResults: { ...state.runResults, [nodeId]: { ...state.runResults[nodeId], ...result } as NodeResult },
         })),
       setIsRunning: (running) => set({ isRunning: running }),
       clearResults: () => set({ runResults: {} }),
       loadWorkflow: (workflowId, nodes, edges) => set({
-        draft: { nodes, edges },
+        draft: sanitizeDraft({ nodes, edges }),
         linkedWorkflowId: workflowId,
         runResults: {},
         messages: [],
@@ -85,9 +99,22 @@ export const usePlaygroundStore = create<PlaygroundState>()(
     }),
     {
       name: 'venice-playground',
-      version: 1,
+      version: 2,
       storage: createJSONStorage(() => createSafeStorage()),
-      partialize: (s) => ({ messages: s.messages.slice(-40), draft: s.draft, linkedWorkflowId: s.linkedWorkflowId }),
+      migrate: (persisted) => {
+        if (!persisted || typeof persisted !== 'object') return persisted as PlaygroundState
+        const state = persisted as Partial<PlaygroundState>
+        if (state.draft && typeof state.draft === 'object') {
+          state.draft = sanitizeDraft(state.draft as PlaygroundDraft)
+        }
+        if (Array.isArray(state.messages)) state.messages = state.messages.slice(-40)
+        return state as PlaygroundState
+      },
+      partialize: (state) => ({
+        messages: state.messages.slice(-40),
+        draft: state.draft,
+        linkedWorkflowId: state.linkedWorkflowId,
+      }),
     },
   ),
 )
