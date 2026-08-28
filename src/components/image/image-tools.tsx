@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useAuthStore } from '../../stores/auth-store'
 import { useImageEdit, useImageMultiEdit, useImageUpscale, useBackgroundRemove } from '../../hooks/use-image-tools'
 import { useBlobUrl } from '../../hooks/use-blob-url'
@@ -22,6 +22,15 @@ const SWAP_PROMPTS: Record<SwapKind, string> = {
   body: `Replace the body of the woman in image 1 with the body from image 2. Keep the face and hair of image 1. Keep image 1 pose, bed, lighting and camera. Photoreal blend at neck and shoulders. Do not change the face.`,
 }
 
+function loadSaved(key: string, fallback: string) {
+  try {
+    const saved = localStorage.getItem(key)
+    return saved ?? fallback
+  } catch {
+    return fallback
+  }
+}
+
 export function ImageTools() {
   const apiKey = useAuthStore((s) => s.apiKey)
   const [tool, setTool] = useState<Tool>('edit')
@@ -33,8 +42,18 @@ export function ImageTools() {
   const fileRef = useRef<HTMLInputElement>(null)
   const idFileRef = useRef<HTMLInputElement>(null)
 
-  const [editPrompt, setEditPrompt] = useState('')
+  const [editPrompt, setEditPrompt] = useState(() =>
+    loadSaved('venice-edit-prompt', '')
+  )
   const [editModel, setEditModel] = useState('qwen-edit-uncensored')
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('venice-edit-prompt', editPrompt)
+    } catch {
+      // Ignore quota / private-mode storage errors
+    }
+  }, [editPrompt])
   const [swapKind, setSwapKind] = useState<SwapKind>('face')
   const [swapPerson, setSwapPerson] = useState<SwapPerson>('woman')
   const [scale, setScale] = useState(2)
