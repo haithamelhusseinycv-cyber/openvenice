@@ -18,7 +18,8 @@ const DEFAULT_NEGATIVE = `cartoon, anime, illustration, CGI, 3D render, plastic 
 
 function loadSaved(key: string, fallback: string) {
   try {
-    return localStorage.getItem(key) || fallback
+    const saved = localStorage.getItem(key)
+    return saved ?? fallback
   } catch {
     return fallback
   }
