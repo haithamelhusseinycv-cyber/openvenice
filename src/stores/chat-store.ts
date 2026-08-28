@@ -31,6 +31,12 @@ interface ChatState {
   getActiveConversation: () => Conversation | undefined
 }
 
+function clampNumber(value: unknown, fallback: number, min: number, max: number): number {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.min(max, Math.max(min, value))
+    : fallback
+}
+
 function sanitizeConversations(conversations: Conversation[] | undefined): Conversation[] {
   if (!Array.isArray(conversations)) return []
   return conversations.slice(0, 50).map((conversation) => ({
@@ -135,9 +141,9 @@ export const useChatStore = create<ChatState>()(
       setStreaming: (streaming) => set({ isStreaming: streaming }),
       setVeniceParams: (params) => set((state) => ({ veniceParams: { ...state.veniceParams, ...params } })),
       setSystemPrompt: (prompt) => set({ systemPrompt: prompt }),
-      setTemperature: (temperature) => set({ temperature }),
-      setTopP: (topP) => set({ topP }),
-      setMaxTokens: (maxTokens) => set({ maxTokens }),
+      setTemperature: (temperature) => set({ temperature: clampNumber(temperature, 0.7, 0, 2) }),
+      setTopP: (topP) => set({ topP: clampNumber(topP, 1, 0, 1) }),
+      setMaxTokens: (maxTokens) => set({ maxTokens: Math.round(clampNumber(maxTokens, DEFAULT_CHAT_MAX_TOKENS, 256, 32768)) }),
 
       getActiveConversation: () => {
         const { conversations, activeConversationId } = get()
@@ -146,7 +152,7 @@ export const useChatStore = create<ChatState>()(
     }),
     {
       name: 'venice-chat',
-      version: 4,
+      version: 5,
       storage: createJSONStorage(() => createIndexedDBStorage()),
       migrate: (persisted, version) => {
         if (!persisted || typeof persisted !== 'object') return persisted as ChatState
@@ -159,7 +165,9 @@ export const useChatStore = create<ChatState>()(
         if (version < 3 && (state.maxTokens === undefined || state.maxTokens === 4096)) {
           state.maxTokens = DEFAULT_CHAT_MAX_TOKENS
         }
-        if (state.maxTokens === undefined) state.maxTokens = DEFAULT_CHAT_MAX_TOKENS
+        state.temperature = clampNumber(state.temperature, 0.7, 0, 2)
+        state.topP = clampNumber(state.topP, 1, 0, 1)
+        state.maxTokens = Math.round(clampNumber(state.maxTokens, DEFAULT_CHAT_MAX_TOKENS, 256, 32768))
         if (state.activeConversationId && !state.conversations.some((conversation) => conversation.id === state.activeConversationId)) {
           state.activeConversationId = null
         }
