@@ -2,22 +2,27 @@ import type { VeniceError } from '../types/venice'
 import { useAuthStore } from '../stores/auth-store'
 
 const ENV_BASE = (import.meta.env.VITE_VENICE_BASE_URL as string | undefined)?.replace(/\/$/, '')
-const BASE_URL = ENV_BASE || (import.meta.env.DEV ? '/venice/api/v1' : 'https://api.venice.ai/api/v1')
+export const VENICE_BASE_URL = ENV_BASE || (import.meta.env.DEV ? '/venice/api/v1' : 'https://api.venice.ai/api/v1')
+const BASE_URL = VENICE_BASE_URL
 
-const RETRY_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504])
-const MAX_RETRIES = 2
+const RETRY_STATUSES = new Set([408, 425, 500, 502, 503, 504])
+const MAX_READ_RETRIES = 2
+
+const PAID_PATH = /\/(image\/(generate|multi-edit|edit|upscale|background-remove)|chat\/completions|audio\/|video\/|embeddings)/
 
 export class VeniceAPIError extends Error {
   status: number
   code?: string
   suggestedPrompt?: string
+  details?: unknown
 
-  constructor(message: string, status: number, code?: string, suggestedPrompt?: string) {
+  constructor(message: string, status: number, code?: string, suggestedPrompt?: string, details?: unknown) {
     super(message)
     this.name = 'VeniceAPIError'
     this.status = status
     this.code = code
     this.suggestedPrompt = suggestedPrompt
+    this.details = details
   }
 }
 
@@ -34,24 +39,50 @@ function backoffDelay(attempt: number, retryAfter?: string | null): number {
     const secs = Number(retryAfter)
     if (Number.isFinite(secs) && secs > 0) return Math.min(secs * 1000, 30_000)
   }
-  // Exponential backoff with jitter: 500, 1000, 2000 ms (+/- 25%)
   const base = 500 * 2 ** attempt
   return base + Math.random() * base * 0.25
 }
 
-async function parseError(res: Response): Promise<VeniceAPIError> {
-  let message = `HTTP ${res.status}`
+function defaultRetries(method: string | undefined, path: string, explicit?: number): number {
+  if (explicit !== undefined) return explicit
+  const m = (method || 'GET').toUpperCase()
+  if (m === 'GET' || m === 'HEAD') return MAX_READ_RETRIES
+  if (PAID_PATH.test(path)) return 0
+  return 0
+}
+
+export async function parseVeniceErrorPayload(raw: string, status: number): Promise<VeniceAPIError> {
+  let message = raw?.trim() || `HTTP ${status}`
   let code: string | undefined
   let suggestedPrompt: string | undefined
+  let details: unknown
   try {
-    const err = (await res.json()) as VeniceError
-    message = err.error?.message ?? message
-    code = err.error?.code
-    suggestedPrompt = err.error?.suggested_prompt
+    const err = JSON.parse(raw) as VeniceError & {
+      error?: string | { message?: string; code?: string; suggested_prompt?: string }
+      message?: string
+      details?: unknown
+    }
+    if (typeof err?.error === 'string') {
+      message = err.error || message
+      details = err.details
+    } else if (err?.error && typeof err.error === 'object') {
+      message = err.error.message || message
+      code = err.error.code
+      suggestedPrompt = err.error.suggested_prompt
+      details = err.details
+    } else if (typeof err?.message === 'string') {
+      message = err.message
+      details = err.details
+    }
   } catch {
-    /* keep default */
+    /* keep text body */
   }
-  return new VeniceAPIError(message, res.status, code, suggestedPrompt)
+  return new VeniceAPIError(message, status, code, suggestedPrompt, details)
+}
+
+async function parseError(res: Response): Promise<VeniceAPIError> {
+  const raw = await res.text()
+  return parseVeniceErrorPayload(raw, res.status)
 }
 
 interface VeniceFetchOptions extends RequestInit {
@@ -61,7 +92,9 @@ interface VeniceFetchOptions extends RequestInit {
 }
 
 async function veniceFetch(path: string, options: VeniceFetchOptions): Promise<Response> {
-  const { stream, noAuth, retries = MAX_RETRIES, ...fetchOptions } = options
+  const method = options.method || (options.body ? 'POST' : 'GET')
+  const { stream, noAuth, retries: explicitRetries, ...fetchOptions } = options
+  const retries = defaultRetries(method, path, explicitRetries)
   const headers = new Headers(fetchOptions.headers)
   if (!noAuth) headers.set('Authorization', `Bearer ${getApiKey()}`)
   if (fetchOptions.body && typeof fetchOptions.body === 'string') {
@@ -71,25 +104,28 @@ async function veniceFetch(path: string, options: VeniceFetchOptions): Promise<R
   let lastErr: unknown
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const res = await fetch(`${BASE_URL}${path}`, { ...fetchOptions, headers })
+      const res = await fetch(`${BASE_URL}${path}`, { ...fetchOptions, method, headers })
       if (res.ok) return res
 
-      // Don't retry client errors (auth, validation) or terminal failures
+      if (res.status === 429) {
+        const err = await parseError(res)
+        err.message = err.message || 'Rate limited. Wait and retry manually.'
+        throw err
+      }
+
       if (!RETRY_STATUSES.has(res.status) || attempt === retries) throw await parseError(res)
 
-      // Drain body so connection can be reused
       try { await res.arrayBuffer() } catch { /* noop */ }
       await sleep(backoffDelay(attempt, res.headers.get('Retry-After')))
       continue
     } catch (err) {
       lastErr = err
-      // Network error: retry up to limit
       if (err instanceof VeniceAPIError) throw err
       if (err instanceof DOMException && err.name === 'AbortError') throw err
       if (attempt === retries) break
       await sleep(backoffDelay(attempt))
     }
-    void stream // suppress unused-var lint (kept for future per-call overrides)
+    void stream
   }
   throw lastErr instanceof Error ? lastErr : new VeniceAPIError('Network error', 0)
 }
