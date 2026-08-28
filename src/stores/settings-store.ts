@@ -6,6 +6,8 @@ import {
   DEFAULT_IMAGE_MODEL_ID,
   isAllowedChatModel,
   isAllowedImageModel,
+  isEnabledAppTab,
+  resolveChatModel,
 } from '../lib/allowed-models'
 
 export type Tab = 'chat' | 'image' | 'audio' | 'music' | 'video' | 'embeddings' | 'workflows' | 'playground'
@@ -15,6 +17,10 @@ export function sanitizeSelectedModels(selected: Record<string, string> | undefi
   if (!isAllowedChatModel(next.chat)) next.chat = DEFAULT_CHAT_MODEL_ID
   if (!isAllowedImageModel(next.image)) next.image = DEFAULT_IMAGE_MODEL_ID
   return next
+}
+
+export function sanitizeActiveTab(tab: unknown): Tab {
+  return isEnabledAppTab(typeof tab === 'string' ? tab : undefined) ? tab as Tab : 'chat'
 }
 
 interface SettingsState {
@@ -33,7 +39,7 @@ export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
       activeTab: 'chat',
-      setActiveTab: (tab) => set({ activeTab: tab }),
+      setActiveTab: (tab) => set({ activeTab: sanitizeActiveTab(tab) }),
       sidebarOpen: true,
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
@@ -45,17 +51,19 @@ export const useSettingsStore = create<SettingsState>()(
         set((s) => ({
           selectedModels: sanitizeSelectedModels({ ...s.selectedModels, [tab]: modelId }),
         })),
-      playgroundAgentModel: '',
-      setPlaygroundAgentModel: (modelId) => set({ playgroundAgentModel: modelId }),
+      playgroundAgentModel: DEFAULT_CHAT_MODEL_ID,
+      setPlaygroundAgentModel: (modelId) => set({ playgroundAgentModel: resolveChatModel(modelId) }),
     }),
     {
       name: 'venice-settings',
-      version: 2,
+      version: 3,
       storage: createJSONStorage(() => createSafeStorage()),
       migrate: (persisted) => {
         if (!persisted || typeof persisted !== 'object') return persisted as SettingsState
         const s = persisted as Partial<SettingsState>
         s.selectedModels = sanitizeSelectedModels(s.selectedModels)
+        s.activeTab = sanitizeActiveTab(s.activeTab)
+        s.playgroundAgentModel = resolveChatModel(s.playgroundAgentModel)
         return s as SettingsState
       },
     },

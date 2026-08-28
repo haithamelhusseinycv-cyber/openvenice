@@ -7,12 +7,9 @@ import { Header } from './components/layout/header'
 import { ApiKeyDialog } from './components/layout/api-key-dialog'
 import { ChatView } from './components/chat/chat-view'
 import { ImagePage } from './components/image/image-page'
-import { AudioView } from './components/audio/audio-view'
-import { MusicView } from './components/music/music-view'
-import { VideoView } from './components/video/video-view'
-import { EmbeddingsView } from './components/embeddings/embeddings-view'
 import { ErrorBoundary } from './components/ui/error-boundary'
 import { Toaster } from './components/ui/toaster'
+import { ENABLED_APP_TABS } from './lib/allowed-models'
 
 const LazyWorkflowsView = lazy(() => import('./components/workflows/workflows-view').then((m) => ({ default: m.WorkflowsView })))
 function WorkflowsView() {
@@ -27,15 +24,11 @@ function PlaygroundView() {
 const views = {
   chat: ChatView,
   image: ImagePage,
-  audio: AudioView,
-  music: MusicView,
-  video: VideoView,
-  embeddings: EmbeddingsView,
   workflows: WorkflowsView,
   playground: PlaygroundView,
 } as const
 
-const TAB_ORDER: Tab[] = ['chat', 'image', 'audio', 'music', 'video', 'embeddings', 'workflows', 'playground']
+const TAB_ORDER: Tab[] = [...ENABLED_APP_TABS]
 
 export function App() {
   const needsUnlock = useAuthStore((s) => s.hasEncrypted && !s.apiKey)
@@ -43,7 +36,7 @@ export function App() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const activeTab = useSettingsStore((s) => s.activeTab)
   const setActiveTab = useSettingsStore((s) => s.setActiveTab)
-  const ActiveView = views[activeTab]
+  const ActiveView = views[activeTab as keyof typeof views] || ChatView
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -73,7 +66,6 @@ export function App() {
 
   return (
     <div className="flex h-[100dvh] w-screen overflow-hidden">
-      {/* Mobile drawer overlay */}
       {mobileSidebarOpen && (
         <button
           aria-label="Close menu"
