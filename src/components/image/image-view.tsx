@@ -1,20 +1,28 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useSettingsStore } from '../../stores/settings-store'
 import { useModels } from '../../hooks/use-models'
-import { useStyles } from '../../hooks/use-styles'
 import { useImageGenerate } from '../../hooks/use-image'
 import { useAuthStore } from '../../stores/auth-store'
-import { Select } from '../ui/select'
-import { Label, TextArea, PrimaryButton, PillGroup, ErrorText, ExamplePrompts } from '../ui/shared'
+import { Label, TextArea, PrimaryButton, PillGroup, ErrorText } from '../ui/shared'
 import { GenerationView } from '../ui/generation-view'
 import type { ImageConstraints } from '../../types/venice'
 
-const IMAGE_EXAMPLES = [
-  'A serene mountain lake at golden hour, low fog over the water, painterly',
-  'Macro photo of a dewdrop on a spider web, sunrise lighting',
-  'Cyberpunk street market at night, neon signs reflecting in puddles',
-  'Children\'s book illustration of a fox reading a book under a mushroom',
-]
+const DEFAULT_PROMPT = `amateur iphone snapshot, slightly messy framing, film grain, available room light, one light source, messy lived-in bedroom, unmade bed, clutter, raw candid
+2people, 1girl, 1boy, adults 18+, couple having sex, third-person view, both faces visible, woman's face clearly visible, man's face visible
+natural skin, visible pores, peach fuzz, skin imperfections, realistic bodies, sweat, flushed, damp hair, half-lidded eyes, parted lips, uncensored nsfw
+erect nipples, detailed areolae, wet pussy, labia, trimmed pubic hair
+erect penis, hard cock, veiny shaft, testicles, pubic hair
+penis inside pussy, labia stretched around the shaft, part of the shaft still visible, insertion readable, anatomically correct penetration`
+
+const DEFAULT_NEGATIVE = `cartoon, anime, illustration, CGI, 3D render, plastic skin, waxy skin, doll, airbrushed, beauty filter, studio, cyclorama, rim light, cinematic lighting, posed photoshoot, pov, hidden faces, censored, mosaic, blurry genitals, clothes, lingerie on, flaccid, small penis, deformed hands, extra fingers, extra limbs, watermark, text, no penetration, floating penis, penis beside pussy, disconnected genitals, bad insertion`
+
+function loadSaved(key: string, fallback: string) {
+  try {
+    return localStorage.getItem(key) || fallback
+  } catch {
+    return fallback
+  }
+}
 
 function toImageSrc(b64: string): string {
   if (b64.startsWith('data:')) return b64
@@ -38,7 +46,6 @@ export function ImageView() {
   const apiKey = useAuthStore((s) => s.apiKey)
   const selectedModel = useSettingsStore((s) => s.selectedModels.image)
   const { data: models } = useModels('image')
-  const { data: styles } = useStyles()
   const allowedImageModels = models?.filter((m) =>
   ['lustify-v8', 'lustify-v7', 'lustify-sdxl'].includes(m.id.toLowerCase())
 )
@@ -58,12 +65,15 @@ const model =
   const defaultSteps = constraints?.steps?.default || 20
   const promptLimit = constraints?.promptCharacterLimit || 4096
 
-  const [prompt, setPrompt] = useState('')
-  const [negativePrompt, setNegativePrompt] = useState('')
+  const [prompt, setPrompt] = useState(() =>
+    loadSaved('venice-image-prompt', DEFAULT_PROMPT)
+  )
+  const [negativePrompt, setNegativePrompt] = useState(() =>
+    loadSaved('venice-image-negative', DEFAULT_NEGATIVE)
+  )
   const [sizeIdx, setSizeIdx] = useState('2')
   const [aspectRatio, setAspectRatio] = useState('')
   const [resolution, setResolution] = useState('')
-  const [style, setStyle] = useState('')
   const [steps, setSteps] = useState(defaultSteps)
   const [variants, setVariants] = useState(1)
   const [images, setImages] = useState<string[]>([])
@@ -73,6 +83,15 @@ useEffect(() => {
   setAspectRatio('')
   setResolution('')
 }, [model, defaultSteps])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('venice-image-prompt', prompt)
+      localStorage.setItem('venice-image-negative', negativePrompt)
+    } catch {
+      // Ignore quota / private-mode storage errors
+    }
+  }, [prompt, negativePrompt])
   // Build aspect ratio options from model constraints
   const aspectOptions = useMemo(() => {
     if (!hasAspectRatios) return []
@@ -96,7 +115,6 @@ useEffect(() => {
   }
 
   const mutation = useImageGenerate()
-  const styleOptions = [{ value: '', label: 'None' }, ...(styles?.map((s) => ({ value: s, label: s })) ?? [])]
 
   const handleGenerate = () => {
     if (!prompt.trim()) return
@@ -106,7 +124,6 @@ useEffect(() => {
   prompt: prompt.trim(),
   negative_prompt: negativePrompt.trim() || undefined,
   model,
-  style_preset: style || undefined,
   variants,
   hide_watermark: true,
   safe_mode: false,
@@ -156,15 +173,13 @@ useEffect(() => {
         <div><Label>Resolution</Label><PillGroup options={resolutionOptions} value={resolution || resolutionOptions[0]?.value || ''} onChange={setResolution} /></div>
       )}
 
-      <div><Label>Style</Label><Select value={style} onChange={setStyle} options={styleOptions} searchable placeholder="None" /></div>
-
       <div>
         <Label hint={String(steps)}>Steps</Label>
         <input type="range" min={1} max={maxSteps} value={steps} onChange={(e) => setSteps(Number(e.target.value))} className="w-full" />
       </div>
       <div>
         <Label hint={String(variants)}>Variants</Label>
-        <input type="range" min={1} max={4} value={variants} onChange={(e) => setVariants(Number(e.target.value))} className="w-full" />
+        <input type="range" min={1} max={2} value={variants} onChange={(e) => setVariants(Number(e.target.value))} className="w-full" />
       </div>
 
       <PrimaryButton onClick={handleGenerate} disabled={!prompt.trim() || !apiKey} loading={mutation.isPending} size="lg">
@@ -198,9 +213,7 @@ useEffect(() => {
               <div className="w-8 h-8 border-2 border-white/[0.08] border-t-[var(--color-accent)] rounded-full animate-spin" />
               <span className="text-[13px] text-white/55">Generating…</span>
             </div>
-          ) : (
-            <ExamplePrompts items={IMAGE_EXAMPLES} onPick={setPrompt} />
-          )}
+          ) : null}
         </div>
       ) : (
         <div className="grid grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
