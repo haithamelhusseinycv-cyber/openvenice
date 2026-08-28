@@ -28,21 +28,24 @@ function getBucket(type?: string): VeniceType | null {
 
 function isAllowed(model: VeniceModel, bucket: VeniceType | null) {
   if (!bucket) return false
-  return ALLOWED_MODELS[bucket].includes(model.id as never)
+  const allowed = ALLOWED_MODELS[bucket] as readonly string[]
+  return allowed.includes(model.id)
 }
 
 function getRank(model: VeniceModel, bucket: VeniceType | null) {
   if (!bucket) return 9999
-  const rank = ALLOWED_MODELS[bucket].indexOf(model.id as never)
+  const allowed = ALLOWED_MODELS[bucket] as readonly string[]
+  const rank = allowed.indexOf(model.id)
   return rank === -1 ? 9999 : rank
 }
 
-export function useModels(type?: string) {
+export function useModels(type?: string, enabled = true) {
   const bucket = getBucket(type)
 
   return useQuery({
     queryKey: ['models', type],
     queryFn: () => venice<ModelsResponse>(`/models${type ? `?type=${type}` : ''}`),
+    enabled: enabled && bucket !== null,
     staleTime: 10 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnMount: false,
@@ -59,7 +62,7 @@ export function useModels(type?: string) {
   })
 }
 
-// Kept for legacy code imports. Video is disabled, so useModels('video') returns no models.
+// Kept for legacy code imports. Video is disabled, so this query never runs.
 export interface VideoModelGroup {
   name: string
   textModel?: VeniceModel
