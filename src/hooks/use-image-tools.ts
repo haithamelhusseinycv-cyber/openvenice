@@ -8,7 +8,7 @@ import type { ImageEditRequest, ImageUpscaleRequest } from '../types/venice'
  */
 export function useImageEdit() {
   return useMutation({
-    mutationFn: (req: ImageEditRequest) => veniceBlob('/image/edit', req),
+    mutationFn: (req: ImageEditRequest) => veniceBlob('/image/multi-edit', req),
   })
 }
 
