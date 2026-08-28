@@ -164,10 +164,15 @@ export interface ImageGenerateResponse {
 }
 
 export interface ImageEditRequest {
-  image: string
+  images: string[]
   prompt: string
   modelId?: string
   aspect_ratio?: string
+  output_format?: 'jpeg' | 'jpg' | 'png' | 'webp'
+  resolution?: string
+  safe_mode?: boolean
+  disable_prompt_optimization_thinking?: boolean
+  enhance_prompt?: boolean
 }
 
 export interface ImageUpscaleRequest {
