@@ -8,12 +8,13 @@ interface ChatInputProps {
   onStop: () => void
   isStreaming: boolean
   disabled?: boolean
+  allowImages?: boolean
 }
 
 const MAX_ATTACHMENTS = 4
 const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif'
 
-export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputProps) {
+export function ChatInput({ onSend, onStop, isStreaming, disabled, allowImages = false }: ChatInputProps) {
   const [value, setValue] = useState('')
   const [images, setImages] = useState<string[]>([])
   const [dragOver, setDragOver] = useState(false)
@@ -25,7 +26,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
   const handleSubmit = () => {
     const trimmed = value.trim()
     if (!trimmed || disabled) return
-    onSend(trimmed, images.length > 0 ? images : undefined)
+    onSend(trimmed, allowImages && images.length > 0 ? images : undefined)
     setValue('')
     setImages([])
     if (fileRef.current) fileRef.current.value = ''
@@ -33,6 +34,11 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
   }
 
   const addImageFiles = async (files: File[]) => {
+    if (!allowImages) {
+      toast.info('The selected chat model does not support image input.')
+      return
+    }
+
     const availableSlots = Math.max(0, MAX_ATTACHMENTS - images.length)
     if (availableSlots === 0) {
       toast.info(`You can attach up to ${MAX_ATTACHMENTS} images per message.`)
@@ -91,34 +97,52 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
             'focus-within:border-white/[0.22] focus-within:shadow-xl focus-within:shadow-black/40',
             dragOver ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)]' : 'border-white/[0.08]',
           )}
-          onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(true) }}
-          onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(false) }}
-          onDrop={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
+          onDragOver={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            if (allowImages) setDragOver(true)
+          }}
+          onDragLeave={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
             setDragOver(false)
-            handleImageUpload(e.dataTransfer.files)
+          }}
+          onDrop={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            setDragOver(false)
+            if (!allowImages) {
+              toast.info('The selected chat model does not support image input.')
+              return
+            }
+            handleImageUpload(event.dataTransfer.files)
           }}
         >
           <textarea
             ref={textareaRef}
             value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
+            onChange={(event) => setValue(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault()
                 handleSubmit()
               }
             }}
-            onPaste={(e) => {
+            onPaste={(event) => {
               const files: File[] = []
-              for (const item of Array.from(e.clipboardData?.items ?? [])) {
+              for (const item of Array.from(event.clipboardData?.items ?? [])) {
                 if (item.type.startsWith('image/')) {
                   const file = item.getAsFile()
                   if (file) files.push(file)
                 }
               }
-              if (files.length > 0) void addImageFiles(files)
+              if (files.length > 0) {
+                if (!allowImages) {
+                  toast.info('The selected chat model does not support image input.')
+                  return
+                }
+                void addImageFiles(files)
+              }
             }}
             placeholder={disabled ? 'Connect an API key to start…' : dragOver ? 'Drop image to attach' : 'Ask anything — Enter to send, Shift+Enter for newline'}
             rows={1}
@@ -134,22 +158,22 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
                 accept={IMAGE_ACCEPT}
                 multiple
                 className="hidden"
-                onChange={(e) => {
-                  handleImageUpload(e.target.files)
-                  e.target.value = ''
+                onChange={(event) => {
+                  handleImageUpload(event.target.files)
+                  event.target.value = ''
                 }}
               />
               <button
                 onClick={() => fileRef.current?.click()}
-                disabled={disabled || images.length >= MAX_ATTACHMENTS}
-                aria-label="Attach image"
-                className="flex items-center gap-1.5 px-2 py-1.5 text-white/50 hover:text-white text-[13px] transition-colors rounded-lg hover:bg-white/[0.05] disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
-                title={`Attach image (JPEG/PNG/WebP/GIF, max ${MAX_ATTACHMENTS})`}
+                disabled={disabled || !allowImages || images.length >= MAX_ATTACHMENTS}
+                aria-label={allowImages ? 'Attach image' : 'Image input unavailable for selected model'}
+                className="flex items-center gap-1.5 px-2 py-1.5 text-white/50 hover:text-white text-[13px] transition-colors rounded-lg hover:bg-white/[0.05] disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
+                title={allowImages ? `Attach image (JPEG/PNG/WebP/GIF, max ${MAX_ATTACHMENTS})` : 'Selected model does not support image input'}
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
                 </svg>
-                <span className="hidden sm:inline">{images.length}/{MAX_ATTACHMENTS}</span>
+                {allowImages && <span className="hidden sm:inline">{images.length}/{MAX_ATTACHMENTS}</span>}
               </button>
             </div>
             {isStreaming ? (
