@@ -7,6 +7,7 @@ import { Select } from '../ui/select'
 import { Label, TextArea, PrimaryButton, ErrorText, EmptyState } from '../ui/shared'
 import { cn } from '../../lib/utils'
 import { toast } from '../../stores/toast-store'
+import { ImageInputError, validateImageFile } from '../../lib/image-io'
 
 type Tool = 'edit' | 'swap' | 'undress' | 'upscale' | 'remove-bg'
 type SwapKind = 'face' | 'head' | 'body'
@@ -110,9 +111,15 @@ export function ImageTools() {
   const bgRemoveMutation = useBackgroundRemove()
 
   const readFile = (file: File, onDone: (data: string, name: string) => void) => {
-    const reader = new FileReader()
-    reader.onload = () => onDone(reader.result as string, file.name)
-    reader.readAsDataURL(file)
+    void validateImageFile(file)
+      .then(() => {
+        const reader = new FileReader()
+        reader.onload = () => onDone(reader.result as string, file.name)
+        reader.readAsDataURL(file)
+      })
+      .catch((err) => {
+        toast.fromError(err instanceof ImageInputError ? err : new Error('Could not read that image.'), 'Invalid image')
+      })
   }
 
   const aspectRatio = sceneSize || 'auto'
@@ -245,7 +252,7 @@ export function ImageTools() {
               <button
                 onClick={removeSource}
                 aria-label="Remove image"
-                className="absolute top-1.5 right-1.5 p-1 bg-black/60 rounded-md text-white/60 hover:text-white opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all"
+                className="absolute top-1.5 right-1.5 p-1 bg-black/60 rounded-md text-white/60 hover:text-white opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-colors"
               >
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
               </button>
