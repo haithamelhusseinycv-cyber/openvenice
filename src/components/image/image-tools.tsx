@@ -16,7 +16,8 @@ const EDIT_MODELS = [
 
 function loadSaved(key: string, fallback: string) {
   try {
-    return localStorage.getItem(key) || fallback
+    const saved = localStorage.getItem(key)
+    return saved ?? fallback
   } catch {
     return fallback
   }
