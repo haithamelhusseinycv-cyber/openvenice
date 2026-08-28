@@ -23,7 +23,7 @@ export function extensionForBlob(blob: Blob): 'png' | 'jpg' | 'webp' {
 }
 
 export async function validateImageFile(file: File): Promise<void> {
-  if (!file.type || (!ALLOWED_TYPES.has(file.type) && !file.type.startsWith('image/'))) {
+  if (!ALLOWED_TYPES.has(file.type)) {
     throw new ImageInputError('Use a JPEG, PNG, WebP, or GIF image.')
   }
   if (file.size > MAX_MULTI_EDIT_BYTES) {
