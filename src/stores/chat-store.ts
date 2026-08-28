@@ -43,7 +43,7 @@ export const useChatStore = create<ChatState>()(
       systemPrompt: '',
       temperature: 0.7,
       topP: 1,
-      maxTokens: 4096,
+      maxTokens: 1024,
 
       createConversation: (model) => {
         const id = generateId()
@@ -139,7 +139,7 @@ export const useChatStore = create<ChatState>()(
     }),
     {
       name: 'venice-chat',
-      version: 2,
+      version: 3,
       storage: createJSONStorage(() => createSafeStorage()),
       migrate: (persisted, version) => {
         // v1 → v2: trim conversations to 50, ensure veniceParams shape
@@ -150,8 +150,12 @@ export const useChatStore = create<ChatState>()(
           s.veniceParams = { include_venice_system_prompt: false, enable_web_search: 'off' }
         }
         if (version < 2) {
-          // Drop in-flight streaming flag from previous schema if present
           delete (s as Record<string, unknown>).isStreaming
+        }
+        if (version < 3) {
+          if (s.maxTokens === undefined || s.maxTokens === 4096) {
+            s.maxTokens = 1024
+          }
         }
         return s as ChatState
       },
