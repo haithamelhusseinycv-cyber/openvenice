@@ -12,6 +12,12 @@ export function useImageEdit() {
   })
 }
 
+export function useImageMultiEdit() {
+  return useMutation({
+    mutationFn: (req: ImageEditRequest) => veniceBlob('/image/multi-edit', req),
+  })
+}
+
 export function useImageUpscale() {
   return useMutation({
     mutationFn: (req: ImageUpscaleRequest) => veniceBlob('/image/upscale', req),
