@@ -66,10 +66,10 @@ function clearFileInput(input: HTMLInputElement | null) {
 
 export function ImageTools() {
   const apiKey = useAuthStore((s) => s.apiKey)
-  const consumePendingSource = useImageWorkspace((s) => s.consumePendingSource)
-  const [tool, setTool] = useState<Tool>('edit')
-  const [imageData, setImageData] = useState<string | null>(null)
-  const [imageName, setImageName] = useState('')
+  const [pending] = useState(() => useImageWorkspace.getState().consumePendingSource())
+  const [tool, setTool] = useState<Tool>(pending?.tool ?? 'edit')
+  const [imageData, setImageData] = useState<string | null>(pending?.data ?? null)
+  const [imageName, setImageName] = useState(pending?.name ?? '')
   const [idImage, setIdImage] = useState<string | null>(null)
   const [idName, setIdName] = useState('')
   const [resultUrl, setResultBlob, resetResult] = useBlobUrl()
@@ -89,16 +89,6 @@ export function ImageTools() {
       // Ignore quota / private-mode storage errors
     }
   }, [editPrompt])
-
-  useEffect(() => {
-    const pending = consumePendingSource()
-    if (!pending) return
-    setTool(pending.tool)
-    setImageData(pending.data)
-    setImageName(pending.name)
-    resetResult()
-    clearFileInput(fileRef.current)
-  }, [consumePendingSource, resetResult])
 
   const [swapKind, setSwapKind] = useState<SwapKind>('face')
   const [swapPerson, setSwapPerson] = useState<SwapPerson>('woman')
