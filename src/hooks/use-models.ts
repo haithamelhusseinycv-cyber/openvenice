@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { venice } from '../lib/venice-client'
+import { useAuthStore } from '../stores/auth-store'
 import type { ModelsResponse, VeniceModel, VideoConstraints } from '../types/venice'
 import {
   ALLOWED_CHAT_MODEL_IDS,
@@ -41,11 +42,12 @@ function getRank(model: VeniceModel, bucket: VeniceType | null) {
 
 export function useModels(type?: string, enabled = true) {
   const bucket = getBucket(type)
+  const hasApiKey = useAuthStore((state) => state.apiKey !== null)
 
   return useQuery({
     queryKey: ['models', type],
     queryFn: () => venice<ModelsResponse>(`/models${type ? `?type=${type}` : ''}`),
-    enabled: enabled && bucket !== null,
+    enabled: enabled && bucket !== null && hasApiKey,
     staleTime: 10 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnMount: false,
