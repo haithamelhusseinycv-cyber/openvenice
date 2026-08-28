@@ -1,5 +1,6 @@
 import { venice } from './venice-client'
-import { NODE_SCHEMAS } from './workflow-schema'
+import { NODE_SCHEMAS, NODE_TYPES } from './workflow-schema'
+import { DEFAULT_AGENT_MAX_TOKENS, DEFAULT_CHAT_MODEL_ID } from './allowed-models'
 import type { WorkflowPatch } from './workflow-mutations'
 import type { ChatCompletionResponse, ModelCapabilities } from '../types/venice'
 import type { Node, Edge } from '@xyflow/react'
@@ -14,12 +15,12 @@ export interface AgentResponse {
 
 const VALID_OPS = new Set(['add_node', 'remove_node', 'set_params', 'move_node', 'connect', 'disconnect', 'clear'])
 
-// Empirically validated default — see scripts/agent-bench results.
-// qwen3-next-80b: ~2s, perfect output, supports response_format.
-export const DEFAULT_AGENT_MODEL = 'qwen3-next-80b'
+export const DEFAULT_AGENT_MODEL = DEFAULT_CHAT_MODEL_ID
 
 function nodeCatalog(): string {
-  return Object.values(NODE_SCHEMAS)
+  return NODE_TYPES
+    .map((type) => NODE_SCHEMAS[type])
+    .filter(Boolean)
     .map((s) => {
       const params = s.params
         .map((p) => {
@@ -47,34 +48,7 @@ function modelMenu(catalog: ModelCatalog | undefined): string {
   return `\n\nAvailable models per node type (use ONLY these ids; pick the one that best matches the user's intent or use the default if no preference):\n${sections.map((s) => `- ${s}`).join('\n')}`
 }
 
-const SYSTEM_PROMPT_BASE = `You are a workflow designer for OpenVenice. You help the user author visual workflows that chain Venice AI models.
-
-You have these node types available:
-
-${nodeCatalog()}
-
-You respond by emitting patches to mutate the current draft workflow. Each patch is one of:
-- {"op":"add_node","nodeType":"<type>","id":"optional_id","params":{...}} — add a new node
-- {"op":"set_params","id":"<node_id>","params":{...}} — update a node's params
-- {"op":"connect","source":"<node_id>","target":"<node_id>"} — connect two nodes
-- {"op":"disconnect","id":"<edge_id>"} — remove an edge
-- {"op":"remove_node","id":"<node_id>"} — remove a node
-- {"op":"clear"} — remove all nodes and edges
-
-RULES:
-1. Every response MUST be a single valid JSON object, nothing before or after. Do not wrap in markdown fences.
-2. Schema: {"say": string, "patches": Array<Patch>}.
-3. "say" is a short (1–3 sentences) narration of what you just did or a question to the user.
-4. When building a new workflow from scratch, start with {"op":"clear"} then add nodes top-to-bottom and connect them.
-5. Always assign explicit ids when adding multiple nodes in one turn so you can reference them in connect patches.
-6. Workflows need at least one textInput (or a generation node with a self-contained prompt) and an output node at the end.
-7. Use {{input}} inside a node's prompt to place upstream text precisely, or leave prompt empty to append input after.
-8. Keep to the param names and enum values listed above. Omit params to accept defaults.
-9. If the user just asks a question, respond with a "say" and an empty "patches" array.
-10. Do not narrate patches you aren't emitting. Do not produce commentary outside the JSON.
-
-Example response:
-{"say":"I built a pipeline that researches a topic, summarizes it, and narrates the summary.","patches":[{"op":"clear"},{"op":"add_node","nodeType":"textInput","id":"in","params":{"inputText":"Quantum computing progress in 2025"}},{"op":"add_node","nodeType":"chat","id":"research","params":{"prompt":"Research this topic thoroughly.","webSearch":"on"}},{"op":"add_node","nodeType":"chat","id":"summary","params":{"prompt":"Summarize into 5 bullet points.","temperature":0.3}},{"op":"add_node","nodeType":"tts","id":"narrate","params":{"voice":"af_sky"}},{"op":"add_node","nodeType":"output","id":"out"},{"op":"connect","source":"in","target":"research"},{"op":"connect","source":"research","target":"summary"},{"op":"connect","source":"summary","target":"narrate"},{"op":"connect","source":"narrate","target":"out"}]}`
+const SYSTEM_PROMPT_BASE = `You are a workflow designer for OpenVenice. You help the user author visual workflows that chain Venice AI models.\n\nYou have these node types available:\n\n${nodeCatalog()}\n\nYou respond by emitting patches to mutate the current draft workflow. Each patch is one of:\n- {"op":"add_node","nodeType":"<type>","id":"optional_id","params":{...}} — add a new node\n- {"op":"set_params","id":"<node_id>","params":{...}} — update a node's params\n- {"op":"connect","source":"<node_id>","target":"<node_id>"} — connect two nodes\n- {"op":"disconnect","id":"<edge_id>"} — remove an edge\n- {"op":"remove_node","id":"<node_id>"} — remove a node\n- {"op":"clear"} — remove all nodes and edges\n\nRULES:\n1. Every response MUST be a single valid JSON object, nothing before or after. Do not wrap in markdown fences.\n2. Schema: {"say": string, "patches": Array<Patch>}.\n3. "say" is a short (1–3 sentences) narration of what you just did or a question to the user.\n4. When building a new workflow from scratch, start with {"op":"clear"} then add nodes top-to-bottom and connect them.\n5. Always assign explicit ids when adding multiple nodes in one turn so you can reference them in connect patches.\n6. Workflows need at least one textInput (or a generation node with a self-contained prompt) and an output node at the end.\n7. Use {{input}} inside a node's prompt to place upstream text precisely, or leave prompt empty to append input after.\n8. Keep to the param names and enum values listed above. Omit params to accept defaults.\n9. If the user just asks a question, respond with a "say" and an empty "patches" array.\n10. Do not narrate patches you aren't emitting. Do not produce commentary outside the JSON.\n\nExample response:\n{"say":"I built a pipeline that researches a topic and writes an image prompt.","patches":[{"op":"clear"},{"op":"add_node","nodeType":"textInput","id":"in","params":{"inputText":"Quantum computing progress in 2025"}},{"op":"add_node","nodeType":"chat","id":"research","params":{"prompt":"Research this topic thoroughly.","webSearch":"on"}},{"op":"add_node","nodeType":"chat","id":"prompt","params":{"prompt":"Turn this into a vivid image-generation prompt.","temperature":0.7}},{"op":"add_node","nodeType":"imageGen","id":"art","params":{}},{"op":"add_node","nodeType":"output","id":"out"},{"op":"connect","source":"in","target":"research"},{"op":"connect","source":"research","target":"prompt"},{"op":"connect","source":"prompt","target":"art"},{"op":"connect","source":"art","target":"out"}]}`
 
 function buildSystemPrompt(catalog?: ModelCatalog): string {
   return SYSTEM_PROMPT_BASE + modelMenu(catalog)
@@ -189,7 +163,7 @@ async function singleCall(opts: {
     model: opts.model,
     messages: opts.messages,
     temperature: opts.temperature,
-    max_tokens: 4096,
+    max_tokens: DEFAULT_AGENT_MAX_TOKENS,
   }
   if (opts.useResponseFormat) body.response_format = { type: 'json_object' }
   const resp = await venice<ChatCompletionResponse>('/chat/completions', {
@@ -203,7 +177,7 @@ async function singleCall(opts: {
 export async function callAgent({ userMessage, draft, history, catalog, model, capabilities, signal }: CallAgentOptions): Promise<AgentResponse> {
   const chosenModel = model || DEFAULT_AGENT_MODEL
   // Only request structured output if the model supports it. Sending response_format
-  // to llama-3.3-70b returns HTTP 400; sending it to gpt-4o-mini degrades quality.
+  // to models that lack supportsResponseSchema returns HTTP 400.
   const useRF = capabilities?.supportsResponseSchema === true
   const messages = [
     { role: 'system' as const, content: buildSystemPrompt(catalog) },
