@@ -2,11 +2,15 @@ import type { Node, Edge } from '@xyflow/react'
 import type { VeniceNodeData, NodeResult } from '../stores/workflow-store'
 import { NODE_SCHEMAS, type IOKind } from './workflow-schema'
 import { validateWorkflow } from './workflow-validator'
-import { venice, veniceBlob } from './venice-client'
-import type { ChatCompletionResponse, ImageGenerateResponse, MusicQueueResponse, MusicRetrieveResponse, VideoQueueResponse, VideoRetrieveResponse } from '../types/venice'
-
-const POLL_INTERVAL_MS = 3000
-const POLL_MAX_ATTEMPTS = 200 // ~10 minutes per node
+import { venice } from './venice-client'
+import type { ChatCompletionResponse, ImageGenerateResponse } from '../types/venice'
+import {
+  DEFAULT_CHAT_MAX_TOKENS,
+  DEFAULT_CHAT_MODEL_ID,
+  DEFAULT_IMAGE_MODEL_ID,
+  resolveChatModel,
+  resolveImageModel,
+} from './allowed-models'
 
 export class WorkflowExecutionError extends Error {
   nodeId?: string
@@ -17,8 +21,6 @@ export class WorkflowExecutionError extends Error {
   }
 }
 
-// Group nodes into topological "levels" — nodes within a level have no dependency
-// on each other and can run in parallel. Returns null on cycle.
 function topoLevels(nodes: Node<VeniceNodeData>[], edges: Edge[]): string[][] | null {
   const inDegree = new Map<string, number>()
   const adj = new Map<string, string[]>()
@@ -62,40 +64,6 @@ function resolvePrompt(template: string, input: string): string {
   return input ? `${template}\n\n${input}` : template
 }
 
-interface PollOptions<T> {
-  path: string
-  id: string
-  getStatus: (r: T) => string
-  getResult: (r: T) => string | undefined
-  getError: (r: T) => string | undefined
-  signal?: AbortSignal
-}
-
-async function pollUntilDone<T>({ path, id, getStatus, getResult, getError, signal }: PollOptions<T>): Promise<string> {
-  for (let i = 0; i < POLL_MAX_ATTEMPTS; i++) {
-    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
-    await new Promise<void>((resolve, reject) => {
-      const t = setTimeout(resolve, POLL_INTERVAL_MS)
-      signal?.addEventListener('abort', () => { clearTimeout(t); reject(new DOMException('Aborted', 'AbortError')) }, { once: true })
-    })
-    const result = await venice<T>(path, {
-      method: 'POST',
-      body: JSON.stringify({ id }),
-      signal,
-    })
-    const status = getStatus(result).toLowerCase()
-    if (status === 'completed') {
-      const url = getResult(result)
-      if (url) return url
-      throw new Error('Completed but no output URL returned')
-    }
-    if (status === 'failed') {
-      throw new Error(getError(result) ?? 'Generation failed')
-    }
-  }
-  throw new Error(`Generation timed out after ${(POLL_MAX_ATTEMPTS * POLL_INTERVAL_MS) / 1000}s`)
-}
-
 async function executeNode(
   node: Node<VeniceNodeData>,
   input: string,
@@ -114,10 +82,10 @@ async function executeNode(
       const resp = await venice<ChatCompletionResponse>('/chat/completions', {
         method: 'POST',
         body: JSON.stringify({
-          model: data.model || 'llama-3.3-70b',
+          model: resolveChatModel(data.model || DEFAULT_CHAT_MODEL_ID),
           messages: [{ role: 'user', content: prompt }],
           temperature: data.temperature ?? 0.7,
-          max_tokens: data.maxTokens ?? 4096,
+          max_tokens: data.maxTokens ?? DEFAULT_CHAT_MAX_TOKENS,
           venice_parameters: { enable_web_search: data.webSearch ?? 'off' },
         }),
         signal,
@@ -128,14 +96,15 @@ async function executeNode(
     case 'imageGen': {
       const prompt = resolvePrompt(data.prompt, input)
       const body: Record<string, unknown> = {
-        model: data.model || 'z-image-turbo',
+        model: resolveImageModel(data.model || DEFAULT_IMAGE_MODEL_ID),
         prompt,
         negative_prompt: data.negativePrompt || undefined,
         steps: data.steps ?? 20,
-        style_preset: data.style || undefined,
         width: data.width ?? 1024,
         height: data.height ?? 1024,
         hide_watermark: data.hideWatermark ?? true,
+        safe_mode: false,
+        enhance_prompt: false,
       }
       if (data.aspectRatio) body.aspect_ratio = data.aspectRatio
       const resp = await venice<ImageGenerateResponse>('/image/generate', {
@@ -152,68 +121,13 @@ async function executeNode(
       return `[image:data:${mime};base64,${b64}]`
     }
 
-    case 'tts': {
-      const text = resolvePrompt(data.prompt, input)
-      const blob = await veniceBlob('/audio/speech', {
-        model: data.model || 'tts-kokoro',
-        input: text,
-        voice: data.voice || 'af_sky',
-        speed: data.speed ?? 1,
-        response_format: data.responseFormat || 'mp3',
-      }, { signal })
-      return `[audio:${URL.createObjectURL(blob)}]`
-    }
-
-    case 'music': {
-      const prompt = resolvePrompt(data.prompt, input)
-      const body: Record<string, unknown> = {
-        model: data.model || 'stable-audio',
-        prompt,
-        duration_seconds: data.duration ?? 30,
-        force_instrumental: data.instrumental ?? false,
-      }
-      if (data.lyrics) body.lyrics_prompt = data.lyrics
-      const queueResp = await venice<MusicQueueResponse>('/audio/queue', {
-        method: 'POST',
-        body: JSON.stringify(body),
-        signal,
-      })
-      const url = await pollUntilDone<MusicRetrieveResponse>({
-        path: '/audio/retrieve',
-        id: queueResp.queue_id,
-        getStatus: (r) => r.status,
-        getResult: (r) => r.audio_url,
-        getError: (r) => r.error,
-        signal,
-      })
-      return `[audio:${url}]`
-    }
-
-    case 'video': {
-      const prompt = resolvePrompt(data.prompt, input)
-      const body: Record<string, unknown> = {
-        model: data.model || 'wan-2.1',
-        prompt,
-        aspect_ratio: data.videoAspectRatio || '16:9',
-      }
-      if (data.videoDuration) body.duration = data.videoDuration
-      if (data.videoResolution) body.resolution = data.videoResolution
-      const queueResp = await venice<VideoQueueResponse>('/video/queue', {
-        method: 'POST',
-        body: JSON.stringify(body),
-        signal,
-      })
-      const videoId = queueResp.queue_id || queueResp.id || ''
-      const url = await pollUntilDone<VideoRetrieveResponse>({
-        path: '/video/retrieve',
-        id: videoId,
-        getStatus: (r) => r.status,
-        getResult: (r) => r.video_url,
-        getError: (r) => r.error,
-        signal,
-      })
-      return `[video:${url}]`
-    }
+    case 'tts':
+    case 'music':
+    case 'video':
+      throw new WorkflowExecutionError(
+        `${data.nodeType} nodes are disabled in this build. Use Chat and Image Gen only.`,
+        node.id,
+      )
   }
 }
 
@@ -227,7 +141,6 @@ export async function executeWorkflow(
   edges: Edge[],
   arg: ExecuteOptions | ((nodeId: string, result: Partial<NodeResult>) => void),
 ): Promise<void> {
-  // Backwards-compatible: accept either an options bag or a bare onUpdate function.
   const opts: ExecuteOptions = typeof arg === 'function' ? { onUpdate: arg } : arg
   const { signal, onUpdate } = opts
 
@@ -245,7 +158,6 @@ export async function executeWorkflow(
 
   for (const level of levels) {
     if (signal?.aborted) return
-    // Run all nodes at this dependency level in parallel.
     await Promise.all(level.map(async (nodeId) => {
       const node = nodeMap.get(nodeId)
       if (!node) return
