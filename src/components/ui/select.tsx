@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo, useId } from 'react'
 import { cn } from '../../lib/utils'
 
 interface SelectProps {
@@ -13,38 +13,124 @@ interface SelectProps {
 export function Select({ value, onChange, options, placeholder = 'Select...', searchable = false, className }: SelectProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
+  const [activeIndex, setActiveIndex] = useState(0)
   const ref = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const listboxId = useId()
+
+  const filtered = useMemo(() => {
+    if (!search) return options
+    const query = search.trim().toLowerCase()
+    return options.filter((option) =>
+      option.label.toLowerCase().includes(query) || option.value.toLowerCase().includes(query),
+    )
+  }, [options, search])
+
+  const selectedIndex = filtered.findIndex((option) => option.value === value)
+  const selectedLabel = options.find((option) => option.value === value)?.label || placeholder
+  const hasValue = options.some((option) => option.value === value)
+
+  const close = (restoreFocus = false) => {
+    setOpen(false)
+    setSearch('')
+    setActiveIndex(0)
+    if (restoreFocus) requestAnimationFrame(() => triggerRef.current?.focus())
+  }
+
+  const openMenu = (direction: 'selected' | 'first' | 'last' = 'selected') => {
+    setOpen(true)
+    if (direction === 'first') setActiveIndex(0)
+    else if (direction === 'last') setActiveIndex(Math.max(0, options.length - 1))
+    else {
+      const index = options.findIndex((option) => option.value === value)
+      setActiveIndex(index >= 0 ? index : 0)
+    }
+  }
+
+  const choose = (index: number) => {
+    const option = filtered[index]
+    if (!option) return
+    onChange(option.value)
+    close(true)
+  }
+
+  const moveActive = (delta: number) => {
+    if (filtered.length === 0) return
+    setActiveIndex((current) => {
+      const base = Math.min(current, filtered.length - 1)
+      return (base + delta + filtered.length) % filtered.length
+    })
+  }
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    const handler = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) close(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
   useEffect(() => {
+    if (!open) return
+    const next = selectedIndex >= 0 ? selectedIndex : 0
+    setActiveIndex(Math.min(next, Math.max(0, filtered.length - 1)))
+  }, [open, filtered.length, selectedIndex])
+
+  useEffect(() => {
     if (open && searchable) inputRef.current?.focus()
   }, [open, searchable])
 
-  const filtered = useMemo(() =>
-    search ? options.filter((o) => o.label.toLowerCase().includes(search.toLowerCase())) : options,
-    [options, search],
-  )
-
-  const selectedLabel = options.find((o) => o.value === value)?.label || placeholder
+  const handleNavigationKey = (event: React.KeyboardEvent) => {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      close(true)
+      return
+    }
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      if (!open) openMenu('first')
+      else moveActive(1)
+      return
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      if (!open) openMenu('last')
+      else moveActive(-1)
+      return
+    }
+    if (open && event.key === 'Home') {
+      event.preventDefault()
+      setActiveIndex(0)
+      return
+    }
+    if (open && event.key === 'End') {
+      event.preventDefault()
+      setActiveIndex(Math.max(0, filtered.length - 1))
+      return
+    }
+    if (open && event.key === 'Enter') {
+      event.preventDefault()
+      choose(activeIndex)
+    }
+  }
 
   return (
     <div ref={ref} className={cn('relative', className)}>
       <button
-        onClick={() => { const next = !open; setOpen(next); if (!next) setSearch('') }}
+        ref={triggerRef}
+        type="button"
+        onClick={() => open ? close(false) : openMenu()}
+        onKeyDown={handleNavigationKey}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={open ? listboxId : undefined}
         className={cn(
           'w-full flex items-center justify-between gap-2 bg-transparent border border-white/[0.06] rounded-md px-2.5 py-1.5 text-[15px] hover:border-white/[0.12] transition-colors outline-none',
           open && 'border-white/[0.15]',
         )}
       >
-        <span className={cn('truncate text-[15px]', value ? 'text-white/70' : 'text-white/20')}>{selectedLabel}</span>
+        <span className={cn('truncate text-[15px]', hasValue ? 'text-white/70' : 'text-white/20')}>{selectedLabel}</span>
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
           className={cn('shrink-0 text-white/20 transition-transform duration-150', open && 'rotate-180')}>
           <path d="M2.5 3.75L5 6.25L7.5 3.75" />
@@ -58,28 +144,39 @@ export function Select({ value, onChange, options, placeholder = 'Select...', se
               <input
                 ref={inputRef}
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(event) => { setSearch(event.target.value); setActiveIndex(0) }}
+                onKeyDown={handleNavigationKey}
                 placeholder="Search..."
-                className="w-full bg-white/[0.03] rounded px-2 py-1 text-[15px] text-white/70 outline-none placeholder:text-white/12"
+                aria-label="Search options"
+                aria-controls={listboxId}
+                aria-activedescendant={filtered[activeIndex] ? `${listboxId}-${activeIndex}` : undefined}
+                className="w-full bg-white/[0.03] rounded px-2 py-1 text-[15px] text-white/70 outline-none placeholder:text-white/20"
               />
             </div>
           )}
-          <div className="max-h-60 overflow-y-auto p-0.5">
+          <div id={listboxId} role="listbox" aria-label="Options" className="max-h-60 overflow-y-auto p-0.5">
             {filtered.length === 0 ? (
-              <div className="px-2.5 py-2.5 text-[14px] text-white/15 text-center">No results</div>
+              <div className="px-2.5 py-2.5 text-[14px] text-white/25 text-center">No results</div>
             ) : (
-              filtered.map((o) => (
+              filtered.map((option, index) => (
                 <button
-                  key={o.value}
-                  onClick={() => { onChange(o.value); setOpen(false) }}
+                  id={`${listboxId}-${index}`}
+                  key={option.value}
+                  type="button"
+                  role="option"
+                  aria-selected={option.value === value}
+                  onMouseEnter={() => setActiveIndex(index)}
+                  onClick={() => choose(index)}
                   className={cn(
                     'w-full text-left px-3 py-[6px] text-[15px] rounded transition-colors',
-                    o.value === value
-                      ? 'bg-white/[0.07] text-white/80'
-                      : 'text-white/40 hover:bg-white/[0.04] hover:text-white/70',
+                    option.value === value
+                      ? 'bg-white/[0.07] text-white/85'
+                      : index === activeIndex
+                        ? 'bg-white/[0.04] text-white/70'
+                        : 'text-white/45 hover:bg-white/[0.04] hover:text-white/70',
                   )}
                 >
-                  {o.label}
+                  {option.label}
                 </button>
               ))
             )}
