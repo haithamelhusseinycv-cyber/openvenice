@@ -1,158 +1,165 @@
-# OpenVenice
+# OpenVenice — Focused Custom Build
 
-A customizable, open-source frontend for the [Venice AI](https://venice.ai) API.
+A self-hosted React frontend for the Venice AI API, customized around a small allowlist of chat, still-image generation, image-editing, workflow, and workflow-agent features.
 
-Venice gives you access to powerful AI models for text, images, audio, music, and video. OpenVenice gives you a clean interface to use them — one you own, can modify, and can host yourself.
+This fork intentionally hides Audio, Music, Video, and Embeddings from the application surface. Model IDs and defaults are centralized in `src/lib/allowed-models.ts` so UI, settings, Workflows, and Playground follow the same policy.
 
-https://github.com/user-attachments/assets/1056682b-80c2-45da-9b57-6572840e8db4
-
-## Why OpenVenice?
-
-**Your interface, your rules.** Venice's official UI is great, but sometimes you want more control:
-
-- **Customize everything** — add tools, change layouts, tweak parameters, build features that matter to you. The codebase is intentionally simple and hackable.
-- **Share your API key with family** — host OpenVenice on your own server, enter your key once, and give your family a clean AI interface without them needing their own accounts.
-- **No server, no backend** — it's a static site. Your API key stays in your browser and goes directly to Venice's API. Nothing passes through a middleman.
-- **Transparent** — every API call is visible in the source. No telemetry, no analytics, no tracking.
-- **Barebones on purpose** — ships with useful features like visual workflows, but keeps things minimal so you can build on top without fighting existing complexity.
-
-## Features
+## Enabled surfaces
 
 ### Chat
-Streaming responses, conversation history, model selection, web search, citations, temperature control. Markdown rendering with safe URL handling and syntax highlighting. Image attachments (paste, drag-drop, or upload) for vision models.
 
-### Image Generation
-Prompts, negative prompts, style presets, steps, resolution, aspect ratio, variants, watermark control. Lightbox gallery with download. Edit / Upscale / Background-remove tools in a separate tab.
+Streaming chat, conversation history, image attachments, configurable generation settings, Markdown rendering, and Venice web-search options where supported by the selected model.
 
-### Audio
-Text-to-speech with 50+ voices across 9 languages. Adjustable speed, multiple formats (MP3, Opus, AAC, FLAC, WAV). Audio transcription via Whisper.
+Allowlisted chat models:
 
-### Music Generation
-Text-to-music with optional lyrics, duration control, instrumental mode. Supports Stable Audio, ACE-Step, ElevenLabs, MiniMax, MMAudio.
+- `venice-uncensored-1-2` — default
+- `venice-uncensored-role-play`
+- `qwen-3-6-plus`
+- `olafangensan-glm-4-7-flash-heretic`
 
-### Video Generation
-Text-to-video and image-to-video. Configurable aspect ratio, resolution, duration. Auto-detects model capabilities. Cancellable polling with elapsed-time display.
+Default maximum output is 1024 tokens unless the user changes it.
 
-### Embeddings
-Vector embeddings for text with selectable models and dimension display.
+### Image Generate
+
+Allowlisted generators:
+
+- `lustify-v8` — default
+- `lustify-v7`
+- `lustify-sdxl`
+
+The generator keeps prompt and negative-prompt text locally, supports model-advertised aspect ratios/resolutions, limits variants to two, caps the in-session gallery, and downloads images with a MIME-aware extension.
+
+### Image Tools
+
+Tools include Edit, Swap, Undress, Upscale, and Background Remove. Edit uses:
+
+- `qwen-edit-uncensored` — default
+- `firered-image-edit`
+
+Edit / Swap / Undress use Venice `/image/multi-edit`. Requests keep `safe_mode: false` and `enhance_prompt: false`; this fork does not add a `moderation` field. Multi-edit uploads are restricted to JPEG, PNG, WebP, or GIF, under 25 MB, with preflight image validation.
+
+Generate results can be handed directly to Edit or Swap. The Undress workflow requires an adult/permission confirmation before the action is enabled.
 
 ### Workflows
-Visual node editor for chaining models. Connect Input → LLM → Image Gen → Output, with full parameter controls per node. Independent branches run in parallel. Starter templates for album covers, podcast episodes, music videos, song writing, character portraits, and story scenes.
+
+The visual workflow editor exposes only:
+
+- Input
+- Chat
+- Image Gen
+- Output
+
+Legacy saved TTS/Music/Video nodes can still be rendered as unsupported nodes so users can remove them, but validation/execution will not run them.
 
 ### Playground
-Conversational agent that builds and edits workflows on a live canvas as you describe them in plain language.
 
-## Getting Started
+The workflow agent can create and edit the same restricted workflow graph. Its model picker and model-discovery tools use the centralized allowlist, and agent responses are capped at 1536 tokens.
+
+## API reliability
+
+The Venice client distinguishes safe reads from billable mutations:
+
+- GET/HEAD requests may retry transient server/network failures.
+- Paid POST operations default to zero automatic retries to avoid accidental duplicate generations.
+- HTTP 429 is surfaced to the user rather than automatically replaying a mutation.
+- Error parsing handles Venice object errors, flat `{ "error": "..." }` responses, top-level messages, and plain text.
+
+## API key storage
+
+By default the Venice API key is kept in `sessionStorage`, so it disappears when the browser session closes.
+
+If **Remember across sessions** is enabled, the key is encrypted in-browser with AES-GCM using a passphrase-derived key (PBKDF2) before being stored in `localStorage`. The passphrase itself is not persisted.
+
+## Development
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
-Open `http://localhost:5173`, click **API Key** in the header, paste your [Venice AI API key](https://venice.ai/settings/api), and start using it.
-
-### Where does my API key live?
-
-By default, your key is held in **`sessionStorage`** — meaning it's gone when you close the tab. If you check **Remember across sessions**, the key is encrypted with a passphrase you choose (AES-GCM via PBKDF2, 250k iterations, all in-browser) and stored in `localStorage`. Your passphrase is never persisted; you re-enter it on each new session.
-
-You can disconnect at any time from the API key dialog.
-
-## Self-hosting
-
-You have three options. Pick whichever fits.
-
-### 1. Static hosting + direct API calls (simplest)
-
-Build the app and serve `/dist` from any static host (Netlify, Vercel, Cloudflare Pages, S3, Pi, …). The browser will hit `https://api.venice.ai` directly. CORS must allow your origin — Venice's API does.
+Quality checks:
 
 ```bash
-npm run build       # outputs to /dist
+npm run lint
+npm run build
 ```
 
-Override the API base URL at build time if you proxy elsewhere:
+Pull requests also run the same lint/build gate through GitHub Actions.
 
-```bash
-VITE_VENICE_BASE_URL=https://my-proxy.example.com/api/v1 npm run build
-```
+## Production / Railway
 
-### 2. Docker (Railway, Fly, Render, your homelab)
-
-A multi-stage Dockerfile is included; runtime is Nginx serving the built bundle with a SPA fallback.
+The repository includes a multi-stage Docker build and `railway.json`.
 
 ```bash
 docker build -t openvenice .
-docker run -p 8080:80 openvenice
+docker run --rm -p 8080:80 openvenice
 ```
 
-A `railway.json` is included for one-click Railway deploy.
+The runtime Nginx configuration provides SPA fallback, cache rules, CSP, clickjacking protection, MIME sniffing protection, referrer policy, and a restrictive permissions policy.
 
-### 3. Run a tiny proxy yourself
+The default production API endpoint is:
 
-If you'd rather keep API calls server-side (so the key never touches a browser), front the static bundle with any reverse proxy that forwards `/api/v1/*` to `https://api.venice.ai/api/v1/*` and strips/injects the key. The frontend already speaks to a relative `/api/v1` base when `VITE_VENICE_BASE_URL` is unset in dev (it uses the Vite proxy automatically).
+```text
+https://api.venice.ai/api/v1
+```
 
-### Sharing with family
+You can override it at build time:
 
-Deploy it, share the URL, have them enter your API key (or their own). Each browser stores its own key and history.
+```bash
+docker build \
+  --build-arg VITE_VENICE_BASE_URL=https://example.com/api/v1 \
+  -t openvenice .
+```
 
-## Keyboard Shortcuts
+If the override points to a different external origin, add that origin to `connect-src` in both `index.html` and `nginx.conf`. A same-origin proxy is preferable when the API key should be injected server-side.
+
+## Keyboard shortcuts
 
 | Shortcut | Action |
-|----------|--------|
-| `Cmd+N` | New chat |
-| `Cmd+1‒8` | Switch tabs |
-| `Enter` | Send message (in chat) |
-| `Shift+Enter` | Newline (in chat) |
-| `Esc` | Close any dialog or lightbox |
+| --- | --- |
+| `Cmd/Ctrl + N` | New chat |
+| `Cmd/Ctrl + 1–4` | Switch enabled tabs |
+| `Enter` | Send in Chat |
+| `Shift + Enter` | Newline |
+| `Esc` | Close supported dialogs/lightboxes |
 
-## Tech Stack
+## Architecture
 
-React 19, TypeScript, Vite, Zustand, TanStack Query, Tailwind CSS v4, React Flow.
-
-## Project Structure
-
-```
+```text
 src/
-├── app.tsx                     # Tab routing + error boundary
 ├── components/
-│   ├── chat/                   # Chat interface + message bubbles
-│   ├── image/                  # Image generation + edit/upscale/bg-remove
-│   ├── audio/                  # TTS + transcription
-│   ├── music/                  # Music generation
-│   ├── video/                  # Video generation (cancellable polling)
-│   ├── embeddings/             # Embeddings
-│   ├── workflows/              # Visual workflow editor
-│   ├── playground/             # Agent-authored workflows
-│   ├── layout/                 # Sidebar, header, API key dialog
-│   └── ui/                     # Shared components, ErrorBoundary, Toaster
-├── stores/                     # Zustand stores (versioned + quota-safe)
-├── hooks/                      # Data hooks, useBlobUrl, useChat
+│   ├── chat/
+│   ├── image/
+│   ├── workflows/
+│   ├── playground/
+│   ├── layout/
+│   └── ui/
+├── hooks/
 ├── lib/
-│   ├── venice-client.ts        # fetch w/ retry+backoff
-│   ├── stream.ts               # robust SSE parser
-│   ├── workflow-engine.ts      # parallel topological executor
-│   ├── workflow-validator.ts   # graph + param validation
-│   ├── workflow-mutations.ts   # patch reducer + auto-layout
-│   ├── playground-agent.ts     # validated patch parser
-│   └── safe-storage.ts         # localStorage with quota recovery
-└── types/                      # TypeScript types
+│   ├── allowed-models.ts
+│   ├── image-io.ts
+│   ├── venice-client.ts
+│   ├── workflow-engine.ts
+│   ├── workflow-schema.ts
+│   ├── workflow-validator.ts
+│   └── playground-agent-tools.ts
+├── stores/
+└── types/
 ```
 
-## Production-grade defaults
+The source tree still contains some upstream components for disabled modalities so the fork can be rebased more easily, but those surfaces are not exposed by the customized application routing.
 
-- **Retry + backoff** on transient API failures (429/5xx), respecting `Retry-After`.
-- **Cancellable streams and polling** — Stop button kills any in-flight request.
-- **Capped polling** with elapsed-time display so video/music jobs can't run forever.
-- **Object-URL lifecycle** managed via `useBlobUrl` — no leaked blob references.
-- **CSP** in `index.html` restricts script/style/connect sources.
-- **Error boundary** at the root + per-tab so one bad render doesn't take the whole app down.
-- **Toast system** for user-facing errors (network failures, transient issues).
-- **Persisted state versioned + quota-safe** — schema migrations, automatic pruning on `QuotaExceededError`.
-- **Markdown sanitization** — `javascript:` and other unsafe URI schemes are stripped from rendered AI output.
-- **Accessible** — every interactive control is a real `<button>`, focus-visible rings everywhere, aria labels on icon-only controls, `prefers-reduced-motion` honored.
+## Security notes
 
-## Contributing
+- Browser-rendered model Markdown uses a URL allowlist.
+- Production CSP is sent as an HTTP response header by Nginx; a compatible meta CSP remains for static-host fallbacks.
+- Persisted Zustand stores are versioned and quota-safe.
+- Blob preview URLs are revoked on replacement/unmount.
+- Do not commit API keys or `.env` secrets; environment files are ignored except `.env.example`.
 
-Fork it, break it, make it yours. PRs welcome.
+## Tech stack
+
+React 19, TypeScript, Vite, Zustand, TanStack Query, Tailwind CSS v4, React Flow, Nginx.
 
 ## License
 
