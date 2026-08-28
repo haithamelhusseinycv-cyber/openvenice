@@ -1,0 +1,13 @@
+node_modules
+dist
+.git
+.github
+.DS_Store
+.env
+.env.*
+!.env.example
+*.log
+*.mp4
+*.mov
+*.webm
+coverage
