@@ -4,6 +4,7 @@ import { useSettingsStore } from '../../stores/settings-store'
 import { useModels } from '../../hooks/use-models'
 import { useChat } from '../../hooks/use-chat'
 import { useAuthStore } from '../../stores/auth-store'
+import { DEFAULT_CHAT_MODEL_ID } from '../../lib/allowed-models'
 import { MessageBubble } from './message-bubble'
 import { ChatInput } from './chat-input'
 import { VeniceParams } from './venice-params'
@@ -17,25 +18,27 @@ const STARTER_PROMPTS = [
 ]
 
 export function ChatView() {
-  const deleteMessage = useChatStore((s) => s.deleteMessage)
-  const conversation = useChatStore((s) => {
-    const id = s.activeConversationId
-    return id ? s.conversations.find((c) => c.id === id) : undefined
+  const deleteMessage = useChatStore((state) => state.deleteMessage)
+  const conversation = useChatStore((state) => {
+    const id = state.activeConversationId
+    return id ? state.conversations.find((candidate) => candidate.id === id) : undefined
   })
-  const apiKey = useAuthStore((s) => s.apiKey)
-  const selectedModel = useSettingsStore((s) => s.selectedModels.chat)
+  const apiKey = useAuthStore((state) => state.apiKey)
+  const selectedModel = useSettingsStore((state) => state.selectedModels.chat)
   const { data: models } = useModels('text')
   const model =
-    selectedModel && models?.some((m) => m.id === selectedModel)
+    selectedModel && models?.some((candidate) => candidate.id === selectedModel)
       ? selectedModel
-      : models?.[0]?.id || 'venice-uncensored-1-2'
+      : models?.[0]?.id || DEFAULT_CHAT_MODEL_ID
+  const modelData = models?.find((candidate) => candidate.id === model)
+  const supportsImages = modelData?.model_spec?.capabilities?.supportsVision === true
   const { send, stop, regenerate, isStreaming } = useChat()
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const messageCount = conversation?.messages.length ?? 0
   const lastContent = conversation?.messages[messageCount - 1]?.content
-  const lastLen = typeof lastContent === 'string' ? lastContent.length : 0
-  const scrollTrigger = `${messageCount}-${Math.floor(lastLen / 200)}`
+  const lastLength = typeof lastContent === 'string' ? lastContent.length : 0
+  const scrollTrigger = `${messageCount}-${Math.floor(lastLength / 200)}`
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [scrollTrigger])
@@ -58,14 +61,14 @@ export function ChatView() {
               <div className="w-full max-w-md flex flex-col gap-2">
                 <div className="text-[12px] uppercase tracking-[0.08em] text-white/35 font-medium text-left">Try one of these</div>
                 <div className="flex flex-col gap-1.5">
-                  {STARTER_PROMPTS.map((p) => (
+                  {STARTER_PROMPTS.map((prompt) => (
                     <button
-                      key={p}
+                      key={prompt}
                       type="button"
-                      onClick={() => send(p, model)}
+                      onClick={() => send(prompt, model)}
                       className="text-left px-3 py-2.5 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:border-white/[0.14] hover:bg-white/[0.04] transition-all text-[14px] text-white/65 focus-visible:outline focus-visible:outline-1 focus-visible:outline-white/40"
                     >
-                      {p}
+                      {prompt}
                     </button>
                   ))}
                 </div>
@@ -79,14 +82,14 @@ export function ChatView() {
               <VeniceParams />
             </div>
             <div className="w-full max-w-[960px] mx-auto py-5 px-4 sm:px-5 flex flex-col gap-5">
-              {conversation.messages.map((msg, i) => (
+              {conversation.messages.map((message, index) => (
                 <MessageBubble
-                  key={i}
-                  message={msg}
-                  index={i}
+                  key={index}
+                  message={message}
+                  index={index}
                   onCopy={() => {}}
-                  onDelete={() => { if (conversation) deleteMessage(conversation.id, i) }}
-                  onRegenerate={msg.role === 'assistant' && i === conversation.messages.length - 1 ? () => regenerate(model) : undefined}
+                  onDelete={() => { if (conversation) deleteMessage(conversation.id, index) }}
+                  onRegenerate={message.role === 'assistant' && index === conversation.messages.length - 1 ? () => regenerate(model) : undefined}
                 />
               ))}
               <div ref={messagesEndRef} />
@@ -94,7 +97,13 @@ export function ChatView() {
           </>
         )}
       </div>
-      <ChatInput onSend={(msg, images) => send(msg, model, images)} onStop={stop} isStreaming={isStreaming} disabled={!apiKey} />
+      <ChatInput
+        onSend={(message, images) => send(message, model, images)}
+        onStop={stop}
+        isStreaming={isStreaming}
+        disabled={!apiKey}
+        allowImages={supportsImages}
+      />
     </div>
   )
 }
