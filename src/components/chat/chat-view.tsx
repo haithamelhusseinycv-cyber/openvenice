@@ -25,7 +25,10 @@ export function ChatView() {
   const apiKey = useAuthStore((s) => s.apiKey)
   const selectedModel = useSettingsStore((s) => s.selectedModels.chat)
   const { data: models } = useModels('text')
-  const model = selectedModel || models?.[0]?.id || 'venice-uncensored-1-2'
+  const model =
+    selectedModel && models?.some((m) => m.id === selectedModel)
+      ? selectedModel
+      : models?.[0]?.id || 'venice-uncensored-1-2'
   const { send, stop, regenerate, isStreaming } = useChat()
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
