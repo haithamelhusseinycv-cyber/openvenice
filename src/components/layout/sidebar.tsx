@@ -5,24 +5,13 @@ import { useChatStore } from '../../stores/chat-store'
 import { toast } from '../../stores/toast-store'
 import { VeniceLogo, VeniceWordmark } from '../ui/logo'
 import type { Conversation } from '../../types/venice'
+import { DEFAULT_CHAT_MODEL_ID } from '../../lib/allowed-models'
 
 function ChatIcon() {
   return (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg>)
 }
 function ImageIcon() {
   return (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>)
-}
-function AudioIcon() {
-  return (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" /><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8" /></svg>)
-}
-function VideoIcon() {
-  return (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" /></svg>)
-}
-function MusicIcon() {
-  return (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="5.5" cy="17.5" r="2.5" /><circle cx="17.5" cy="15.5" r="2.5" /><path d="M8 17.5V5l12-2v12.5" /></svg>)
-}
-function EmbedIcon() {
-  return (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" /></svg>)
 }
 function WorkflowIcon() {
   return (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="5" r="2" /><circle cx="6" cy="19" r="2" /><circle cx="18" cy="19" r="2" /><path d="M12 7v4M12 11l-6 6M12 11l6 6" /></svg>)
@@ -45,10 +34,6 @@ const navGroups: NavGroup[] = [
     label: 'Generate',
     items: [
       { id: 'image', label: 'Image', Icon: ImageIcon },
-      { id: 'audio', label: 'Audio', Icon: AudioIcon },
-      { id: 'music', label: 'Music', Icon: MusicIcon },
-      { id: 'video', label: 'Video', Icon: VideoIcon },
-      { id: 'embeddings', label: 'Embed', Icon: EmbedIcon },
     ],
   },
   {
@@ -171,7 +156,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: Props) {
           <div className="flex items-center justify-between px-3 pt-3 pb-1.5">
             <span className="text-[10.5px] font-semibold text-white/40 uppercase tracking-[0.1em]">History</span>
             <button
-              onClick={() => createConversation(selectedModel || 'qwen3-next-80b')}
+              onClick={() => createConversation(selectedModel || DEFAULT_CHAT_MODEL_ID)}
               aria-label="New chat"
               className="text-white/55 hover:text-white transition-colors p-1 rounded-md hover:bg-white/[0.05] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
               title="New chat (⌘N)"
@@ -217,7 +202,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: Props) {
         <div className="px-3 py-2.5 border-t border-white/[0.04]">
           <div className="text-[11px] text-white/35 space-y-0.5">
             <div className="flex justify-between"><span>New chat</span><kbd className="font-mono text-white/50">⌘N</kbd></div>
-            <div className="flex justify-between"><span>Switch tab</span><kbd className="font-mono text-white/50">⌘1-8</kbd></div>
+            <div className="flex justify-between"><span>Switch tab</span><kbd className="font-mono text-white/50">⌘1-4</kbd></div>
           </div>
         </div>
       )}
