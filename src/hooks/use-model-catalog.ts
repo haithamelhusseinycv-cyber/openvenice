@@ -16,11 +16,12 @@ export type ModelCatalog = {
 
 function extractAllowed(resp: ModelsResponse | undefined, allowed: readonly string[]): string[] {
   if (!resp) return []
-  const set = new Set(allowed)
-  return resp.data
-    .filter((m) => !m.model_spec?.offline)
-    .map((m) => m.id)
-    .filter((id) => set.has(id))
+  const available = new Set(
+    resp.data
+      .filter((m) => !m.model_spec?.offline)
+      .map((m) => m.id),
+  )
+  return allowed.filter((id) => available.has(id))
 }
 
 export function useModelCatalog() {
