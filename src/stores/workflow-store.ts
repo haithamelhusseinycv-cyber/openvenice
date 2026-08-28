@@ -75,7 +75,7 @@ interface WorkflowState {
   applyPatches: (workflowId: string, patches: readonly WorkflowPatch[]) => PatchResult
 }
 
-function sanitizeNodeData(data: VeniceNodeData): VeniceNodeData {
+export function sanitizeWorkflowNodeData(data: VeniceNodeData): VeniceNodeData {
   const next = { ...data }
 
   if (next.nodeType === 'chat') {
@@ -93,12 +93,12 @@ function sanitizeNodeData(data: VeniceNodeData): VeniceNodeData {
   return next
 }
 
-function sanitizeNodes(nodes: Node<VeniceNodeData>[]): Node<VeniceNodeData>[] {
-  return nodes.map((node) => ({ ...node, data: sanitizeNodeData(node.data) }))
+export function sanitizeWorkflowNodes(nodes: Node<VeniceNodeData>[]): Node<VeniceNodeData>[] {
+  return nodes.map((node) => ({ ...node, data: sanitizeWorkflowNodeData(node.data) }))
 }
 
 function sanitizeWorkflow(workflow: Workflow): Workflow {
-  return { ...workflow, nodes: sanitizeNodes(workflow.nodes) }
+  return { ...workflow, nodes: sanitizeWorkflowNodes(workflow.nodes) }
 }
 
 export const useWorkflowStore = create<WorkflowState>()(
@@ -130,7 +130,7 @@ export const useWorkflowStore = create<WorkflowState>()(
           workflows: state.workflows.map((workflow) => {
             if (workflow.id !== id) return workflow
             const next = { ...workflow, ...updates }
-            if (updates.nodes) next.nodes = sanitizeNodes(updates.nodes)
+            if (updates.nodes) next.nodes = sanitizeWorkflowNodes(updates.nodes)
             return next
           }),
         })),
@@ -158,7 +158,7 @@ export const useWorkflowStore = create<WorkflowState>()(
         const workflow = get().workflows.find((candidate) => candidate.id === workflowId)
         if (!workflow) throw new Error(`Workflow not found: ${workflowId}`)
         const result = applyPatches({ nodes: workflow.nodes, edges: workflow.edges }, patches)
-        const nodes = sanitizeNodes(result.nodes)
+        const nodes = sanitizeWorkflowNodes(result.nodes)
         set((state) => ({
           workflows: state.workflows.map((candidate) =>
             candidate.id === workflowId ? { ...candidate, nodes, edges: result.edges } : candidate,
