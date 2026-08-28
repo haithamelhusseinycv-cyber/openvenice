@@ -24,8 +24,7 @@ export function ImageTools() {
 
   // Edit state
   const [editPrompt, setEditPrompt] = useState('')
-  const [editModel, setEditModel] = useState('qwen-edit-uncensored')
-
+  const [editModel, setEditModel] = use
   // Upscale state
   const [scale, setScale] = useState(2)
   const [enhance, setEnhance] = useState(false)
