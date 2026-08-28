@@ -34,6 +34,9 @@ const SWAP_NEGATIVE =
 
 function buildSwapPrompt(kind: SwapKind, person: SwapPerson) {
   const subject = person === 'man' ? 'man' : 'woman'
+  const bodyParts = person === 'man'
+    ? 'torso, chest, belly, hips, legs, arms, skin'
+    : 'torso, breasts, belly, hips, legs, arms, skin'
 
   if (kind === 'face') {
     return `Image 1 is the target photograph. Image 2 is the identity source.\n\nReplace ONLY the face of the ${subject} in image 1 with a 100% 1:1 identical copy of the face from image 2. Copy the exact identity: bone structure, eye shape and color, eyelids, eyebrows, nose, lips, teeth if visible, skin texture, pores, moles, freckles, scars, wrinkles, age, and ethnicity. Do not invent a new face. Do not beautify. Do not slim or age-shift.\n\nKeep image 1 otherwise identical: pose, body, hands, hair, neck, ears, clothing, jewelry, background, lighting, shadows, camera angle, crop, and any visible anatomy. Seamless photoreal blend only at the jawline and ears. Same expression as image 1.\n\nAvoid: ${SWAP_NEGATIVE}`
@@ -43,7 +46,7 @@ function buildSwapPrompt(kind: SwapKind, person: SwapPerson) {
     return `Image 1 is the target photograph. Image 2 is the identity source.\n\nReplace the entire head of the ${subject} in image 1 with a 100% 1:1 identical copy of the head from image 2, including face, hair, ears, and neck. Copy the exact identity and hairstyle from image 2. Do not invent a new head. Do not beautify.\n\nKeep image 1 body, pose, hands, clothing, jewelry, background, lighting, shadows, camera angle, and crop identical. Match skin tone and shadows only at the neck seam. Photoreal blend.\n\nAvoid: ${SWAP_NEGATIVE}, different hair, hair from image 1`
   }
 
-  return `Image 1 is the target photograph. Image 2 is the body source.\n\nReplace the body of the ${subject} in image 1 with a 100% 1:1 identical copy of the body from image 2, including torso, breasts, belly, hips, legs, arms, skin, and any visible anatomy or clothing from image 2. Do not invent a new body. Do not reshape.\n\nKeep the exact face and hair of image 1 100% unchanged. Keep image 1 pose, camera angle, bed or background, and lighting as close as possible. Photoreal blend only at the neck and shoulders.\n\nAvoid: ${SWAP_NEGATIVE}, different face from image 1, face from image 2, new pose`
+  return `Image 1 is the target photograph. Image 2 is the body source.\n\nReplace the body of the ${subject} in image 1 with a 100% 1:1 identical copy of the body from image 2, including ${bodyParts}, and any visible anatomy or clothing from image 2. Do not invent a new body. Do not reshape.\n\nKeep the exact face and hair of image 1 100% unchanged. Keep image 1 pose, camera angle, bed or background, and lighting as close as possible. Photoreal blend only at the neck and shoulders.\n\nAvoid: ${SWAP_NEGATIVE}, different face from image 1, face from image 2, new pose`
 }
 
 const UNDRESS_NEGATIVE =
@@ -66,10 +69,13 @@ function clearFileInput(input: HTMLInputElement | null) {
 
 export function ImageTools() {
   const apiKey = useAuthStore((s) => s.apiKey)
-  const consumePendingSource = useImageWorkspace((s) => s.consumePendingSource)
-  const [tool, setTool] = useState<Tool>('edit')
-  const [imageData, setImageData] = useState<string | null>(null)
-  const [imageName, setImageName] = useState('')
+  const [pending] = useState(() => useImageWorkspace.getState().pendingSource)
+  const [tool, setTool] = useState<Tool>(pending?.tool ?? 'edit')
+  const [imageData, setImageData] = useState<string | null>(pending?.data ?? null)
+  const [imageName, setImageName] = useState(pending?.name ?? '')
+  useEffect(() => {
+    if (pending) useImageWorkspace.getState().clearPendingSource()
+  }, [pending])
   const [idImage, setIdImage] = useState<string | null>(null)
   const [idName, setIdName] = useState('')
   const [resultUrl, setResultBlob, resetResult] = useBlobUrl()
@@ -89,16 +95,6 @@ export function ImageTools() {
       // Ignore quota / private-mode storage errors
     }
   }, [editPrompt])
-
-  useEffect(() => {
-    const pending = consumePendingSource()
-    if (!pending) return
-    setTool(pending.tool)
-    setImageData(pending.data)
-    setImageName(pending.name)
-    resetResult()
-    clearFileInput(fileRef.current)
-  }, [consumePendingSource, resetResult])
 
   const [swapKind, setSwapKind] = useState<SwapKind>('face')
   const [swapPerson, setSwapPerson] = useState<SwapPerson>('woman')
