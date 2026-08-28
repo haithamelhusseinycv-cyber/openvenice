@@ -1,26 +1,30 @@
-import { useState } from 'react'
 import { ImageView } from './image-view'
 import { ImageTools } from './image-tools'
+import { useImageWorkspace, type ImageSubTab } from '../../stores/image-workspace-store'
 import { cn } from '../../lib/utils'
 
-type ImageTab = 'generate' | 'tools'
+const TABS: { id: ImageSubTab; label: string }[] = [
+  { id: 'generate', label: 'Generate' },
+  { id: 'tools', label: 'Edit / Swap / Undress / Upscale / BG' },
+]
 
 export function ImagePage() {
-  const [tab, setTab] = useState<ImageTab>('generate')
+  const tab = useImageWorkspace((s) => s.imageSubTab)
+  const setTab = useImageWorkspace((s) => s.setImageSubTab)
 
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-1 px-4 py-2.5 border-b border-white/[0.04]">
-        {(['generate', 'tools'] as const).map((t) => (
+        {TABS.map((t) => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
+            key={t.id}
+            onClick={() => setTab(t.id)}
             className={cn(
               'text-[14px] font-medium px-2.5 py-[3px] rounded-full transition-all duration-150',
-              tab === t ? 'bg-white text-black' : 'bg-white/[0.03] text-white/20 hover:text-white/40 hover:bg-white/[0.05]',
+              tab === t.id ? 'bg-white text-black' : 'bg-white/[0.03] text-white/20 hover:text-white/40 hover:bg-white/[0.05]',
             )}
           >
-            {t === 'generate' ? 'Generate' : 'Edit / Upscale / BG Remove'}
+            {t.label}
           </button>
         ))}
       </div>
