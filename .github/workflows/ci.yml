@@ -16,14 +16,30 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
+
       - name: Install
         run: npm ci
+
       - name: Lint
-        run: npm run lint
+        run: npm run lint 2>&1 | tee lint.log
+
       - name: Build
-        run: npm run build
+        if: always()
+        run: npm run build 2>&1 | tee build.log
+
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-diagnostics-${{ github.run_id }}
+          path: |
+            lint.log
+            build.log
+          if-no-files-found: ignore
+          retention-days: 3
