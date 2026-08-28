@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useAuthStore } from '../../stores/auth-store'
+import { useImageWorkspace } from '../../stores/image-workspace-store'
 import { useImageEdit, useImageMultiEdit, useImageUpscale, useBackgroundRemove } from '../../hooks/use-image-tools'
 import { useBlobUrl } from '../../hooks/use-blob-url'
 import { Select } from '../ui/select'
@@ -25,15 +26,24 @@ const SCENE_SIZES = [
   { value: '9:16', label: '9:16' },
   { value: '3:2', label: '3:2' },
   { value: '16:9', label: '16:9' },
+  { value: '21:9', label: '21:9' },
 ]
 
 const SWAP_NEGATIVE =
   'different face, similar face, cousin face, beautified face, face mix, identity drift, age change, gender change, extra person, extra limbs, extra fingers, warped hands, melted blend, halo, mismatch lighting, plastic skin, airbrush, cartoon, anime, CGI, text, watermark, mosaic, censor bar, clothes change, pose change, background change, camera change'
 
-const SWAP_PROMPTS: Record<SwapKind, string> = {
-  face: `Image 1 is the target photograph. Image 2 is the identity source.\n\nReplace ONLY the face of the woman in image 1 with a 100% 1:1 identical copy of the face from image 2. Copy the exact identity: bone structure, eye shape and color, eyelids, eyebrows, nose, lips, teeth if visible, skin texture, pores, moles, freckles, scars, wrinkles, age, and ethnicity. Do not invent a new face. Do not beautify. Do not slim or age-shift.\n\nKeep image 1 otherwise identical: pose, body, hands, hair, neck, ears, clothing, jewelry, background, lighting, shadows, camera angle, crop, and any visible anatomy. Seamless photoreal blend only at the jawline and ears. Same expression as image 1.\n\nAvoid: ${SWAP_NEGATIVE}`,
-  head: `Image 1 is the target photograph. Image 2 is the identity source.\n\nReplace the entire head of the woman in image 1 with a 100% 1:1 identical copy of the head from image 2, including face, hair, ears, and neck. Copy the exact identity and hairstyle from image 2. Do not invent a new head. Do not beautify.\n\nKeep image 1 body, pose, hands, clothing, jewelry, background, lighting, shadows, camera angle, and crop identical. Match skin tone and shadows only at the neck seam. Photoreal blend.\n\nAvoid: ${SWAP_NEGATIVE}, different hair, hair from image 1`,
-  body: `Image 1 is the target photograph. Image 2 is the body source.\n\nReplace the body of the woman in image 1 with a 100% 1:1 identical copy of the body from image 2, including torso, breasts, belly, hips, legs, arms, skin, and any visible anatomy or clothing from image 2. Do not invent a new body. Do not reshape.\n\nKeep the exact face and hair of image 1 100% unchanged. Keep image 1 pose, camera angle, bed or background, and lighting as close as possible. Photoreal blend only at the neck and shoulders.\n\nAvoid: ${SWAP_NEGATIVE}, different face from image 1, face from image 2, new pose`,
+function buildSwapPrompt(kind: SwapKind, person: SwapPerson) {
+  const subject = person === 'man' ? 'man' : 'woman'
+
+  if (kind === 'face') {
+    return `Image 1 is the target photograph. Image 2 is the identity source.\n\nReplace ONLY the face of the ${subject} in image 1 with a 100% 1:1 identical copy of the face from image 2. Copy the exact identity: bone structure, eye shape and color, eyelids, eyebrows, nose, lips, teeth if visible, skin texture, pores, moles, freckles, scars, wrinkles, age, and ethnicity. Do not invent a new face. Do not beautify. Do not slim or age-shift.\n\nKeep image 1 otherwise identical: pose, body, hands, hair, neck, ears, clothing, jewelry, background, lighting, shadows, camera angle, crop, and any visible anatomy. Seamless photoreal blend only at the jawline and ears. Same expression as image 1.\n\nAvoid: ${SWAP_NEGATIVE}`
+  }
+
+  if (kind === 'head') {
+    return `Image 1 is the target photograph. Image 2 is the identity source.\n\nReplace the entire head of the ${subject} in image 1 with a 100% 1:1 identical copy of the head from image 2, including face, hair, ears, and neck. Copy the exact identity and hairstyle from image 2. Do not invent a new head. Do not beautify.\n\nKeep image 1 body, pose, hands, clothing, jewelry, background, lighting, shadows, camera angle, and crop identical. Match skin tone and shadows only at the neck seam. Photoreal blend.\n\nAvoid: ${SWAP_NEGATIVE}, different hair, hair from image 1`
+  }
+
+  return `Image 1 is the target photograph. Image 2 is the body source.\n\nReplace the body of the ${subject} in image 1 with a 100% 1:1 identical copy of the body from image 2, including torso, breasts, belly, hips, legs, arms, skin, and any visible anatomy or clothing from image 2. Do not invent a new body. Do not reshape.\n\nKeep the exact face and hair of image 1 100% unchanged. Keep image 1 pose, camera angle, bed or background, and lighting as close as possible. Photoreal blend only at the neck and shoulders.\n\nAvoid: ${SWAP_NEGATIVE}, different face from image 1, face from image 2, new pose`
 }
 
 const UNDRESS_NEGATIVE =
@@ -50,8 +60,13 @@ function loadSaved(key: string, fallback: string) {
   }
 }
 
+function clearFileInput(input: HTMLInputElement | null) {
+  if (input) input.value = ''
+}
+
 export function ImageTools() {
   const apiKey = useAuthStore((s) => s.apiKey)
+  const consumePendingSource = useImageWorkspace((s) => s.consumePendingSource)
   const [tool, setTool] = useState<Tool>('edit')
   const [imageData, setImageData] = useState<string | null>(null)
   const [imageName, setImageName] = useState('')
@@ -74,6 +89,17 @@ export function ImageTools() {
       // Ignore quota / private-mode storage errors
     }
   }, [editPrompt])
+
+  useEffect(() => {
+    const pending = consumePendingSource()
+    if (!pending) return
+    setTool(pending.tool)
+    setImageData(pending.data)
+    setImageName(pending.name)
+    resetResult()
+    clearFileInput(fileRef.current)
+  }, [consumePendingSource, resetResult])
+
   const [swapKind, setSwapKind] = useState<SwapKind>('face')
   const [swapPerson, setSwapPerson] = useState<SwapPerson>('woman')
   const [scale, setScale] = useState(2)
@@ -119,7 +145,7 @@ export function ImageTools() {
       swapMutation.mutate(
         {
           images: [imageData, idImage],
-          prompt: SWAP_PROMPTS[swapKind].replace(/woman/g, swapPerson),
+          prompt: buildSwapPrompt(swapKind, swapPerson),
           modelId: 'qwen-edit-uncensored',
           aspect_ratio: aspectRatio,
           safe_mode: false,
@@ -183,6 +209,20 @@ export function ImageTools() {
   const swapReady = !!(imageData && idImage && apiKey && !isLoading)
   const otherReady = !!(imageData && apiKey && !isLoading && (tool !== 'edit' || editPrompt.trim()))
 
+  const removeSource = () => {
+    setImageData(null)
+    setImageName('')
+    resetResult()
+    clearFileInput(fileRef.current)
+  }
+
+  const removeId = () => {
+    setIdImage(null)
+    setIdName('')
+    resetResult()
+    clearFileInput(idFileRef.current)
+  }
+
   return (
     <div className="flex h-full">
       <div className="w-96 border-r border-white/[0.06] p-6 flex flex-col gap-4 overflow-y-auto shrink-0">
@@ -202,12 +242,12 @@ export function ImageTools() {
         </div>
 
         <div>
-          <Label>{tool === 'swap' ? '1. Target still' : 'Source image'}</Label>
+          <Label>{tool === 'swap' ? '1. Target still' : tool === 'undress' ? 'Dressed photo' : 'Source image'}</Label>
           {imageData ? (
             <div className="relative group">
               <img src={imageData} alt="Source" className="w-full rounded-lg border border-white/[0.06]" />
               <button
-                onClick={() => { setImageData(null); setImageName(''); resetResult() }}
+                onClick={removeSource}
                 aria-label="Remove image"
                 className="absolute top-1.5 right-1.5 p-1 bg-black/60 rounded-md text-white/60 hover:text-white opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all"
               >
@@ -225,9 +265,10 @@ export function ImageTools() {
                 const file = e.target.files?.[0]
                 if (!file) return
                 readFile(file, (data, name) => { setImageData(data); setImageName(name); resetResult() })
+                clearFileInput(e.target)
               }} />
               <p className="text-[14px] text-white/40">
-                {tool === 'undress' ? 'Dressed photo' : tool === 'swap' ? 'Lustify still / body photo' : 'Source image'}
+                {tool === 'undress' ? 'Upload a dressed adult photo' : tool === 'swap' ? 'Lustify still / body photo' : 'Source image'}
               </p>
             </button>
           )}
@@ -240,7 +281,7 @@ export function ImageTools() {
               <div className="relative group">
                 <img src={idImage} alt="ID" className="w-full rounded-lg border border-white/[0.06]" />
                 <button
-                  onClick={() => { setIdImage(null); setIdName(''); resetResult() }}
+                  onClick={removeId}
                   aria-label="Remove ID image"
                   className="absolute top-1.5 right-1.5 p-1 bg-black/60 rounded-md text-white/60 hover:text-white opacity-0 group-hover:opacity-100"
                 >
@@ -258,6 +299,7 @@ export function ImageTools() {
                   const file = e.target.files?.[0]
                   if (!file) return
                   readFile(file, (data, name) => { setIdImage(data); setIdName(name); resetResult() })
+                  clearFileInput(e.target)
                 }} />
                 <p className="text-[14px] text-white/40">Front face / head / body ID</p>
               </button>
@@ -425,7 +467,7 @@ export function ImageTools() {
                   ? 'Undressed image appears here'
                   : tool === 'upscale'
                     ? 'Upscaled image appears here'
-                    : 'Result appears here'}
+                    : 'Background-removed image appears here'}
           </EmptyState>
         )}
       </div>

@@ -1,4 +1,5 @@
 import { useSettingsStore } from '../../stores/settings-store'
+import { useImageWorkspace } from '../../stores/image-workspace-store'
 import { useModels } from '../../hooks/use-models'
 import { useAuthStore } from '../../stores/auth-store'
 import { Select } from '../ui/select'
@@ -44,8 +45,10 @@ interface Props {
 
 export function Header({ onOpenApiKey, onOpenMobileSidebar }: Props) {
   const { activeTab, selectedModels, setSelectedModel, toggleSidebar } = useSettingsStore()
+  const imageSubTab = useImageWorkspace((s) => s.imageSubTab)
   const apiKey = useAuthStore((s) => s.apiKey)
-  const hasOwnSelector = noModelSelector.has(activeTab)
+  const hideImageModels = activeTab === 'image' && imageSubTab === 'tools'
+  const hasOwnSelector = noModelSelector.has(activeTab) || hideImageModels
   const modelType = modelTypeMap[activeTab] || 'text'
   const { data: models } = useModels(hasOwnSelector ? undefined : modelType)
   const currentModel = hasOwnSelector ? '' : (selectedModels[activeTab] || models?.[0]?.id || '')

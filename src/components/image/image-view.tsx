@@ -3,6 +3,7 @@ import { useSettingsStore } from '../../stores/settings-store'
 import { useModels } from '../../hooks/use-models'
 import { useImageGenerate } from '../../hooks/use-image'
 import { useAuthStore } from '../../stores/auth-store'
+import { useImageWorkspace } from '../../stores/image-workspace-store'
 import { Label, TextArea, PrimaryButton, PillGroup, ErrorText } from '../ui/shared'
 import { GenerationView } from '../ui/generation-view'
 import type { ImageConstraints } from '../../types/venice'
@@ -105,6 +106,12 @@ useEffect(() => {
     return constraints!.resolutions!.map((r) => ({ value: r, label: r }))
   }, [constraints, hasResolutions])
 
+  const sendToEdit = useImageWorkspace((s) => s.sendToEdit)
+
+  const editGenerated = (b64: string, index?: number) => {
+    sendToEdit(toImageSrc(b64), `generated${index !== undefined ? `-${index + 1}` : ''}.png`)
+  }
+
   const downloadImage = (b64: string, index?: number) => {
     const a = document.createElement('a')
     a.href = toImageSrc(b64)
@@ -192,6 +199,9 @@ useEffect(() => {
           <div className="relative" onClick={(e) => e.stopPropagation()}>
             <img src={toImageSrc(selectedImage)} alt="Generated" className="max-w-[90vw] max-h-[90vh] rounded-xl shadow-2xl" />
             <div className="absolute top-3 right-3 flex gap-1.5">
+              <button onClick={() => editGenerated(selectedImage)} aria-label="Send to Edit" className="px-2 py-2 bg-black/60 hover:bg-black/80 rounded-lg text-[12px] text-white/80 hover:text-white transition-colors backdrop-blur-sm">
+                Edit
+              </button>
               <button onClick={() => downloadImage(selectedImage)} aria-label="Download" className="p-2 bg-black/60 hover:bg-black/80 rounded-lg text-white/70 hover:text-white transition-colors backdrop-blur-sm">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
               </button>
@@ -224,14 +234,24 @@ useEffect(() => {
                 className="w-full rounded-xl cursor-pointer border border-white/[0.05] hover:border-white/[0.18] transition-all duration-200"
                 onClick={() => setSelectedImage(img)}
               />
+              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+              <button
+                onClick={(e) => { e.stopPropagation(); editGenerated(img, i) }}
+                aria-label="Send to Edit"
+                className="px-1.5 py-1 bg-black/60 hover:bg-black/85 rounded-lg text-[11px] text-white/80 hover:text-white backdrop-blur-sm"
+                title="Send to Edit"
+              >
+                Edit
+              </button>
               <button
                 onClick={(e) => { e.stopPropagation(); downloadImage(img, i) }}
                 aria-label="Download"
-                className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/85 rounded-lg text-white/70 hover:text-white opacity-0 group-hover:opacity-100 transition-all backdrop-blur-sm"
+                className="p-1.5 bg-black/60 hover:bg-black/85 rounded-lg text-white/70 hover:text-white backdrop-blur-sm"
                 title="Download"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
               </button>
+              </div>
             </div>
           ))}
         </div>
