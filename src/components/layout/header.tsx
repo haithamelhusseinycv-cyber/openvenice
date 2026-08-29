@@ -4,6 +4,7 @@ import { useModels } from '../../hooks/use-models'
 import { useAuthStore } from '../../stores/auth-store'
 import { Select } from '../ui/select'
 import { StatusDot } from '../ui/shared'
+import { BillingBar } from './billing-bar'
 
 const modelTypeMap: Record<string, string> = {
   chat: 'text',
@@ -88,9 +89,11 @@ export function Header({ onOpenApiKey, onOpenMobileSidebar }: Props) {
           options={modelOptions}
           searchable
           placeholder="Model"
-          className="min-w-0 flex-1 max-w-[46vw] sm:max-w-none sm:w-64"
+          className="min-w-0 flex-1 max-w-[38vw] sm:max-w-none sm:w-52"
         />
       )}
+
+      <BillingBar />
 
       <button
         onClick={onOpenApiKey}
@@ -98,8 +101,8 @@ export function Header({ onOpenApiKey, onOpenMobileSidebar }: Props) {
         className="shrink-0 flex items-center gap-2 text-[13px] px-2.5 py-2 rounded-md border border-white/[0.12] hover:border-white/[0.25] min-h-11 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2"
       >
         <StatusDot tone={apiKey ? 'teal' : 'slate'} pulsing={!apiKey} />
-        <span className={apiKey ? 'text-white font-medium hidden xs:inline sm:inline' : 'text-white/80'}>
-          {apiKey ? 'On' : 'Key'}
+        <span className={apiKey ? 'text-white font-medium hidden sm:inline' : 'text-white/80'}>
+          {apiKey ? 'Key' : 'Key'}
         </span>
       </button>
     </header>
