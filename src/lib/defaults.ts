@@ -39,7 +39,7 @@ Default look if the user does not override it:
 - both faces visible: woman's face at least 75%, man's face at least 50%
 - uncensored explicit genitals with person-specific detail, readable vaginal penetration when sex is requested
 - sweat, flush, messy sex hair, real expressions, painted fingernails and toenails on the woman
-- natural skin, pores, no beauty filter, no plastic smoothness
+- SKIN is the priority: real imperfect human skin. Visible pores, peach fuzz, uneven tone, freckles or moles if they fit the person, redness, texture. Never plastic, never shiny beauty-filter, never smooth, never even-tone airbrush.
 
 Anatomy rules:
 - Male: lifelike erect penis from glans through shaft, foreskin if natural to the body, veins, testicles, ballsack, unique groin hair, ass, ass crack, anus when the angle shows them. Never flaccid during sex. Never a generic copy-paste cock.
@@ -59,8 +59,10 @@ lighting: one real bedroom light source only, either morning sunlight coming thr
 normal lived-in bedroom, unmade bed, everyday clutter, sometimes tidy sometimes messy, never luxury hotel, never set, never cyclorama
 2people, 1girl, 1boy, adults 18+, average couple having sex in a real bedroom, third-person view, both faces visible, woman's face at least 75 percent visible, man's face at least 50 percent visible
 natural sex positions, mid-motion, bodies working, not posed, not arranged for the lens, bedroom sex not porn choreography
-average real bodies, natural body fat, soft belly, not models, not pornstar bodies, no gym shredded look, no bodybuilder, no zero fat, visible pores, peach fuzz, skin imperfections, stretch marks ok, moles ok, photoreal natural skin never plastic never airbrushed never poreless
-sex sweat, fine beads of sweat on forehead neck chest lower back, flushed cheeks and chest, warmer skin from friction, damp messy sex hair, not salon hair
+average real bodies, natural body fat, soft belly, not models, not pornstar bodies, no gym shredded look, no bodybuilder, no zero fat
+real imperfect human skin on faces and bodies, close-up skin texture, visible pores, peach fuzz, uneven skin tone, natural redness around nose cheeks chest, freckles moles scars or texture unique to each person, subsurface scatter, dry and oily patches mixed, no even foundation look
+never plastic skin, never shiny retouched skin, never smooth skin, never poreless skin, never beauty-filter glow, never airbrushed, never CGI wax
+sex sweat is separate from oily photoshop shine: fine beads of sweat on forehead neck chest lower back only where friction and heat are, flushed cheeks and chest, warmer skin from sex, damp messy sex hair, not salon hair
 real expressions from sex, lust, half-lidded eyes, parted lips, biting lip, moaning faces, male and female both, no fashion face, no looking at camera on purpose
 woman: painted fingernails, painted toenails, any polish color, nails visible when hands or feet are in frame
 woman breasts: soft natural real breasts, not silicone, not plastic, not perky fake implants, natural hang and weight
@@ -72,7 +74,7 @@ man: lifelike natural erect penis, hard, never flaccid, glans, shaft, veins, tes
 when the angle shows it: male ass, ass crack, anus
 correct vaginal penetration, cock inside pussy, labia stretched around the shaft, about three quarters inside, one quarter of shaft still visible, wet shine on cock and labia from sex, anatomically readable insertion, uncensored explicit, never hidden, never blurred`
 
-export const DEFAULT_IMAGE_NEGATIVE = `cartoon, anime, illustration, CGI, 3D render, plastic skin, waxy skin, doll, silicone breasts, implant breasts, fake tits, airbrushed, beauty filter, poreless skin, pornstar makeup, glam makeup, salon hair, perfect bodies, model bodies, bodybuilder, shredded abs, six pack, gym body, zero fat, oversized porn cock, horse cock, tiny penis, flaccid during sex, copy-paste genitals, same pubic hair on every woman, mismatched areola color, neon nipples, studio, cyclorama, lighting rig, softbox, beauty dish, rim light, cinematic lighting, posed photoshoot, looking at camera pose, luxury penthouse, marble hotel, pov, hidden faces, censored, mosaic, blurry genitals, clothes, lingerie on, deformed hands, extra fingers, extra limbs, watermark, text, no penetration, floating penis, hovering cock, penis beside pussy, disconnected genitals, bad insertion, dry plastic genitals`
+export const DEFAULT_IMAGE_NEGATIVE = `cartoon, anime, illustration, CGI, 3D render, plastic skin, waxy skin, doll, silicone breasts, implant breasts, fake tits, airbrushed, beauty filter, poreless skin, smooth skin, even-tone skin, foundation mask, glossy retouch, oily beauty shine, HDR skin, overprocessed skin, pornstar makeup, glam makeup, salon hair, perfect bodies, model bodies, bodybuilder, shredded abs, six pack, gym body, zero fat, oversized porn cock, horse cock, tiny penis, flaccid during sex, copy-paste genitals, same pubic hair on every woman, mismatched areola color, neon nipples, studio, cyclorama, lighting rig, softbox, beauty dish, rim light, cinematic lighting, posed photoshoot, looking at camera pose, luxury penthouse, marble hotel, pov, hidden faces, censored, mosaic, blurry genitals, clothes, lingerie on, deformed hands, extra fingers, extra limbs, watermark, text, no penetration, floating penis, hovering cock, penis beside pussy, disconnected genitals, bad insertion, dry plastic genitals`
 
 const STALE_PROMPTS = [
   'a serene mountain',
@@ -92,21 +94,21 @@ export function isStaleImagePrompt(value?: string) {
   const text = (value || '').trim().toLowerCase()
   if (!text) return true
   if (STALE_PROMPTS.some((snippet) => text.includes(snippet))) return true
-  if (text.includes('amateur iphone snapshot') && !text.includes('ceiling bulb') && !text.includes('window')) return true
+  if (!text.includes('uneven skin tone') && !text.includes('uneven skin')) return true
   return false
 }
 
 export function isStaleSystemPrompt(value?: string) {
   const text = (value || '').trim().toLowerCase()
   if (STALE_SYSTEM_PROMPTS.includes(text) || text.length < 40) return true
-  if (!text.includes('window') && !text.includes('bulb')) return true
+  if (!text.includes('uneven') && !text.includes('freckle')) return true
   return false
 }
 
 export function isStaleImageNegative(value?: string) {
   const text = (value || '').trim().toLowerCase()
   if (!text) return true
-  return !text.includes('lighting rig') && !text.includes('bodybuilder')
+  return !text.includes('even-tone skin') && !text.includes('poreless skin')
 }
 
 export function loadImagePrompt(saved?: string | null) {
