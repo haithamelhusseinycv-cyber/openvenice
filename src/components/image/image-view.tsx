@@ -7,6 +7,8 @@ import { useAuthStore } from '../../stores/auth-store'
 import { useImageWorkspace } from '../../stores/image-workspace-store'
 import { DEFAULT_IMAGE_MODEL_ID, isAllowedImageModel } from '../../lib/allowed-models'
 import {
+  LOCKED_COUPLE_ASPECT,
+  LOCKED_COUPLE_SIZE,
   LOCKED_IMAGE_SIZE_IDX,
   LOCKED_IMAGE_STEPS,
   LOCKED_IMAGE_VARIANTS,
@@ -67,6 +69,11 @@ const DEFAULT_SIZE_MAP = [
   { w: 512, h: 512 }, { w: 768, h: 768 }, { w: 1024, h: 1024 }, { w: 1280, h: 1280 },
 ]
 
+function loadAspect(saved: string) {
+  if (!saved || saved === '1:1' || saved === 'Auto') return LOCKED_COUPLE_ASPECT
+  return saved
+}
+
 export function ImageView() {
   const apiKey = useAuthStore((s) => s.apiKey)
   const selectedModel = useSettingsStore((s) => s.selectedModels.image)
@@ -94,7 +101,7 @@ export function ImageView() {
     loadImageNegative(loadSaved('venice-image-negative', ''))
   )
   const [sizeIdx, setSizeIdx] = useState(() => loadSaved('venice-image-size', LOCKED_IMAGE_SIZE_IDX))
-  const [aspectRatio, setAspectRatio] = useState(() => loadSaved('venice-image-aspect', ''))
+  const [aspectRatio, setAspectRatio] = useState(() => loadAspect(loadSaved('venice-image-aspect', LOCKED_COUPLE_ASPECT)))
   const [resolution, setResolution] = useState(() => loadSaved('venice-image-resolution', ''))
   const [steps, setSteps] = useState(() => {
     const saved = loadSaved('venice-image-steps', '')
@@ -127,10 +134,7 @@ export function ImageView() {
 
   const aspectOptions = useMemo(() => {
     if (!hasAspectRatios) return []
-    return [
-      { value: '', label: 'Auto' },
-      ...constraints!.aspectRatios!.map((a) => ({ value: a, label: a })),
-    ]
+    return constraints!.aspectRatios!.map((a) => ({ value: a, label: a }))
   }, [constraints, hasAspectRatios])
 
   const resolutionOptions = useMemo(() => {
@@ -176,9 +180,9 @@ export function ImageView() {
 
   const handleGenerate = () => {
     if (!prompt.trim()) return
-    const size = DEFAULT_SIZE_MAP[Number(sizeIdx)] || DEFAULT_SIZE_MAP[2]
     const seedNum = seed.trim() === '' ? undefined : Number(seed)
     const validSeed = seedNum !== undefined && Number.isFinite(seedNum) ? Math.trunc(seedNum) : undefined
+    const ratio = aspectRatio || LOCKED_COUPLE_ASPECT
 
     const req: Record<string, unknown> = {
       prompt: prompt.trim(),
@@ -192,11 +196,11 @@ export function ImageView() {
     }
     if (validSeed !== undefined) req.seed = validSeed
 
-    if (hasAspectRatios && aspectRatio) {
-      req.aspect_ratio = aspectRatio
-    } else if (!hasAspectRatios) {
-      req.width = size.w
-      req.height = size.h
+    if (hasAspectRatios) {
+      req.aspect_ratio = ratio
+    } else {
+      req.width = LOCKED_COUPLE_SIZE.w
+      req.height = LOCKED_COUPLE_SIZE.h
     }
 
     if (hasResolutions && resolution) {
@@ -311,7 +315,7 @@ export function ImageView() {
       ) : (
         <div className="grid grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
           {mutation.isPending && Array.from({ length: variants }).map((_, i) => (
-            <div key={`skel-${i}`} className="aspect-square rounded-xl skeleton" />
+            <div key={`skel-${i}`} className="aspect-[3/2] rounded-xl skeleton" />
           ))}
           {images.map((img, i) => (
             <div key={i} className="relative group">
