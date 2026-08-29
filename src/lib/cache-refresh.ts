@@ -1,16 +1,5 @@
 const SIX_HOURS = 6 * 60 * 60 * 1000
-const BOOT_KEY = 'venice-cache-boot'
 const CHECK_KEY = 'venice-cache-checked'
-
-function bootStamp() {
-  try {
-    if (!sessionStorage.getItem(BOOT_KEY)) {
-      sessionStorage.setItem(BOOT_KEY, String(Date.now()))
-    }
-  } catch {
-    /* ignore */
-  }
-}
 
 function lastCheck(): number {
   try {
@@ -28,37 +17,23 @@ function markCheck() {
   }
 }
 
-async function newerBundle(): Promise<boolean> {
-  try {
-    const res = await fetch(`/?cache=${Date.now()}`, { cache: 'no-store' })
-    const html = await res.text()
-    const remote = html.match(/\/assets\/[^"']+\.js/g) || []
-    if (remote.length === 0) return false
-    const local = [...document.scripts].map((s) => s.src).join(' ')
-    return remote.some((src) => !local.includes(src.replace(/^\//, '')))
-  } catch {
-    return false
-  }
-}
-
 async function refreshIfDue() {
-  const due = Date.now() - lastCheck() >= SIX_HOURS
-  if (!due) return
-  markCheck()
-  if (document.visibilityState !== 'visible') return
-  if (await newerBundle()) {
-    location.reload()
+  const last = lastCheck()
+  if (!last) {
+    markCheck()
     return
   }
+  if (Date.now() - last < SIX_HOURS) return
+  if (document.visibilityState !== 'visible') return
+  markCheck()
   location.reload()
 }
 
 export function startCacheRefresh() {
-  bootStamp()
+  if (!lastCheck()) markCheck()
   const tick = () => {
     void refreshIfDue()
   }
   window.setInterval(tick, 15 * 60 * 1000)
   document.addEventListener('visibilitychange', tick)
-  window.setTimeout(tick, 20_000)
 }
