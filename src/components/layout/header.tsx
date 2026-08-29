@@ -27,7 +27,7 @@ const tabLabels: Record<string, string> = {
 
 const tabSubtitles: Record<string, string> = {
   chat: 'Conversational AI',
-  image: 'Generate images from text',
+  image: 'Lustify stills',
   audio: 'Text-to-speech and transcription',
   music: 'Generate music and sound',
   video: 'Generate video clips',
