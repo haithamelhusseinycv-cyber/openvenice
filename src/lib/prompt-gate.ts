@@ -42,9 +42,9 @@ export function scoreImagePrompt(prompt?: string): PromptGate {
         : hasAny(t, ['tall portrait', 'portrait 2:3', 'solo torso']),
     },
     {
-      id: 'hairdo',
-      label: 'Hairdos in frame',
-      ok: hasAny(t, ['hairdo', 'hair dos', 'visible hair']),
+      id: 'hair',
+      label: 'Messy or moist sex hair',
+      ok: hasAny(t, ['messy sex hair', 'damp messy', 'moist', 'damp hair', 'sex hair', 'messy hair']),
     },
     {
       id: 'faces',
