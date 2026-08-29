@@ -46,9 +46,9 @@ export function VeniceParams() {
             <textarea
               value={systemPrompt}
               onChange={(e) => setSystemPrompt(e.target.value)}
-              placeholder="You are a helpful assistant..."
-              rows={2}
-              className="w-full bg-white/[0.02] border border-white/[0.05] rounded-lg px-3 py-2 text-[15px] text-white/50 outline-none resize-none placeholder:text-white/8 focus:border-white/[0.1] transition-colors"
+              placeholder="Lustify prompt writer…"
+              rows={8}
+              className="w-full bg-white/[0.02] border border-white/[0.05] rounded-lg px-3 py-2 text-[15px] text-white/50 outline-none resize-y min-h-[8rem] placeholder:text-white/8 focus:border-white/[0.1] transition-colors"
             />
           </div>
           <div className="grid grid-cols-3 gap-3">
