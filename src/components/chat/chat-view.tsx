@@ -4,16 +4,16 @@ import { useSettingsStore } from '../../stores/settings-store'
 import { useModels } from '../../hooks/use-models'
 import { useChat } from '../../hooks/use-chat'
 import { useAuthStore } from '../../stores/auth-store'
+import { DEFAULT_CHAT_MODEL_ID, isAllowedChatModel } from '../../lib/allowed-models'
 import { MessageBubble } from './message-bubble'
 import { ChatInput } from './chat-input'
 import { VeniceParams } from './venice-params'
 import { VeniceLogo } from '../ui/logo'
 
 const STARTER_PROMPTS = [
-  'Explain how RSA encryption works using a metaphor a 10-year-old could grasp.',
-  'Draft a polite but firm email asking my landlord to fix the heating.',
-  'Compare REST and GraphQL — when does each shine?',
-  'Brainstorm five novel side-project ideas using LLMs and a Raspberry Pi.',
+  'Write a short explicit amateur couple sex scene I can paste into Lustify v8.',
+  'Tighten this image prompt for readable vaginal penetration and visible faces.',
+  'Turn this scene into a negative prompt that blocks clothes, CGI, and failed insertion.',
 ]
 
 export function ChatView() {
@@ -26,9 +26,9 @@ export function ChatView() {
   const selectedModel = useSettingsStore((s) => s.selectedModels.chat)
   const { data: models } = useModels('text')
   const model =
-    selectedModel && models?.some((m) => m.id === selectedModel)
+    selectedModel && isAllowedChatModel(selectedModel) && models?.some((m) => m.id === selectedModel)
       ? selectedModel
-      : models?.[0]?.id || 'venice-uncensored-1-2'
+      : models?.find((m) => m.id === DEFAULT_CHAT_MODEL_ID)?.id || models?.[0]?.id || DEFAULT_CHAT_MODEL_ID
   const { send, stop, regenerate, isStreaming } = useChat()
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -50,7 +50,7 @@ export function ChatView() {
               <div className="text-[20px] font-semibold text-white/85">How can I help today?</div>
               <p className="text-[14px] text-white/45 max-w-sm">
                 {apiKey
-                  ? 'Pick a model in the header above, then start a conversation. Streaming, web search, and citations are all built in.'
+                  ? 'Uncensored 1.2 is the default writer. Use it to draft Lustify prompts, then generate on Image.'
                   : 'Connect a Venice API key from the header above to get started.'}
               </p>
             </div>
