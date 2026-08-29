@@ -7,8 +7,8 @@ export function VeniceParams() {
   const [showSettings, setShowSettings] = useState(false)
 
   return (
-    <div className="px-4 py-1.5">
-      <div className="flex items-center gap-1">
+    <div className="px-3 sm:px-4 py-1.5">
+      <div className="flex flex-wrap items-center gap-1">
         <SearchPill
           value={veniceParams.enable_web_search || 'off'}
           onChange={(v) => setVeniceParams({ enable_web_search: v })}
@@ -23,41 +23,50 @@ export function VeniceParams() {
           active={veniceParams.include_search_results_in_stream === true}
           onClick={() => setVeniceParams({ include_search_results_in_stream: !veniceParams.include_search_results_in_stream })}
         />
-        <div className="ml-auto">
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className={cn(
-              'flex items-center gap-1 text-[13px] font-medium px-2 py-[2px] rounded-full transition-colors duration-100',
-              showSettings ? 'bg-white/90 text-black' : 'bg-white/[0.03] text-white/18 hover:text-white/35 hover:bg-white/[0.05]',
-            )}
-          >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
-            </svg>
-            Settings
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setShowSettings(!showSettings)}
+          className={cn(
+            'ml-auto flex items-center gap-1 text-[13px] font-medium px-3 py-1.5 rounded-full transition-colors duration-100 min-h-[36px]',
+            showSettings ? 'bg-white/90 text-black' : 'bg-white/[0.06] text-white/55 hover:text-white/80 hover:bg-white/[0.1]',
+          )}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+          </svg>
+          {showSettings ? 'Close' : 'Settings'}
+        </button>
       </div>
 
       {showSettings && (
-        <div className="mt-2.5 pb-1 flex flex-col gap-2.5">
+        <div className="mt-2.5 pb-2 flex flex-col gap-2.5 rounded-xl border border-white/[0.06] bg-black/30 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-[12px] uppercase tracking-[0.08em] text-white/35">Locked writer settings</div>
+            <button
+              type="button"
+              onClick={() => setShowSettings(false)}
+              className="min-h-[36px] px-3 rounded-lg bg-white text-black text-[13px] font-medium"
+            >
+              Close
+            </button>
+          </div>
           <div>
-            <label className="text-[13px] text-white/15 font-medium mb-1 block uppercase tracking-[0.08em]">System Prompt</label>
+            <label className="text-[13px] text-white/35 font-medium mb-1 block uppercase tracking-[0.08em]">System Prompt</label>
             <textarea
               value={systemPrompt}
               onChange={(e) => setSystemPrompt(e.target.value)}
               placeholder="Lustify prompt writer…"
-              rows={8}
-              className="w-full bg-white/[0.02] border border-white/[0.05] rounded-lg px-3 py-2 text-[15px] text-white/50 outline-none resize-y min-h-[8rem] placeholder:text-white/8 focus:border-white/[0.1] transition-colors"
+              rows={6}
+              className="w-full bg-white/[0.02] border border-white/[0.05] rounded-lg px-3 py-2 text-[15px] text-white/50 outline-none resize-y min-h-[6rem] max-h-[40vh] placeholder:text-white/8 focus:border-white/[0.1] transition-colors"
             />
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <ParamSlider label="Temperature" value={temperature} onChange={setTemperature} min={0} max={2} step={0.1} />
             <ParamSlider label="Top P" value={topP} onChange={setTopP} min={0} max={1} step={0.05} />
             <ParamSlider label="Max Tokens" value={maxTokens} onChange={setMaxTokens} min={256} max={32768} step={256} format={(v) => v >= 1000 ? `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}k` : String(v)} />
           </div>
 
-          <div className="flex flex-wrap gap-2.5">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
             <Toggle label="Venice system prompt" active={veniceParams.include_venice_system_prompt !== false} onChange={(v) => setVeniceParams({ include_venice_system_prompt: v })} />
             <Toggle label="Disable thinking" active={veniceParams.disable_thinking === true} onChange={(v) => setVeniceParams({ disable_thinking: v })} />
             <Toggle label="Strip thinking" active={veniceParams.strip_thinking_response === true} onChange={(v) => setVeniceParams({ strip_thinking_response: v })} />
@@ -75,10 +84,10 @@ function ParamSlider({ label, value, onChange, min, max, step, format }: {
   return (
     <div>
       <div className="flex items-center justify-between mb-0.5">
-        <label className="text-[12px] text-white/15 font-medium uppercase tracking-[0.08em]">{label}</label>
-        <span className="text-[12px] text-white/25 font-mono">{display}</span>
+        <label className="text-[12px] text-white/35 font-medium uppercase tracking-[0.08em]">{label}</label>
+        <span className="text-[12px] text-white/45 font-mono">{display}</span>
       </div>
-      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} className="w-full" />
+      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} className="w-full min-h-[32px]" />
     </div>
   )
 }
@@ -86,12 +95,13 @@ function ParamSlider({ label, value, onChange, min, max, step, format }: {
 function Pill({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       className={cn(
-        'text-[13px] font-medium px-2 py-[2px] rounded-full transition-colors duration-100',
+        'text-[13px] font-medium px-2.5 py-1.5 rounded-full transition-colors duration-100 min-h-[36px]',
         active
           ? 'bg-white/90 text-black'
-          : 'bg-white/[0.03] text-white/18 hover:text-white/35 hover:bg-white/[0.05]',
+          : 'bg-white/[0.03] text-white/35 hover:text-white/55 hover:bg-white/[0.05]',
       )}
     >
       {label}
@@ -110,12 +120,13 @@ function SearchPill({ value, onChange }: { value: string; onChange: (v: SearchMo
 
   return (
     <button
+      type="button"
       onClick={next}
       className={cn(
-        'text-[13px] font-medium px-2 py-[2px] rounded-full transition-colors duration-100',
+        'text-[13px] font-medium px-2.5 py-1.5 rounded-full transition-colors duration-100 min-h-[36px]',
         active
           ? 'bg-white/90 text-black'
-          : 'bg-white/[0.03] text-white/18 hover:text-white/35 hover:bg-white/[0.05]',
+          : 'bg-white/[0.03] text-white/35 hover:text-white/55 hover:bg-white/[0.05]',
       )}
     >
       {label}
@@ -126,16 +137,17 @@ function SearchPill({ value, onChange }: { value: string; onChange: (v: SearchMo
 function Toggle({ label, active, onChange }: { label: string; active: boolean; onChange: (v: boolean) => void }) {
   return (
     <button
+      type="button"
       onClick={() => onChange(!active)}
-      className="flex items-center gap-2 text-[14px] text-white/30 hover:text-white/50 transition-colors"
+      className="flex items-center gap-2 text-[14px] text-white/45 hover:text-white/70 transition-colors min-h-[36px]"
     >
       <div className={cn(
-        'w-6 h-3.5 rounded-full transition-colors duration-150 relative',
+        'w-8 h-5 rounded-full transition-colors duration-150 relative shrink-0',
         active ? 'bg-white/80' : 'bg-white/[0.08]',
       )}>
         <div className={cn(
-          'absolute top-0.5 w-2.5 h-2.5 rounded-full transition-all duration-150',
-          active ? 'left-3 bg-black' : 'left-0.5 bg-white/30',
+          'absolute top-0.5 w-4 h-4 rounded-full transition-all duration-150',
+          active ? 'left-3.5 bg-black' : 'left-0.5 bg-white/30',
         )} />
       </div>
       {label}
