@@ -143,7 +143,7 @@ export const useChatStore = create<ChatState>()(
     }),
     {
       name: 'venice-chat',
-      version: 8,
+      version: 9,
       storage: createJSONStorage(() => createSafeStorage()),
       migrate: (persisted) => {
         if (!persisted || typeof persisted !== 'object') return persisted as ChatState
