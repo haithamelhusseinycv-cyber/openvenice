@@ -7,13 +7,13 @@ import { useAuthStore } from '../../stores/auth-store'
 import { useImageWorkspace } from '../../stores/image-workspace-store'
 import { DEFAULT_IMAGE_MODEL_ID, isAllowedImageModel } from '../../lib/allowed-models'
 import {
-  LOCKED_COUPLE_ASPECT,
-  LOCKED_COUPLE_SIZE,
   LOCKED_IMAGE_SIZE_IDX,
   LOCKED_IMAGE_STEPS,
   LOCKED_IMAGE_VARIANTS,
   loadImageNegative,
   loadImagePrompt,
+  pickAspectFromPrompt,
+  pickSizeFromPrompt,
 } from '../../lib/defaults'
 import { formatVeniceError } from '../../lib/venice-client'
 import { Label, TextArea, PrimaryButton, PillGroup, ErrorText } from '../ui/shared'
@@ -65,14 +65,6 @@ const DEFAULT_SIZES = [
   { value: '2', label: '1024' },
   { value: '3', label: '1280' },
 ]
-const DEFAULT_SIZE_MAP = [
-  { w: 512, h: 512 }, { w: 768, h: 768 }, { w: 1024, h: 1024 }, { w: 1280, h: 1280 },
-]
-
-function loadAspect(saved: string) {
-  if (!saved || saved === '1:1' || saved === 'Auto') return LOCKED_COUPLE_ASPECT
-  return saved
-}
 
 export function ImageView() {
   const apiKey = useAuthStore((s) => s.apiKey)
@@ -101,7 +93,7 @@ export function ImageView() {
     loadImageNegative(loadSaved('venice-image-negative', ''))
   )
   const [sizeIdx, setSizeIdx] = useState(() => loadSaved('venice-image-size', LOCKED_IMAGE_SIZE_IDX))
-  const [aspectRatio, setAspectRatio] = useState(() => loadAspect(loadSaved('venice-image-aspect', LOCKED_COUPLE_ASPECT)))
+  const [aspectRatio, setAspectRatio] = useState(() => pickAspectFromPrompt(loadImagePrompt(loadSaved('venice-image-prompt', ''))))
   const [resolution, setResolution] = useState(() => loadSaved('venice-image-resolution', ''))
   const [steps, setSteps] = useState(() => {
     const saved = loadSaved('venice-image-steps', '')
@@ -113,6 +105,10 @@ export function ImageView() {
   const [images, setImages] = useState<string[]>(() => loadGallery())
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    setAspectRatio(pickAspectFromPrompt(prompt))
+  }, [prompt])
 
   useEffect(() => {
     try {
@@ -182,7 +178,9 @@ export function ImageView() {
     if (!prompt.trim()) return
     const seedNum = seed.trim() === '' ? undefined : Number(seed)
     const validSeed = seedNum !== undefined && Number.isFinite(seedNum) ? Math.trunc(seedNum) : undefined
-    const ratio = aspectRatio || LOCKED_COUPLE_ASPECT
+    const ratio = pickAspectFromPrompt(prompt)
+    const size = pickSizeFromPrompt(prompt)
+    setAspectRatio(ratio)
 
     const req: Record<string, unknown> = {
       prompt: prompt.trim(),
@@ -199,8 +197,8 @@ export function ImageView() {
     if (hasAspectRatios) {
       req.aspect_ratio = ratio
     } else {
-      req.width = LOCKED_COUPLE_SIZE.w
-      req.height = LOCKED_COUPLE_SIZE.h
+      req.width = size.w
+      req.height = size.h
     }
 
     if (hasResolutions && resolution) {
