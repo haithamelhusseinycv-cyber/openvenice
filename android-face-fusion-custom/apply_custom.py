@@ -78,8 +78,9 @@ elif 'Selected face swapper model:' not in text:
     raise RuntimeError('Could not locate FaceSwapper model loading block')
 swapper.write_text(text, encoding='utf-8')
 
-# Identify this build in Android app metadata.
+# Identify this build in Android app metadata and establish v2's upgrade line.
 text = build_gradle.read_text(encoding='utf-8')
+text = text.replace('versionCode = 1', 'versionCode = 2')
 text = text.replace('versionName = "1.0"', 'versionName = "2.0"')
 build_gradle.write_text(text, encoding='utf-8')
 
