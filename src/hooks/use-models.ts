@@ -8,7 +8,6 @@ import {
 import type {
   ModelsResponse,
   VeniceModel,
-  VideoConstraints,
 } from '../types/venice'
 
 type VeniceType = 'text' | 'image' | 'inpaint'
