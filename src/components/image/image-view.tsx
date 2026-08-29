@@ -5,6 +5,7 @@ import { useModels } from '../../hooks/use-models'
 import { useImageGenerate } from '../../hooks/use-image'
 import { useAuthStore } from '../../stores/auth-store'
 import { useImageWorkspace } from '../../stores/image-workspace-store'
+import { DEFAULT_IMAGE_MODEL_ID, isAllowedImageModel } from '../../lib/allowed-models'
 import { Label, TextArea, PrimaryButton, PillGroup, ErrorText } from '../ui/shared'
 import { GenerationView } from '../ui/generation-view'
 import type { ImageConstraints } from '../../types/venice'
@@ -49,15 +50,13 @@ export function ImageView() {
   const apiKey = useAuthStore((s) => s.apiKey)
   const selectedModel = useSettingsStore((s) => s.selectedModels.image)
   const { data: models } = useModels('image')
-  const allowedImageModels = models?.filter((m) =>
-  ['lustify-v8', 'lustify-v7', 'lustify-sdxl'].includes(m.id.toLowerCase())
-)
+  const allowedImageModels = models?.filter((m) => isAllowedImageModel(m.id))
 
-const model =
-  selectedModel &&
-  allowedImageModels?.some((m) => m.id === selectedModel)
-    ? selectedModel
-    : allowedImageModels?.[0]?.id || 'lustify-v8'
+  const model =
+    selectedModel &&
+    allowedImageModels?.some((m) => m.id === selectedModel)
+      ? selectedModel
+      : allowedImageModels?.[0]?.id || DEFAULT_IMAGE_MODEL_ID
 
   const modelData = models?.find((m) => m.id === model)
   const constraints = modelData?.model_spec?.constraints as ImageConstraints | undefined
@@ -141,15 +140,15 @@ const model =
     const size = DEFAULT_SIZE_MAP[Number(sizeIdx)]
 
     const req: Record<string, unknown> = {
-  prompt: prompt.trim(),
-  negative_prompt: negativePrompt.trim() || undefined,
-  model,
-  variants,
-  hide_watermark: true,
-  safe_mode: false,
-  enhance_prompt: false,
-  steps,
-}
+      prompt: prompt.trim(),
+      negative_prompt: negativePrompt.trim() || undefined,
+      model,
+      variants,
+      hide_watermark: true,
+      safe_mode: false,
+      enhance_prompt: false,
+      steps,
+    }
 
     if (hasAspectRatios && aspectRatio) {
       req.aspect_ratio = aspectRatio
@@ -177,9 +176,9 @@ const model =
     <>
       <div>
         <Label hint={`${prompt.length}/${promptLimit}`}>Prompt</Label>
-        <TextArea value={prompt} onChange={setPrompt} placeholder="A serene mountain landscape at golden hour…" />
+        <TextArea value={prompt} onChange={setPrompt} placeholder="Amateur couple sex still…" />
       </div>
-      <div><Label>Negative prompt</Label><TextArea value={negativePrompt} onChange={setNegativePrompt} placeholder="blurry, low quality…" rows={2} /></div>
+      <div><Label>Negative prompt</Label><TextArea value={negativePrompt} onChange={setNegativePrompt} placeholder="blurry, clothes, CGI…" rows={2} /></div>
 
       {hasAspectRatios ? (
         <div><Label>Aspect Ratio</Label><PillGroup options={aspectOptions} value={aspectRatio} onChange={setAspectRatio} /></div>
