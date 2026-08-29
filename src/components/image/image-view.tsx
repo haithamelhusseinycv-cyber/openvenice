@@ -6,19 +6,17 @@ import { useImageGenerate } from '../../hooks/use-image'
 import { useAuthStore } from '../../stores/auth-store'
 import { useImageWorkspace } from '../../stores/image-workspace-store'
 import { DEFAULT_IMAGE_MODEL_ID, isAllowedImageModel } from '../../lib/allowed-models'
+import {
+  LOCKED_IMAGE_SIZE_IDX,
+  LOCKED_IMAGE_STEPS,
+  LOCKED_IMAGE_VARIANTS,
+  loadImageNegative,
+  loadImagePrompt,
+} from '../../lib/defaults'
 import { formatVeniceError } from '../../lib/venice-client'
 import { Label, TextArea, PrimaryButton, PillGroup, ErrorText } from '../ui/shared'
 import { GenerationView } from '../ui/generation-view'
 import type { ImageConstraints } from '../../types/venice'
-
-const DEFAULT_PROMPT = `amateur iphone snapshot, slightly messy framing, film grain, available room light, one light source, messy lived-in bedroom, unmade bed, clutter, raw candid
-2people, 1girl, 1boy, adults 18+, couple having sex, third-person view, both faces visible, woman's face clearly visible, man's face visible
-natural skin, visible pores, peach fuzz, skin imperfections, realistic bodies, sweat, flushed, damp hair, half-lidded eyes, parted lips, uncensored nsfw
-erect nipples, detailed areolae, wet pussy, labia, trimmed pubic hair
-erect penis, hard cock, veiny shaft, testicles, pubic hair
-penis inside pussy, labia stretched around the shaft, part of the shaft still visible, insertion readable, anatomically correct penetration`
-
-const DEFAULT_NEGATIVE = `cartoon, anime, illustration, CGI, 3D render, plastic skin, waxy skin, doll, airbrushed, beauty filter, studio, cyclorama, rim light, cinematic lighting, posed photoshoot, pov, hidden faces, censored, mosaic, blurry genitals, clothes, lingerie on, flaccid, small penis, deformed hands, extra fingers, extra limbs, watermark, text, no penetration, floating penis, penis beside pussy, disconnected genitals, bad insertion`
 
 const GALLERY_KEY = 'venice-image-gallery'
 const GALLERY_MAX = 4
@@ -86,16 +84,16 @@ export function ImageView() {
   const hasAspectRatios = constraints?.aspectRatios && constraints.aspectRatios.length > 0
   const hasResolutions = constraints?.resolutions && constraints.resolutions.length > 0
   const maxSteps = constraints?.steps?.max || 50
-  const defaultSteps = constraints?.steps?.default || 20
+  const defaultSteps = constraints?.steps?.default || LOCKED_IMAGE_STEPS
   const promptLimit = constraints?.promptCharacterLimit || 4096
 
   const [prompt, setPrompt] = useState(() =>
-    loadSaved('venice-image-prompt', DEFAULT_PROMPT)
+    loadImagePrompt(loadSaved('venice-image-prompt', ''))
   )
   const [negativePrompt, setNegativePrompt] = useState(() =>
-    loadSaved('venice-image-negative', DEFAULT_NEGATIVE)
+    loadImageNegative(loadSaved('venice-image-negative', ''))
   )
-  const [sizeIdx, setSizeIdx] = useState(() => loadSaved('venice-image-size', '2'))
+  const [sizeIdx, setSizeIdx] = useState(() => loadSaved('venice-image-size', LOCKED_IMAGE_SIZE_IDX))
   const [aspectRatio, setAspectRatio] = useState(() => loadSaved('venice-image-aspect', ''))
   const [resolution, setResolution] = useState(() => loadSaved('venice-image-resolution', ''))
   const [steps, setSteps] = useState(() => {
@@ -104,7 +102,7 @@ export function ImageView() {
     return Number.isFinite(n) && n > 0 ? n : defaultSteps
   })
   const [seed, setSeed] = useState(() => loadSaved('venice-image-seed', ''))
-  const [variants, setVariants] = useState(1)
+  const [variants, setVariants] = useState(LOCKED_IMAGE_VARIANTS)
   const [images, setImages] = useState<string[]>(() => loadGallery())
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
