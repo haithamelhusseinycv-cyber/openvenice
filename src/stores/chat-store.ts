@@ -30,20 +30,22 @@ interface ChatState {
   getActiveConversation: () => Conversation | undefined
 }
 
+const DEFAULT_VENICE_PARAMS: VeniceParameters = {
+  include_venice_system_prompt: false,
+  enable_web_search: 'off',
+}
+
 export const useChatStore = create<ChatState>()(
   persist(
     (set, get) => ({
       conversations: [],
       activeConversationId: null,
       isStreaming: false,
-      veniceParams: {
-        include_venice_system_prompt: false,
-        enable_web_search: 'off',
-      },
+      veniceParams: { ...DEFAULT_VENICE_PARAMS },
       systemPrompt: '',
       temperature: 0.7,
       topP: 1,
-      maxTokens: 1024,
+      maxTokens: 2048,
 
       createConversation: (model) => {
         const id = generateId()
@@ -75,7 +77,6 @@ export const useChatStore = create<ChatState>()(
           conversations: s.conversations.map((c) => {
             if (c.id !== conversationId) return c
             const updated = { ...c, messages: [...c.messages, message] }
-            // Auto-title from first user message
             if (
               message.role === 'user' &&
               c.messages.length === 0 &&
@@ -139,15 +140,14 @@ export const useChatStore = create<ChatState>()(
     }),
     {
       name: 'venice-chat',
-      version: 3,
+      version: 4,
       storage: createJSONStorage(() => createSafeStorage()),
       migrate: (persisted, version) => {
-        // v1 → v2: trim conversations to 50, ensure veniceParams shape
         if (!persisted || typeof persisted !== 'object') return persisted as ChatState
         const s = persisted as Partial<ChatState>
         if (Array.isArray(s.conversations)) s.conversations = s.conversations.slice(0, 50)
         if (!s.veniceParams || typeof s.veniceParams !== 'object') {
-          s.veniceParams = { include_venice_system_prompt: false, enable_web_search: 'off' }
+          s.veniceParams = { ...DEFAULT_VENICE_PARAMS }
         }
         if (version < 2) {
           delete (s as Record<string, unknown>).isStreaming
@@ -155,6 +155,14 @@ export const useChatStore = create<ChatState>()(
         if (version < 3) {
           if (s.maxTokens === undefined || s.maxTokens === 4096) {
             s.maxTokens = 1024
+          }
+        }
+        if (version < 4) {
+          s.maxTokens = 2048
+          s.veniceParams = {
+            ...(s.veniceParams || {}),
+            include_venice_system_prompt: false,
+            enable_web_search: 'off',
           }
         }
         return s as ChatState
