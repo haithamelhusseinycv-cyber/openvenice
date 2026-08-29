@@ -15,6 +15,7 @@ import {
   pickAspectFromPrompt,
   pickSizeFromPrompt,
 } from '../../lib/defaults'
+import { scoreImagePrompt } from '../../lib/prompt-gate'
 import { formatVeniceError } from '../../lib/venice-client'
 import { Label, TextArea, PrimaryButton, PillGroup, ErrorText } from '../ui/shared'
 import { GenerationView } from '../ui/generation-view'
@@ -106,6 +107,8 @@ export function ImageView() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
+  const gate = useMemo(() => scoreImagePrompt(prompt), [prompt])
+
   useEffect(() => {
     setAspectRatio(pickAspectFromPrompt(prompt))
   }, [prompt])
@@ -175,7 +178,7 @@ export function ImageView() {
   const mutation = useImageGenerate()
 
   const handleGenerate = () => {
-    if (!prompt.trim()) return
+    if (!prompt.trim() || !gate.pass) return
     const seedNum = seed.trim() === '' ? undefined : Number(seed)
     const validSeed = seedNum !== undefined && Number.isFinite(seedNum) ? Math.trunc(seedNum) : undefined
     const ratio = pickAspectFromPrompt(prompt)
@@ -259,8 +262,12 @@ export function ImageView() {
         />
       </div>
 
-      <PrimaryButton onClick={handleGenerate} disabled={!prompt.trim() || !apiKey} loading={mutation.isPending} size="lg">
-        {mutation.isPending ? 'Generating…' : 'Generate'}
+      <div className={`text-[12px] leading-relaxed ${gate.pass ? 'text-white/45' : 'text-red-300/80'}`}>
+        Prompt review {gate.score}% {gate.pass ? '— ready' : `— blocked under 90%. Missing: ${gate.missing.join(', ')}`}
+      </div>
+
+      <PrimaryButton onClick={handleGenerate} disabled={!prompt.trim() || !apiKey || !gate.pass} loading={mutation.isPending} size="lg">
+        {mutation.isPending ? 'Generating…' : gate.pass ? 'Generate' : 'Blocked under 90%'}
       </PrimaryButton>
       {images.length > 0 && (
         <button
