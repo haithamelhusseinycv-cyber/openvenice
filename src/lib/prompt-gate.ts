@@ -36,10 +36,10 @@ export function scoreImagePrompt(prompt?: string): PromptGate {
     },
     {
       id: 'frame',
-      label: couple ? 'Landscape full body couple' : 'Tall portrait solo torso',
+      label: couple ? 'Landscape full body couple' : 'Tall portrait full body',
       ok: couple
         ? hasAny(t, ['landscape']) && hasAny(t, ['head to toe', 'full body', 'full bodies'])
-        : hasAny(t, ['tall portrait', 'portrait 2:3', 'solo torso']),
+        : hasAny(t, ['tall portrait', 'portrait 2:3', '9:16']) && hasAny(t, ['head to toe', 'full body', 'full bodies']),
     },
     {
       id: 'hair',
@@ -91,10 +91,10 @@ export function scoreImagePrompt(prompt?: string): PromptGate {
     },
     {
       id: 'sex',
-      label: couple ? 'Readable penetration' : 'Torso crop not full-body solo',
+      label: couple ? 'Readable penetration' : 'Head to toe in frame',
       ok: couple
         ? hasAny(t, ['penetration', 'cock inside', 'inside pussy'])
-        : !hasAny(t, ['head to toe', 'full body solo']),
+        : hasAny(t, ['head to toe', 'feet visible']) && !hasAny(t, ['torso crop', 'bust crop']),
     },
   ]
 
