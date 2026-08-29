@@ -5,7 +5,7 @@ import { cn } from '../../lib/utils'
 
 const TABS: { id: ImageSubTab; label: string }[] = [
   { id: 'generate', label: 'Generate' },
-  { id: 'tools', label: 'Edit / Swap / Undress / Upscale / BG' },
+  { id: 'tools', label: 'Tools' },
 ]
 
 export function ImagePage() {
