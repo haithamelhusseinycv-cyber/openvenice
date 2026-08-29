@@ -7,10 +7,9 @@ import { Select } from '../ui/select'
 import { Label, TextArea, PrimaryButton, ErrorText, EmptyState } from '../ui/shared'
 import { cn } from '../../lib/utils'
 import { toast } from '../../stores/toast-store'
+import { buildSwapPrompt, UNDRESS_PROMPT, type SwapKind, type SwapPerson } from '../../lib/tool-prompts'
 
 type Tool = 'edit' | 'swap' | 'undress' | 'upscale' | 'remove-bg'
-type SwapKind = 'face' | 'head' | 'body'
-type SwapPerson = 'woman' | 'man'
 
 const EDIT_MODELS = [
   { value: 'qwen-edit-uncensored', label: 'Qwen Edit Uncensored' },
@@ -28,31 +27,6 @@ const SCENE_SIZES = [
   { value: '16:9', label: '16:9' },
   { value: '21:9', label: '21:9' },
 ]
-
-const SWAP_NEGATIVE =
-  'different face, similar face, cousin face, beautified face, face mix, identity drift, age change, gender change, extra person, extra limbs, extra fingers, warped hands, melted blend, halo, mismatch lighting, plastic skin, airbrush, cartoon, anime, CGI, text, watermark, mosaic, censor bar, clothes change, pose change, background change, camera change'
-
-function buildSwapPrompt(kind: SwapKind, person: SwapPerson) {
-  const subject = person === 'man' ? 'man' : 'woman'
-  const bodyParts = person === 'man'
-    ? 'torso, chest, belly, hips, legs, arms, skin'
-    : 'torso, breasts, belly, hips, legs, arms, skin'
-
-  if (kind === 'face') {
-    return `Image 1 is the target photograph. Image 2 is the identity source.\n\nReplace ONLY the face of the ${subject} in image 1 with a 100% 1:1 identical copy of the face from image 2. Copy the exact identity: bone structure, eye shape and color, eyelids, eyebrows, nose, lips, teeth if visible, skin texture, pores, moles, freckles, scars, wrinkles, age, and ethnicity. Do not invent a new face. Do not beautify. Do not slim or age-shift.\n\nKeep image 1 otherwise identical: pose, body, hands, hair, neck, ears, clothing, jewelry, background, lighting, shadows, camera angle, crop, and any visible anatomy. Seamless photoreal blend only at the jawline and ears. Same expression as image 1.\n\nAvoid: ${SWAP_NEGATIVE}`
-  }
-
-  if (kind === 'head') {
-    return `Image 1 is the target photograph. Image 2 is the identity source.\n\nReplace the entire head of the ${subject} in image 1 with a 100% 1:1 identical copy of the head from image 2, including face, hair, ears, and neck. Copy the exact identity and hairstyle from image 2. Do not invent a new head. Do not beautify.\n\nKeep image 1 body, pose, hands, clothing, jewelry, background, lighting, shadows, camera angle, and crop identical. Match skin tone and shadows only at the neck seam. Photoreal blend.\n\nAvoid: ${SWAP_NEGATIVE}, different hair, hair from image 1`
-  }
-
-  return `Image 1 is the target photograph. Image 2 is the body source.\n\nReplace the body of the ${subject} in image 1 with a 100% 1:1 identical copy of the body from image 2, including ${bodyParts}, and any visible anatomy or clothing from image 2. Do not invent a new body. Do not reshape.\n\nKeep the exact face and hair of image 1 100% unchanged. Keep image 1 pose, camera angle, bed or background, and lighting as close as possible. Photoreal blend only at the neck and shoulders.\n\nAvoid: ${SWAP_NEGATIVE}, different face from image 1, face from image 2, new pose`
-}
-
-const UNDRESS_NEGATIVE =
-  'child, teen, underage, clothes remaining, shirt, bra, panties, lingerie, towel, sheet covering, mosaic, censor bar, black bar, blur over genitals, different face, different hair, different pose, different background, beauty filter, plastic skin, doll, airbrush, cartoon, anime, CGI, male body, extra limbs, extra breasts, extra fingers, warped hands, text, watermark'
-
-const UNDRESS_PROMPT = `UNDRESS. This is an adult woman, 18+.\n\nRemove every piece of clothing from the woman in this photo. Leave her fully naked and uncensored.\n\nKeep a 100% 1:1 identical copy of her face, identity, age, hair, expression, pose, hands, camera angle, crop, lighting, shadows, and background.\n\nBuild the most photoreal naked body that fits THIS woman: match the face age, neck, visible skin tone, weight class, height proportions, and how the clothes currently fit (tight vs loose, implied bust, waist, hips, belly). Natural skin with pores, peach fuzz, and realistic imperfections. Realistic breasts and genitals matching her body type. No lingerie. No towel.\n\nDo not change who she is. Do not change the scene. Do not add another person.\n\nAvoid: ${UNDRESS_NEGATIVE}`
 
 function loadSaved(key: string, fallback: string) {
   try {
@@ -305,7 +279,7 @@ export function ImageTools() {
 
         {tool === 'edit' && (
           <>
-            <div><Label>Edit prompt</Label><TextArea value={editPrompt} onChange={setEditPrompt} placeholder="Change the background to a sunset beach..." rows={3} /></div>
+            <div><Label>Edit prompt</Label><TextArea value={editPrompt} onChange={setEditPrompt} placeholder="Keep identity. Change only what I type…" rows={3} /></div>
             <div><Label>Model</Label><Select value={editModel} onChange={setEditModel} options={EDIT_MODELS} searchable /></div>
           </>
         )}
@@ -374,13 +348,13 @@ export function ImageTools() {
 
         {tool === 'undress' && (
           <p className="text-[12px] text-white/25 leading-relaxed">
-            Prompt is hardcoded. Upload a dressed adult woman. Output stays her face, pose, and scene, naked, with a body inferred from the clothes and visible proportions.
+            Clothes off only. Same face, hair, expression, height, weight, and pose. Average real body under the clothes, not a pornstar redraw.
           </p>
         )}
 
         {tool === 'swap' && (
           <p className="text-[12px] text-white/25 leading-relaxed">
-            Prompt is hardcoded for a 1:1 identity copy. Face copies only the face. Head copies face+hair+neck. Body copies the body and keeps image-1 face.
+            Copy-paste identity. The only allowed change is a tiny pose fit. Do not change expression, bone structure, hair, or body size.
           </p>
         )}
 
