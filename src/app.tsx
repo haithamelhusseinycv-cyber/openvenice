@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react'
+import { useState, useEffect } from 'react'
 import { useSettingsStore, type Tab } from './stores/settings-store'
 import { useChatStore } from './stores/chat-store'
 import { useAuthStore } from './stores/auth-store'
@@ -7,35 +7,16 @@ import { Header } from './components/layout/header'
 import { ApiKeyDialog } from './components/layout/api-key-dialog'
 import { ChatView } from './components/chat/chat-view'
 import { ImagePage } from './components/image/image-page'
-import { AudioView } from './components/audio/audio-view'
-import { MusicView } from './components/music/music-view'
-import { VideoView } from './components/video/video-view'
-import { EmbeddingsView } from './components/embeddings/embeddings-view'
 import { ErrorBoundary } from './components/ui/error-boundary'
 import { Toaster } from './components/ui/toaster'
-
-const LazyWorkflowsView = lazy(() => import('./components/workflows/workflows-view').then((m) => ({ default: m.WorkflowsView })))
-function WorkflowsView() {
-  return <Suspense fallback={<div className="flex items-center justify-center h-full text-[12px] text-white/30">Loading workflows…</div>}><LazyWorkflowsView /></Suspense>
-}
-
-const LazyPlaygroundView = lazy(() => import('./components/playground/playground-view').then((m) => ({ default: m.PlaygroundView })))
-function PlaygroundView() {
-  return <Suspense fallback={<div className="flex items-center justify-center h-full text-[12px] text-white/30">Loading playground…</div>}><LazyPlaygroundView /></Suspense>
-}
+import { isVisibleTab } from './lib/allowed-models'
 
 const views = {
   chat: ChatView,
   image: ImagePage,
-  audio: AudioView,
-  music: MusicView,
-  video: VideoView,
-  embeddings: EmbeddingsView,
-  workflows: WorkflowsView,
-  playground: PlaygroundView,
 } as const
 
-const TAB_ORDER: Tab[] = ['chat', 'image', 'audio', 'music', 'video', 'embeddings', 'workflows', 'playground']
+const TAB_ORDER: Tab[] = ['chat', 'image']
 
 export function App() {
   const needsUnlock = useAuthStore((s) => s.hasEncrypted && !s.apiKey)
@@ -43,7 +24,12 @@ export function App() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const activeTab = useSettingsStore((s) => s.activeTab)
   const setActiveTab = useSettingsStore((s) => s.setActiveTab)
-  const ActiveView = views[activeTab]
+  const safeTab = isVisibleTab(activeTab) ? activeTab : 'chat'
+  const ActiveView = views[safeTab]
+
+  useEffect(() => {
+    if (!isVisibleTab(activeTab)) setActiveTab('chat')
+  }, [activeTab, setActiveTab])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -63,7 +49,6 @@ export function App() {
         e.preventDefault()
         setActiveTab(TAB_ORDER[num - 1])
         setMobileSidebarOpen(false)
-        return
       }
     }
 
@@ -73,7 +58,6 @@ export function App() {
 
   return (
     <div className="flex h-[100dvh] w-screen overflow-hidden">
-      {/* Mobile drawer overlay */}
       {mobileSidebarOpen && (
         <button
           aria-label="Close menu"
@@ -88,7 +72,7 @@ export function App() {
           onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
         />
         <main className="flex-1 min-h-0 overflow-hidden">
-          <ErrorBoundary key={activeTab}>
+          <ErrorBoundary key={safeTab}>
             <ActiveView />
           </ErrorBoundary>
         </main>
