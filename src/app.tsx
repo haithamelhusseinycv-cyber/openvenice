@@ -32,6 +32,34 @@ export function App() {
   }, [activeTab, setActiveTab])
 
   useEffect(() => {
+    const stay = () => {
+      if (window.history.state?.venice !== 1) {
+        window.history.pushState({ venice: 1 }, '')
+      }
+    }
+    stay()
+    const onPop = () => {
+      const ev = new CustomEvent('venice-back', { cancelable: true })
+      window.dispatchEvent(ev)
+      stay()
+      if (ev.defaultPrevented) return
+      if (mobileSidebarOpen) {
+        setMobileSidebarOpen(false)
+        return
+      }
+      if (apiKeyOpen) {
+        setApiKeyOpen(false)
+        return
+      }
+      if (safeTab === 'image') {
+        setActiveTab('chat')
+      }
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [mobileSidebarOpen, apiKeyOpen, safeTab, setActiveTab])
+
+  useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const isMeta = e.metaKey || e.ctrlKey
       if (!isMeta) return
@@ -57,7 +85,7 @@ export function App() {
   }, [setActiveTab])
 
   return (
-    <div className="flex h-[100dvh] w-screen overflow-hidden">
+    <div className="flex h-[100dvh] w-screen overflow-hidden pb-[env(safe-area-inset-bottom)]">
       {mobileSidebarOpen && (
         <button
           aria-label="Close menu"
