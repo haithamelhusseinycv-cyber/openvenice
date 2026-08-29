@@ -51,7 +51,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'venice-settings',
-      version: 3,
+      version: 4,
       storage: createJSONStorage(() => createSafeStorage()),
       migrate: (persisted) => {
         if (!persisted || typeof persisted !== 'object') return persisted as SettingsState
@@ -60,6 +60,12 @@ export const useSettingsStore = create<SettingsState>()(
         if (!isVisibleTab(s.activeTab)) s.activeTab = 'chat'
         return s as SettingsState
       },
+      partialize: (state) => ({
+        activeTab: isVisibleTab(state.activeTab) ? state.activeTab : 'chat',
+        sidebarOpen: state.sidebarOpen,
+        selectedModels: sanitizeSelectedModels(state.selectedModels),
+        playgroundAgentModel: state.playgroundAgentModel,
+      }),
     },
   ),
 )
