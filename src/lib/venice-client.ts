@@ -21,6 +21,24 @@ export class VeniceAPIError extends Error {
   }
 }
 
+export function formatVeniceError(err: unknown): string {
+  if (err instanceof VeniceAPIError) {
+    if (err.status === 402) return 'Venice credits empty. Top up on venice.ai, then retry.'
+    if (err.status === 401) return 'API key missing or invalid. Tap Connected in the header.'
+    if (err.status === 429) return 'Venice is rate-limiting. Wait a few seconds and retry.'
+    return err.message
+  }
+  if (err instanceof Error) {
+    const status = (err as { status?: number }).status
+    if (status === 402) return 'Venice credits empty. Top up on venice.ai, then retry.'
+    if (status === 401) return 'API key missing or invalid. Tap Connected in the header.'
+    if (status === 429) return 'Venice is rate-limiting. Wait a few seconds and retry.'
+    if (/402|payment|credit/i.test(err.message)) return 'Venice credits empty. Top up on venice.ai, then retry.'
+    return err.message
+  }
+  return 'Request failed'
+}
+
 function getApiKey(): string {
   const key = useAuthStore.getState().apiKey
   if (!key) throw new VeniceAPIError('API key not set. Click "API Key" in the header to connect.', 401)
@@ -34,7 +52,6 @@ function backoffDelay(attempt: number, retryAfter?: string | null): number {
     const secs = Number(retryAfter)
     if (Number.isFinite(secs) && secs > 0) return Math.min(secs * 1000, 30_000)
   }
-  // Exponential backoff with jitter: 500, 1000, 2000 ms (+/- 25%)
   const base = 500 * 2 ** attempt
   return base + Math.random() * base * 0.25
 }
@@ -51,6 +68,11 @@ async function parseError(res: Response): Promise<VeniceAPIError> {
   } catch {
     /* keep default */
   }
+  if (res.status === 402) message = 'Venice credits empty. Top up on venice.ai, then retry.'
+  if (res.status === 401 && !message.toLowerCase().includes('api key')) {
+    message = 'API key missing or invalid. Tap Connected in the header.'
+  }
+  if (res.status === 429) message = 'Venice is rate-limiting. Wait a few seconds and retry.'
   return new VeniceAPIError(message, res.status, code, suggestedPrompt)
 }
 
@@ -76,10 +98,8 @@ async function veniceFetch(path: string, options: VeniceFetchOptions): Promise<R
       const res = await fetch(`${BASE_URL}${path}`, { ...fetchOptions, headers })
       if (res.ok) return res
 
-      // Retry only idempotent requests by default. Paid/non-idempotent POSTs use zero retries.
       if (!RETRY_STATUSES.has(res.status) || attempt === retryLimit) throw await parseError(res)
 
-      // Drain body so connection can be reused
       try { await res.arrayBuffer() } catch { /* noop */ }
       await sleep(backoffDelay(attempt, res.headers.get('Retry-After')))
       continue
@@ -90,7 +110,7 @@ async function veniceFetch(path: string, options: VeniceFetchOptions): Promise<R
       if (attempt === retryLimit) break
       await sleep(backoffDelay(attempt))
     }
-    void stream // suppress unused-var lint (kept for future per-call overrides)
+    void stream
   }
   throw lastErr instanceof Error ? lastErr : new VeniceAPIError('Network error', 0)
 }
