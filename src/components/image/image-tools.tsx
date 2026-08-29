@@ -41,6 +41,17 @@ function clearFileInput(input: HTMLInputElement | null) {
   if (input) input.value = ''
 }
 
+function FitImg({ src, alt, className }: { src: string; alt: string; className?: string }) {
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={cn('w-full h-auto max-w-full object-contain rounded-lg border border-white/[0.08]', className)}
+      style={{ maxHeight: 'min(52dvh, 720px)', touchAction: 'pinch-zoom' }}
+    />
+  )
+}
+
 export function ImageTools() {
   const apiKey = useAuthStore((s) => s.apiKey)
   const [pending] = useState(() => useImageWorkspace.getState().pendingSource)
@@ -194,16 +205,17 @@ export function ImageTools() {
   }
 
   return (
-    <div className="flex h-full">
-      <div className="w-96 border-r border-white/[0.06] p-6 flex flex-col gap-4 overflow-y-auto shrink-0">
-        <div className="flex gap-px bg-white/[0.02] rounded-lg p-0.5 border border-white/[0.04]">
+    <div className="flex flex-col md:flex-row h-full min-h-0">
+      <div className="w-full md:w-96 border-b md:border-b-0 md:border-r border-white/[0.06] p-4 sm:p-6 flex flex-col gap-4 overflow-y-auto shrink-0 max-h-[48vh] md:max-h-none">
+        <div className="flex flex-wrap gap-1 bg-white/[0.02] rounded-lg p-1 border border-white/[0.06]">
           {([['edit', 'Edit'], ['swap', 'Swap'], ['undress', 'Undress'], ['upscale', 'Upscale'], ['remove-bg', 'BG']] as const).map(([id, label]) => (
             <button
               key={id}
+              type="button"
               onClick={() => { setTool(id); resetResult() }}
               className={cn(
-                'flex-1 px-1 py-2.5 text-[12px] font-medium rounded-[7px] transition-all duration-150',
-                tool === id ? 'bg-white text-black' : 'text-white/25 hover:text-white/45',
+                'flex-1 min-w-[4.5rem] min-h-11 px-2 py-2 text-[14px] font-medium rounded-md transition-all duration-150',
+                tool === id ? 'bg-white text-black' : 'text-white/55 hover:text-white',
               )}
             >
               {label}
@@ -214,22 +226,23 @@ export function ImageTools() {
         <div>
           <Label>{tool === 'swap' ? '1. Target still' : tool === 'undress' ? 'Dressed photo' : 'Source image'}</Label>
           {imageData ? (
-            <div className="relative group">
-              <img src={imageData} alt="Source" className="w-full rounded-lg border border-white/[0.06]" />
+            <div className="relative">
+              <FitImg src={imageData} alt="Source" />
               <button
+                type="button"
                 onClick={removeSource}
                 aria-label="Remove image"
-                className="absolute top-1.5 right-1.5 p-1 bg-black/60 rounded-md text-white/60 hover:text-white opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all"
+                className="absolute top-1.5 right-1.5 px-2 min-h-11 bg-black/70 rounded-md text-white text-[14px]"
               >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                Remove
               </button>
-              <span className="text-[13px] text-white/15 mt-1 block truncate">{imageName}</span>
+              <span className="text-[13px] text-white/45 mt-1 block truncate">{imageName}</span>
             </div>
           ) : (
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              className="w-full border border-dashed border-white/[0.08] hover:border-white/[0.15] rounded-lg py-8 text-center transition-colors"
+              className="w-full border border-dashed border-white/[0.14] hover:border-white/[0.28] rounded-lg py-8 text-center min-h-24"
             >
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
                 const file = e.target.files?.[0]
@@ -237,7 +250,7 @@ export function ImageTools() {
                 readFile(file, (data, name) => { setImageData(data); setImageName(name); resetResult() })
                 clearFileInput(e.target)
               }} />
-              <p className="text-[14px] text-white/40">
+              <p className="text-[15px] text-white/60">
                 {tool === 'undress' ? 'Upload a dressed adult photo' : tool === 'swap' ? 'Lustify still / body photo' : 'Source image'}
               </p>
             </button>
@@ -248,22 +261,23 @@ export function ImageTools() {
           <div>
             <Label>2. ID photo</Label>
             {idImage ? (
-              <div className="relative group">
-                <img src={idImage} alt="ID" className="w-full rounded-lg border border-white/[0.06]" />
+              <div className="relative">
+                <FitImg src={idImage} alt="ID" />
                 <button
+                  type="button"
                   onClick={removeId}
                   aria-label="Remove ID image"
-                  className="absolute top-1.5 right-1.5 p-1 bg-black/60 rounded-md text-white/60 hover:text-white opacity-0 group-hover:opacity-100"
+                  className="absolute top-1.5 right-1.5 px-2 min-h-11 bg-black/70 rounded-md text-white text-[14px]"
                 >
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                  Remove
                 </button>
-                <span className="text-[13px] text-white/15 mt-1 block truncate">{idName}</span>
+                <span className="text-[13px] text-white/45 mt-1 block truncate">{idName}</span>
               </div>
             ) : (
               <button
                 type="button"
                 onClick={() => idFileRef.current?.click()}
-                className="w-full border border-dashed border-white/[0.08] hover:border-white/[0.15] rounded-lg py-8 text-center transition-colors"
+                className="w-full border border-dashed border-white/[0.14] hover:border-white/[0.28] rounded-lg py-8 text-center min-h-24"
               >
                 <input ref={idFileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
                   const file = e.target.files?.[0]
@@ -271,7 +285,7 @@ export function ImageTools() {
                   readFile(file, (data, name) => { setIdImage(data); setIdName(name); resetResult() })
                   clearFileInput(e.target)
                 }} />
-                <p className="text-[14px] text-white/40">Front face / head / body ID</p>
+                <p className="text-[15px] text-white/60">Front face / head / body ID</p>
               </button>
             )}
           </div>
@@ -292,10 +306,11 @@ export function ImageTools() {
                 {(['woman', 'man'] as const).map((p) => (
                   <button
                     key={p}
+                    type="button"
                     onClick={() => setSwapPerson(p)}
                     className={cn(
-                      'flex-1 py-2 text-[14px] rounded-lg capitalize',
-                      swapPerson === p ? 'bg-white text-black' : 'bg-white/[0.04] text-white/40',
+                      'flex-1 min-h-11 py-2 text-[15px] rounded-lg capitalize',
+                      swapPerson === p ? 'bg-white text-black' : 'bg-white/[0.06] text-white/70',
                     )}
                   >
                     {p}
@@ -309,10 +324,11 @@ export function ImageTools() {
                 {(['face', 'head', 'body'] as const).map((k) => (
                   <button
                     key={k}
+                    type="button"
                     onClick={() => setSwapKind(k)}
                     className={cn(
-                      'flex-1 py-2 text-[14px] rounded-lg capitalize',
-                      swapKind === k ? 'bg-white text-black' : 'bg-white/[0.04] text-white/40',
+                      'flex-1 min-h-11 py-2 text-[15px] rounded-lg capitalize',
+                      swapKind === k ? 'bg-white text-black' : 'bg-white/[0.06] text-white/70',
                     )}
                   >
                     {k}
@@ -330,71 +346,18 @@ export function ImageTools() {
               {SCENE_SIZES.map((s) => (
                 <button
                   key={s.value}
+                  type="button"
                   onClick={() => setSceneSize(s.value)}
                   className={cn(
-                    'px-2 py-1.5 text-[12px] rounded-md',
-                    sceneSize === s.value ? 'bg-white text-black' : 'bg-white/[0.04] text-white/40',
+                    'px-3 py-2 text-[14px] rounded-md min-h-11',
+                    sceneSize === s.value ? 'bg-white text-black' : 'bg-white/[0.06] text-white/65',
                   )}
                 >
                   {s.label}
                 </button>
               ))}
             </div>
-            <p className="text-[12px] text-white/25 leading-relaxed mt-1">
-              Scene keeps the uploaded photo ratio. Pick another size if the output should change crop.
-            </p>
           </div>
-        )}
-
-        {tool === 'undress' && (
-          <p className="text-[12px] text-white/25 leading-relaxed">
-            Clothes off only. Same face, hair, expression, height, weight, and pose. Average real body under the clothes, not a pornstar redraw.
-          </p>
-        )}
-
-        {tool === 'swap' && (
-          <p className="text-[12px] text-white/25 leading-relaxed">
-            Copy-paste identity. The only allowed change is a tiny pose fit. Do not change expression, bone structure, hair, or body size.
-          </p>
-        )}
-
-        {tool === 'upscale' && (
-          <>
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <Label>Scale</Label>
-                <span className="text-[13px] text-white/30 font-mono">{scale}x</span>
-              </div>
-              <input type="range" min={1} max={4} step={1} value={scale} onChange={(e) => setScale(Number(e.target.value))} className="w-full" />
-            </div>
-            <div className="flex items-center justify-between">
-              <Label>Enhance</Label>
-              <button
-                onClick={() => setEnhance(!enhance)}
-                className={cn(
-                  'w-8 h-[18px] rounded-full transition-colors relative',
-                  enhance ? 'bg-white' : 'bg-white/[0.08]',
-                )}
-              >
-                <div className={cn(
-                  'absolute top-[2px] w-[14px] h-[14px] rounded-full transition-all',
-                  enhance ? 'left-[16px] bg-black' : 'left-[2px] bg-white/30',
-                )} />
-              </button>
-            </div>
-            {enhance && (
-              <>
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <Label>Creativity</Label>
-                    <span className="text-[13px] text-white/30 font-mono">{enhanceCreativity.toFixed(2)}</span>
-                  </div>
-                  <input type="range" min={0} max={1} step={0.05} value={enhanceCreativity} onChange={(e) => setEnhanceCreativity(Number(e.target.value))} className="w-full" />
-                </div>
-                <div><Label>Enhance prompt</Label><TextArea value={enhancePrompt} onChange={setEnhancePrompt} placeholder="Make it more vibrant..." rows={2} /></div>
-              </>
-            )}
-          </>
         )}
 
         <PrimaryButton
@@ -415,17 +378,16 @@ export function ImageTools() {
         {error && <ErrorText>{error.message}</ErrorText>}
       </div>
 
-      <div className="flex-1 p-6 overflow-y-auto flex flex-col min-w-0">
+      <div className="flex-1 p-3 sm:p-6 overflow-y-auto flex flex-col min-w-0 min-h-0">
         {resultUrl ? (
           <div className="animate-fade-in flex flex-col gap-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <Label>Result</Label>
-              <button onClick={downloadResult} className="text-[14px] text-white/20 hover:text-white/40 transition-colors flex items-center gap-1.5">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
-                Download
+              <button type="button" onClick={downloadResult} className="min-h-11 px-3 rounded-lg bg-white text-black text-[15px] font-medium">
+                Save
               </button>
             </div>
-            <img src={resultUrl} alt="Result" className={cn('w-full rounded-lg border border-white/[0.04]', tool === 'remove-bg' && 'bg-[repeating-conic-gradient(#1a1a1a_0%_25%,#111_0%_50%)_0_0/20px_20px]')} />
+            <FitImg src={resultUrl} alt="Result" className={cn(tool === 'remove-bg' && 'bg-[repeating-conic-gradient(#1a1a1a_0%_25%,#111_0%_50%)_0_0/20px_20px]')} />
           </div>
         ) : (
           <EmptyState>
