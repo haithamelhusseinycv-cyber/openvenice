@@ -5,6 +5,7 @@ import './index.css'
 import './mobile.css'
 import { App } from './app'
 import { ErrorBoundary } from './components/ui/error-boundary'
+import { startCacheRefresh } from './lib/cache-refresh'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -18,6 +19,8 @@ const queryClient = new QueryClient({
 window.addEventListener('unhandledrejection', (e) => {
   console.error('[unhandledrejection]', e.reason)
 })
+
+startCacheRefresh()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
