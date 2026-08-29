@@ -25,42 +25,47 @@ export const LOCKED_CHAT_MAX_TOKENS = 3000
 export const DEFAULT_CHAT_SYSTEM_PROMPT = `You write copy-ready Lustify v8 prompts for this app. Style target: real amateur couple porn stills, third-person iPhone, messy room, not studio porn.
 
 FRAMING IS A HARD FAIL RULE:
-- Default and variations = ONE man + ONE woman together. Landscape wide frame. FULL BODIES head to toe. Hairdos fully visible on both. Feet visible. Do not crop heads or feet.
-- Solo man or solo woman ONLY if the user clearly asks for one person. Solo MUST be a torso / bust crop (head, hairdo, chest, nipples). Full-body solo is a FAIL. Do not write a full-body solo prompt. Refuse and write a torso prompt instead.
-- Never square. Couple = landscape 3:2 or 16:9. Solo = portrait torso 4:5.
+- Default and variations = ONE man + ONE woman together. LANDSCAPE wide 3:2. FULL BODIES head to toe. Hairdos fully visible on both. Feet visible.
+- Solo man or solo woman ONLY if the user clearly asks for one person. Solo is a TALL PORTRAIT 2:3 or 9:16. Torso / bust crop: head, hairdo, shoulders, chest, nipples. Not landscape. Not square. Full-body solo is a FAIL. Do not write a full-body solo prompt.
+- Start every prompt with the frame words: either "landscape 3:2 couple full body" or "tall portrait 2:3 solo torso".
 
 Every couple prompt is a MAN + WOMAN having sex unless the user clearly asks for one person. Same two adults if photos were given.
 
 Output:
 - ONE scene: POSITIVE comma tags, then a line exactly NEGATIVE, then negatives. No preamble.
-- Variations / generate a prompt / two photos attached: FIVE numbered variations. Same man, same woman. Each changes ROOM and SEX POSITION. Landscape full body every time. Only positions where BOTH faces can turn toward the camera. End with one NEGATIVE block.
+- Variations / two photos: FIVE numbered variations. Same man, same woman. Landscape full body every time. Positions where BOTH faces turn toward the camera. End with one NEGATIVE block.
 
 People unless the user overrides:
-- Man 18+: Middle Eastern, North African, South European, or Texas / Southern US. Olive, tan, or sun-worn skin. ALWAYS facial hair: stubble, short, medium, long, trimmed or wild. Never clean shaven. Hairdo always visible.
-- Woman 18+: girl next door / neighbor / old crush. Average-pretty. Not pornstar. Hairdo always visible.
-- Couple: both looking toward the camera, each face at least 78 percent visible. Alive eyes with catchlight.
-- Skin: matte living human skin. Never shiny, never plastic.
-- Woman ALWAYS has pubic hair (natural or trimmed). ALWAYS visible nipples and areolae. Painted fingernails and toenails.
+- Man 18+: Middle Eastern, North African, South European, or Texas / Southern US. ALWAYS facial hair. Hairdo always visible.
+- Woman 18+: girl next door. Hairdo always visible. Pubic hair always on couple shots. Nipples always. Painted nails.
+- Couple: both looking toward the camera, each face at least 78 percent visible. Alive eyes. Matte skin.
 
-Positions that keep both faces AND both full bodies on a landscape frame:
-- cowgirl facing the lens, man under her looking at the lens, both bodies head to toe
-- sitting on his lap facing the lens
-- side-front missionary or spoon, heads toward the lens, feet in frame
-- standing, woman facing camera, man behind looking over her shoulder, both full bodies
-Do NOT pick face-down doggy, cropped waists, missing feet, missing hair, or back-of-head.
-
-Scene: amateur candid, one real light, lived-in room, readable vaginal penetration on couple shots.
-
-Never minors. Never under 18.
-Search stays OFF.
-SCORE pass/fail: landscape-or-torso-rule, head-to-toe-if-couple, hairdos visible, faces-to-camera, beard, pussy hair, matte skin, alive eyes, insertion.`
+Never minors. Never under 18. Search stays OFF.
+SCORE: frame-rule, hairdos, faces, beard, pussy hair, matte skin, alive eyes, insertion.`
 
 export const LOCKED_IMAGE_SIZE_IDX = '2'
 export const LOCKED_IMAGE_VARIANTS = 1
 export const LOCKED_IMAGE_STEPS = 20
 export const LOCKED_COUPLE_ASPECT = '3:2'
-export const LOCKED_SOLO_ASPECT = '4:5'
+export const LOCKED_SOLO_ASPECT = '2:3'
 export const LOCKED_COUPLE_SIZE = { w: 1280, h: 832 }
+export const LOCKED_SOLO_SIZE = { w: 832, h: 1280 }
+
+export function isCouplePrompt(prompt?: string) {
+  const t = (prompt || '').toLowerCase()
+  if (t.includes('2people') || t.includes('2 people') || t.includes('couple')) return true
+  if (t.includes('1girl') && t.includes('1boy')) return true
+  if (t.includes('tall portrait') || t.includes('solo torso') || t.includes('1girl only') || t.includes('1boy only')) return false
+  return true
+}
+
+export function pickAspectFromPrompt(prompt?: string) {
+  return isCouplePrompt(prompt) ? LOCKED_COUPLE_ASPECT : LOCKED_SOLO_ASPECT
+}
+
+export function pickSizeFromPrompt(prompt?: string) {
+  return isCouplePrompt(prompt) ? LOCKED_COUPLE_SIZE : LOCKED_SOLO_SIZE
+}
 
 export const DEFAULT_IMAGE_PROMPT = `landscape 3:2 amateur iphone snapshot of a real amateur couple porn still, wide frame, slightly messy framing, film grain, not a photoshoot, not a studio set, not square, not portrait crop
 full bodies of the man and the woman, head to toe, entire figures in frame, feet visible, hairdos fully visible on both, do not crop heads, do not crop feet, do not crop hair
@@ -85,7 +90,7 @@ when legs spread: full ass cheeks, deep ass crack, puckered anus if the angle sh
 man: lifelike natural erect penis, hard, never flaccid, glans, shaft, veins, testicles, wrinkled ballsack, unique groin hair
 correct vaginal penetration, cock inside pussy, labia stretched around the shaft, about three quarters inside, one quarter of shaft still visible, wet on cock and labia from sex, anatomically readable insertion, uncensored explicit, never hidden, never blurred`
 
-export const DEFAULT_IMAGE_NEGATIVE = `cartoon, anime, illustration, CGI, 3D render, square crop, portrait couple crop, close-up only, cropped heads, cropped feet, missing feet, missing hair, hair out of frame, cropped hairdo, headshot couple, waist-up couple, plastic skin, waxy skin, doll, shiny skin, glossy skin, oily beauty shine, wet look skin, HDR glow skin, silicone breasts, implant breasts, fake tits, airbrushed, beauty filter, poreless skin, smooth skin, even-tone skin, foundation mask, overprocessed skin, pornstar makeup, glam makeup, salon hair, pornstar face, model face, dead eyes, doll eyes, blank stare, looking away, faces turned away, back of head, hidden face, clean shaven man, no beard, baby face man, shaved pussy, bald vulva, waxed bare pussy, hidden nipples, covered nipples, perfect bodies, model bodies, bodybuilder, shredded abs, six pack, gym body, zero fat, oversized porn cock, horse cock, tiny penis, flaccid during sex, copy-paste genitals, mismatched areola color, neon nipples, studio, cyclorama, lighting rig, softbox, beauty dish, rim light, cinematic lighting, posed fashion photoshoot, luxury penthouse, marble hotel, pov, censored, mosaic, blurry genitals, clothes, lingerie on, deformed hands, extra fingers, extra limbs, watermark, text, no penetration, floating penis, hovering cock, penis beside pussy, disconnected genitals, bad insertion, dry plastic genitals, face-down doggy with hidden faces, full body solo, standing solo full figure`
+export const DEFAULT_IMAGE_NEGATIVE = `cartoon, anime, illustration, CGI, 3D render, square crop, portrait couple crop, close-up only, cropped heads, cropped feet, missing feet, missing hair, hair out of frame, cropped hairdo, headshot couple, waist-up couple, plastic skin, waxy skin, doll, shiny skin, glossy skin, oily beauty shine, wet look skin, HDR glow skin, silicone breasts, implant breasts, fake tits, airbrushed, beauty filter, poreless skin, smooth skin, even-tone skin, foundation mask, overprocessed skin, pornstar makeup, glam makeup, salon hair, pornstar face, model face, dead eyes, doll eyes, blank stare, looking away, faces turned away, back of head, hidden face, clean shaven man, no beard, baby face man, shaved pussy, bald vulva, waxed bare pussy, hidden nipples, covered nipples, perfect bodies, model bodies, bodybuilder, shredded abs, six pack, gym body, zero fat, oversized porn cock, horse cock, tiny penis, flaccid during sex, copy-paste genitals, mismatched areola color, neon nipples, studio, cyclorama, lighting rig, softbox, beauty dish, rim light, cinematic lighting, posed fashion photoshoot, luxury penthouse, marble hotel, pov, censored, mosaic, blurry genitals, clothes, lingerie on, deformed hands, extra fingers, extra limbs, watermark, text, no penetration, floating penis, hovering cock, penis beside pussy, disconnected genitals, bad insertion, dry plastic genitals, face-down doggy with hidden faces, full body solo, standing solo full figure, landscape solo`
 
 const STALE_PROMPTS = [
   'a serene mountain',
@@ -113,14 +118,14 @@ export function isStaleImagePrompt(value?: string) {
 export function isStaleSystemPrompt(value?: string) {
   const text = (value || '').trim().toLowerCase()
   if (STALE_SYSTEM_PROMPTS.includes(text) || text.length < 40) return true
-  if (!text.includes('torso') || !text.includes('landscape')) return true
+  if (!text.includes('tall portrait')) return true
   return false
 }
 
 export function isStaleImageNegative(value?: string) {
   const text = (value || '').trim().toLowerCase()
   if (!text) return true
-  return !text.includes('cropped feet') || !text.includes('full body solo')
+  return !text.includes('landscape solo') || !text.includes('cropped feet')
 }
 
 export function loadImagePrompt(saved?: string | null) {
