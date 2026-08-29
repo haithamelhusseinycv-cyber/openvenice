@@ -6,6 +6,7 @@ import {
   DEFAULT_IMAGE_MODEL_ID,
   isAllowedChatModel,
   isAllowedImageModel,
+  isVisibleTab,
 } from '../lib/allowed-models'
 
 export type Tab = 'chat' | 'image' | 'audio' | 'music' | 'video' | 'embeddings' | 'workflows' | 'playground'
@@ -33,9 +34,9 @@ export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
       activeTab: 'chat',
-      setActiveTab: (tab) => set({ activeTab: tab }),
+      setActiveTab: (tab) => set({ activeTab: isVisibleTab(tab) ? tab : 'chat' }),
       sidebarOpen: true,
-      setSidebarOpen: (open) => set({ sidebarOpen: open }),
+      setSidebarOpen: (open: boolean) => set({ sidebarOpen: open }),
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
       selectedModels: {
         chat: DEFAULT_CHAT_MODEL_ID,
@@ -50,12 +51,13 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'venice-settings',
-      version: 2,
+      version: 3,
       storage: createJSONStorage(() => createSafeStorage()),
       migrate: (persisted) => {
         if (!persisted || typeof persisted !== 'object') return persisted as SettingsState
         const s = persisted as Partial<SettingsState>
         s.selectedModels = sanitizeSelectedModels(s.selectedModels)
+        if (!isVisibleTab(s.activeTab)) s.activeTab = 'chat'
         return s as SettingsState
       },
     },
