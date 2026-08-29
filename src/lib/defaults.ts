@@ -25,9 +25,11 @@ export const LOCKED_CHAT_MAX_TOKENS = 3000
 export const DEFAULT_CHAT_SYSTEM_PROMPT = `You write copy-ready Lustify v8 prompts for this app. Style target: real amateur couple porn stills, third-person iPhone, messy room, not studio porn.
 
 FRAMING IS A HARD FAIL RULE:
-- Default and variations = ONE man + ONE woman together. LANDSCAPE wide 3:2. FULL BODIES head to toe. Hair visible, a bit moist and messy from sex, not a salon hairdo. Feet visible.
-- Solo man or solo woman ONLY if the user clearly asks for one person. Solo is a TALL PORTRAIT 2:3 or 9:16. Torso / bust crop: head, messy damp hair, shoulders, chest, nipples. Not landscape. Not square. Full-body solo is a FAIL. Do not write a full-body solo prompt.
-- Start every prompt with the frame words: either "landscape 3:2 couple full body" or "tall portrait 2:3 solo torso".
+- EVERY picture shows the WHOLE BODY, head to toes. Heads in frame. Feet in frame. Never a torso crop. Never a bust crop. Never waist-up.
+- Default and variations = ONE man + ONE woman together. LANDSCAPE wide 3:2. Full bodies head to toe.
+- Solo man or solo woman ONLY if the user clearly asks for one person. Solo is a TALL PORTRAIT 2:3 or 9:16 AND still full body head to toes. Not a torso. Not a bust.
+- Hair is a bit moist and messy from sex, not a salon hairdo.
+- Start every prompt with: either "landscape 3:2 couple full body head to toe" or "tall portrait 2:3 solo full body head to toe".
 
 Every couple prompt is a MAN + WOMAN having sex unless the user clearly asks for one person. Same two adults if photos were given.
 
@@ -37,11 +39,11 @@ Output:
 
 People unless the user overrides:
 - Man 18+: Middle Eastern, North African, South European, or Texas / Southern US. ALWAYS facial hair. Hair a bit messy or damp from sex, never freshly styled.
-- Woman 18+: girl next door. Hair a bit messy or moist from sex, never salon. Pubic hair always on couple shots. Nipples always. Painted nails.
+- Woman 18+: girl next door. Hair a bit messy or moist from sex, never salon. Pubic hair always. Nipples always. Painted nails.
 - Couple: both looking toward the camera, each face at least 78 percent visible. Alive eyes. Matte skin.
 
 Never minors. Never under 18. Search stays OFF.
-SCORE: frame-rule, messy damp hair, faces, beard, pussy hair, matte skin, alive eyes, insertion.`
+SCORE: full-body-head-to-toe, messy damp hair, faces, beard, pussy hair, matte skin, alive eyes, insertion.`
 
 export const LOCKED_IMAGE_SIZE_IDX = '2'
 export const LOCKED_IMAGE_VARIANTS = 1
@@ -55,7 +57,7 @@ export function isCouplePrompt(prompt?: string) {
   const t = (prompt || '').toLowerCase()
   if (t.includes('2people') || t.includes('2 people') || t.includes('couple')) return true
   if (t.includes('1girl') && t.includes('1boy')) return true
-  if (t.includes('tall portrait') || t.includes('solo torso') || t.includes('1girl only') || t.includes('1boy only')) return false
+  if (t.includes('tall portrait') || t.includes('solo full body') || t.includes('1girl only') || t.includes('1boy only')) return false
   return true
 }
 
@@ -68,7 +70,7 @@ export function pickSizeFromPrompt(prompt?: string) {
 }
 
 export const DEFAULT_IMAGE_PROMPT = `landscape 3:2 amateur iphone snapshot of a real amateur couple porn still, wide frame, slightly messy framing, film grain, not a photoshoot, not a studio set, not square, not portrait crop
-full bodies of the man and the woman, head to toe, entire figures in frame, feet visible, hair in frame, do not crop heads, do not crop feet
+full bodies of the man and the woman, head to toe, entire figures in frame, feet visible, hair in frame, do not crop heads, do not crop feet, never torso crop, never bust crop
 lighting: one real bedroom light source only, either morning sunlight coming through a window or night with a normal ceiling bulb or bedside lamp, household electricity, ordinary bulb, expected light for that room, soft falloff, real shadows, no lighting rig, no rim light, no cinematic grade, no studio softbox
 normal lived-in bedroom, unmade bed, everyday clutter, sometimes tidy sometimes messy, never luxury hotel, never set, never cyclorama
 2people, 1girl, 1boy, adults 18+, couple having sex together in one landscape frame, third-person view
@@ -90,7 +92,7 @@ when legs spread: full ass cheeks, deep ass crack, puckered anus if the angle sh
 man: lifelike natural erect penis, hard, never flaccid, glans, shaft, veins, testicles, wrinkled ballsack, unique groin hair
 correct vaginal penetration, cock inside pussy, labia stretched around the shaft, about three quarters inside, one quarter of shaft still visible, wet on cock and labia from sex, anatomically readable insertion, uncensored explicit, never hidden, never blurred`
 
-export const DEFAULT_IMAGE_NEGATIVE = `cartoon, anime, illustration, CGI, 3D render, square crop, portrait couple crop, close-up only, cropped heads, cropped feet, missing feet, missing hair, hair out of frame, salon hair, fresh hairdo, blowout hair, posed hair, headshot couple, waist-up couple, plastic skin, waxy skin, doll, shiny skin, glossy skin, oily beauty shine, wet look skin, HDR glow skin, silicone breasts, implant breasts, fake tits, airbrushed, beauty filter, poreless skin, smooth skin, even-tone skin, foundation mask, overprocessed skin, pornstar makeup, glam makeup, pornstar face, model face, dead eyes, doll eyes, blank stare, looking away, faces turned away, back of head, hidden face, clean shaven man, no beard, baby face man, shaved pussy, bald vulva, waxed bare pussy, hidden nipples, covered nipples, perfect bodies, model bodies, bodybuilder, shredded abs, six pack, gym body, zero fat, oversized porn cock, horse cock, tiny penis, flaccid during sex, copy-paste genitals, mismatched areola color, neon nipples, studio, cyclorama, lighting rig, softbox, beauty dish, rim light, cinematic lighting, posed fashion photoshoot, luxury penthouse, marble hotel, pov, censored, mosaic, blurry genitals, clothes, lingerie on, deformed hands, extra fingers, extra limbs, watermark, text, no penetration, floating penis, hovering cock, penis beside pussy, disconnected genitals, bad insertion, dry plastic genitals, face-down doggy with hidden faces, full body solo, standing solo full figure, landscape solo`
+export const DEFAULT_IMAGE_NEGATIVE = `cartoon, anime, illustration, CGI, 3D render, square crop, portrait couple crop, close-up only, cropped heads, cropped feet, missing feet, missing hair, hair out of frame, salon hair, fresh hairdo, blowout hair, posed hair, headshot, torso crop, bust crop, waist-up, chest-up, cropped legs, plastic skin, waxy skin, doll, shiny skin, glossy skin, oily beauty shine, wet look skin, HDR glow skin, silicone breasts, implant breasts, fake tits, airbrushed, beauty filter, poreless skin, smooth skin, even-tone skin, foundation mask, overprocessed skin, pornstar makeup, glam makeup, pornstar face, model face, dead eyes, doll eyes, blank stare, looking away, faces turned away, back of head, hidden face, clean shaven man, no beard, baby face man, shaved pussy, bald vulva, waxed bare pussy, hidden nipples, covered nipples, perfect bodies, model bodies, bodybuilder, shredded abs, six pack, gym body, zero fat, oversized porn cock, horse cock, tiny penis, flaccid during sex, copy-paste genitals, mismatched areola color, neon nipples, studio, cyclorama, lighting rig, softbox, beauty dish, rim light, cinematic lighting, posed fashion photoshoot, luxury penthouse, marble hotel, pov, censored, mosaic, blurry genitals, clothes, lingerie on, deformed hands, extra fingers, extra limbs, watermark, text, no penetration, floating penis, hovering cock, penis beside pussy, disconnected genitals, bad insertion, dry plastic genitals, face-down doggy with hidden faces, landscape solo`
 
 const STALE_PROMPTS = [
   'a serene mountain',
@@ -119,15 +121,15 @@ export function isStaleImagePrompt(value?: string) {
 export function isStaleSystemPrompt(value?: string) {
   const text = (value || '').trim().toLowerCase()
   if (STALE_SYSTEM_PROMPTS.includes(text) || text.length < 40) return true
-  if (text.includes('hairdo always visible') || text.includes('hairdos')) return true
-  if (!text.includes('messy') && !text.includes('damp')) return true
+  if (text.includes('torso / bust') || text.includes('solo torso') || text.includes('hairdos')) return true
+  if (!text.includes('head to toe') && !text.includes('head to toes')) return true
   return false
 }
 
 export function isStaleImageNegative(value?: string) {
   const text = (value || '').trim().toLowerCase()
   if (!text) return true
-  return !text.includes('salon hair') || !text.includes('fresh hairdo')
+  return !text.includes('torso crop') || !text.includes('bust crop')
 }
 
 export function loadImagePrompt(saved?: string | null) {
