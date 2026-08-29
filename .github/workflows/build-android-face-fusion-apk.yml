@@ -1,10 +1,11 @@
-name: Build Android Face Fusion APK
+name: Build Android Face Fusion Complete Models APK
 
 on:
   workflow_dispatch:
   push:
     paths:
       - '.github/workflows/build-android-face-fusion-apk.yml'
+      - 'android-face-fusion-custom/**'
 
 permissions:
   contents: read
@@ -21,10 +22,21 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      - name: Clone build customizations
+        shell: bash
+        run: |
+          git clone --depth 1 --branch master https://github.com/haithamelhusseinycv-cyber/openvenice.git build-host
+          cp -R build-host/android-face-fusion-custom ./android-face-fusion-custom
+
       - name: Clone Android Face Fusion
         shell: bash
         run: |
           git clone --depth 1 --branch master https://github.com/Parasaran-Python/android-face-fusion.git android-face-fusion
+
+      - name: Apply Complete Models customization
+        shell: bash
+        run: |
+          python3 android-face-fusion-custom/apply_custom.py
 
       - name: Build debug APK
         working-directory: android-face-fusion
@@ -39,10 +51,10 @@ jobs:
           test -f android-face-fusion/app/build/outputs/apk/debug/app-debug.apk
           ls -lh android-face-fusion/app/build/outputs/apk/debug/app-debug.apk
 
-      - name: Upload installable APK
+      - name: Upload Complete Models APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: android-face-fusion-debug-apk
+          name: android-face-fusion-complete-models-apk
           path: android-face-fusion/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
