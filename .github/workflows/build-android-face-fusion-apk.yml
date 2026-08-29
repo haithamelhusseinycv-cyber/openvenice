@@ -1,0 +1,63 @@
+name: Build Android Face Fusion APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/build-android-face-fusion-apk.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 37 and NDK
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager \
+            'platform-tools' \
+            'platforms;android-37' \
+            'ndk;28.2.13676358'
+
+      - name: Clone Android Face Fusion
+        shell: bash
+        run: |
+          git clone --depth 1 --branch master https://github.com/Parasaran-Python/android-face-fusion.git android-face-fusion
+
+      - name: Build debug APK
+        working-directory: android-face-fusion
+        shell: bash
+        env:
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+        run: |
+          chmod +x ./gradlew
+          ./gradlew --no-daemon clean assembleDebug --stacktrace
+
+      - name: Verify APK
+        shell: bash
+        run: |
+          test -f android-face-fusion/app/build/outputs/apk/debug/app-debug.apk
+          ls -lh android-face-fusion/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-face-fusion-debug-apk
+          path: android-face-fusion/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
