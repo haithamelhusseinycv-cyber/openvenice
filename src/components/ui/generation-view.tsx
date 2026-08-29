@@ -8,20 +8,11 @@ interface Props {
   className?: string
 }
 
-/**
- * Common layout for image / audio / music / video generation:
- *   ┌─────────┬───────────────────┐
- *   │ Form    │ Output / Gallery  │
- *   │ (left)  │ (right, primary)  │
- *   └─────────┴───────────────────┘
- *
- * On narrow screens, controls collapse above output.
- */
 export function GenerationView({ controls, output, history, className }: Props) {
   return (
     <div className={cn('flex flex-col md:flex-row h-full bg-[#0a0a0c]', className)}>
-      <aside className="md:w-[360px] lg:w-[400px] shrink-0 border-r border-white/[0.05] flex flex-col bg-[#0c0c10] max-h-[55vh] md:max-h-none">
-        <div className="p-5 flex flex-col gap-4 overflow-y-auto">
+      <aside className="md:w-[360px] lg:w-[400px] shrink-0 border-b md:border-b-0 md:border-r border-white/[0.05] flex flex-col bg-[#0c0c10] max-h-[38vh] md:max-h-none">
+        <div className="p-3 sm:p-5 flex flex-col gap-3 sm:gap-4 overflow-y-auto overscroll-contain">
           {controls}
         </div>
         {history && (
@@ -30,7 +21,7 @@ export function GenerationView({ controls, output, history, className }: Props) 
           </div>
         )}
       </aside>
-      <main className="flex-1 min-w-0 overflow-y-auto p-5 md:p-7">
+      <main className="flex-1 min-w-0 overflow-y-auto overscroll-contain p-3 sm:p-5 md:p-7">
         {output}
       </main>
     </div>
