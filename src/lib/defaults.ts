@@ -32,12 +32,14 @@ No preamble, no quotes, no markdown, no analysis.
 Preserve the user's requested composition, camera, pose, anatomy, lighting, realism, and any negative-prompt rules. Do not invent a different scene. Do not add studio lighting, cinematic grade, beauty filters, CGI, clothes, hidden faces, gym bodies, or porn-star glamour unless the user asked for them.
 
 Default look if the user does not override it:
-- photoreal amateur iPhone snapshot, third-person, normal lived-in bedroom, available room light, one light source
+- photoreal amateur iPhone snapshot, third-person, normal lived-in bedroom
+- lighting: ONE real source only. Day = sunlight through a window. Night = a normal ceiling bulb or lamp. Never a lighting rig, never rim light, never cinematic
 - two consenting average adults 18+, 1girl 1boy, real imperfect bodies, not models
+- sex is happening, not posed for a photograph. Natural positions, mid-motion, messy, bedroom-real
 - both faces visible: woman's face at least 75%, man's face at least 50%
 - uncensored explicit genitals with person-specific detail, readable vaginal penetration when sex is requested
 - sweat, flush, messy sex hair, real expressions, painted fingernails and toenails on the woman
-- natural skin, pores, no beauty filter
+- natural skin, pores, no beauty filter, no plastic smoothness
 
 Anatomy rules:
 - Male: lifelike erect penis from glans through shaft, foreskin if natural to the body, veins, testicles, ballsack, unique groin hair, ass, ass crack, anus when the angle shows them. Never flaccid during sex. Never a generic copy-paste cock.
@@ -52,11 +54,14 @@ export const LOCKED_IMAGE_SIZE_IDX = '2'
 export const LOCKED_IMAGE_VARIANTS = 1
 export const LOCKED_IMAGE_STEPS = 20
 
-export const DEFAULT_IMAGE_PROMPT = `amateur iphone snapshot, slightly messy framing, film grain, available room light only, one light source, normal lived-in bedroom, unmade bed, everyday clutter, sometimes tidy sometimes messy, never luxury hotel, never studio, raw candid, not posed for camera
-2people, 1girl, 1boy, adults 18+, average couple having sex, third-person view, both faces visible, woman's face at least 75 percent visible, man's face at least 50 percent visible
-average real bodies, natural body fat, soft belly, not models, not pornstar bodies, no gym shredded look, no bodybuilder, visible pores, peach fuzz, skin imperfections, stretch marks ok, moles ok
+export const DEFAULT_IMAGE_PROMPT = `amateur iphone snapshot, slightly messy framing, film grain, not a photoshoot, not staged for camera
+lighting: one real bedroom light source only, either morning sunlight coming through a window or night with a normal ceiling bulb or bedside lamp, household electricity, ordinary warm or cool bulb, expected light for that room at that time of day, soft falloff, real shadows, no lighting rig, no rim light, no cinematic grade, no studio softbox
+normal lived-in bedroom, unmade bed, everyday clutter, sometimes tidy sometimes messy, never luxury hotel, never set, never cyclorama
+2people, 1girl, 1boy, adults 18+, average couple having sex in a real bedroom, third-person view, both faces visible, woman's face at least 75 percent visible, man's face at least 50 percent visible
+natural sex positions, mid-motion, bodies working, not posed, not arranged for the lens, bedroom sex not porn choreography
+average real bodies, natural body fat, soft belly, not models, not pornstar bodies, no gym shredded look, no bodybuilder, no zero fat, visible pores, peach fuzz, skin imperfections, stretch marks ok, moles ok, photoreal natural skin never plastic never airbrushed never poreless
 sex sweat, fine beads of sweat on forehead neck chest lower back, flushed cheeks and chest, warmer skin from friction, damp messy sex hair, not salon hair
-real expressions, lust, half-lidded eyes, parted lips, biting lip, moaning faces, male and female both, no fashion pose
+real expressions from sex, lust, half-lidded eyes, parted lips, biting lip, moaning faces, male and female both, no fashion face, no looking at camera on purpose
 woman: painted fingernails, painted toenails, any polish color, nails visible when hands or feet are in frame
 woman breasts: soft natural real breasts, not silicone, not plastic, not perky fake implants, natural hang and weight
 areolae and nipples matched to her skin tone, pink or rose on fair skin, brown or dark brown on deeper skin, mixed sizes, not copy-paste
@@ -67,7 +72,7 @@ man: lifelike natural erect penis, hard, never flaccid, glans, shaft, veins, tes
 when the angle shows it: male ass, ass crack, anus
 correct vaginal penetration, cock inside pussy, labia stretched around the shaft, about three quarters inside, one quarter of shaft still visible, wet shine on cock and labia from sex, anatomically readable insertion, uncensored explicit, never hidden, never blurred`
 
-export const DEFAULT_IMAGE_NEGATIVE = `cartoon, anime, illustration, CGI, 3D render, plastic skin, waxy skin, doll, silicone breasts, implant breasts, fake tits, airbrushed, beauty filter, pornstar makeup, glam makeup, salon hair, perfect bodies, model bodies, bodybuilder, shredded abs, six pack, gym body, oversized porn cock, horse cock, tiny penis, flaccid during sex, copy-paste genitals, same pubic hair on every woman, mismatched areola color, neon nipples, studio, cyclorama, luxury penthouse, marble hotel, rim light, cinematic lighting, posed photoshoot, pov, hidden faces, censored, mosaic, blurry genitals, clothes, lingerie on, deformed hands, extra fingers, extra limbs, watermark, text, no penetration, floating penis, hovering cock, penis beside pussy, disconnected genitals, bad insertion, dry plastic genitals`
+export const DEFAULT_IMAGE_NEGATIVE = `cartoon, anime, illustration, CGI, 3D render, plastic skin, waxy skin, doll, silicone breasts, implant breasts, fake tits, airbrushed, beauty filter, poreless skin, pornstar makeup, glam makeup, salon hair, perfect bodies, model bodies, bodybuilder, shredded abs, six pack, gym body, zero fat, oversized porn cock, horse cock, tiny penis, flaccid during sex, copy-paste genitals, same pubic hair on every woman, mismatched areola color, neon nipples, studio, cyclorama, lighting rig, softbox, beauty dish, rim light, cinematic lighting, posed photoshoot, looking at camera pose, luxury penthouse, marble hotel, pov, hidden faces, censored, mosaic, blurry genitals, clothes, lingerie on, deformed hands, extra fingers, extra limbs, watermark, text, no penetration, floating penis, hovering cock, penis beside pussy, disconnected genitals, bad insertion, dry plastic genitals`
 
 const STALE_PROMPTS = [
   'a serene mountain',
@@ -87,21 +92,21 @@ export function isStaleImagePrompt(value?: string) {
   const text = (value || '').trim().toLowerCase()
   if (!text) return true
   if (STALE_PROMPTS.some((snippet) => text.includes(snippet))) return true
-  if (text.includes('amateur iphone snapshot') && !text.includes('nail polish') && !text.includes('painted fingernail')) return true
+  if (text.includes('amateur iphone snapshot') && !text.includes('ceiling bulb') && !text.includes('window')) return true
   return false
 }
 
 export function isStaleSystemPrompt(value?: string) {
   const text = (value || '').trim().toLowerCase()
   if (STALE_SYSTEM_PROMPTS.includes(text) || text.length < 40) return true
-  if (!text.includes('average') && !text.includes('nail')) return true
+  if (!text.includes('window') && !text.includes('bulb')) return true
   return false
 }
 
 export function isStaleImageNegative(value?: string) {
   const text = (value || '').trim().toLowerCase()
   if (!text) return true
-  return !text.includes('bodybuilder') && !text.includes('silicone breasts')
+  return !text.includes('lighting rig') && !text.includes('bodybuilder')
 }
 
 export function loadImagePrompt(saved?: string | null) {
