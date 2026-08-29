@@ -1,0 +1,64 @@
+name: Dependency Security Refresh
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Reclassify build tooling and patch Vite
+        run: |
+          node <<'NODE'
+          const fs = require('fs')
+          const p = JSON.parse(fs.readFileSync('package.json', 'utf8'))
+          p.devDependencies = p.devDependencies || {}
+          p.devDependencies['@tailwindcss/vite'] = p.dependencies['@tailwindcss/vite'] || '^4.2.1'
+          p.devDependencies['tailwindcss'] = p.dependencies['tailwindcss'] || '^4.2.1'
+          p.devDependencies['vite'] = '^7.3.6'
+          delete p.dependencies['@tailwindcss/vite']
+          delete p.dependencies['tailwindcss']
+          fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n')
+          NODE
+          npm install
+          npm audit fix
+
+      - name: Verify clean install and security audit
+        run: |
+          npm ci
+          npm audit --omit=dev
+          npm audit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Commit refreshed dependency tree
+        run: |
+          if git diff --quiet -- package.json package-lock.json; then
+            echo "No dependency changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "Patch dependency security advisories"
+          git push origin HEAD:master
