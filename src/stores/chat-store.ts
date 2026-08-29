@@ -4,10 +4,12 @@ import type { ChatMessage, Conversation, VeniceParameters } from '../types/venic
 import { generateId } from '../lib/utils'
 import { createSafeStorage } from '../lib/safe-storage'
 import {
+  DEFAULT_CHAT_SYSTEM_PROMPT,
   LOCKED_CHAT_MAX_TOKENS,
   LOCKED_CHAT_TEMPERATURE,
   LOCKED_CHAT_TOP_P,
   lockChatParams,
+  lockChatSystemPrompt,
 } from '../lib/defaults'
 
 interface ChatState {
@@ -43,7 +45,7 @@ export const useChatStore = create<ChatState>()(
       activeConversationId: null,
       isStreaming: false,
       veniceParams: lockChatParams(),
-      systemPrompt: '',
+      systemPrompt: DEFAULT_CHAT_SYSTEM_PROMPT,
       temperature: LOCKED_CHAT_TEMPERATURE,
       topP: LOCKED_CHAT_TOP_P,
       maxTokens: LOCKED_CHAT_MAX_TOKENS,
@@ -129,7 +131,7 @@ export const useChatStore = create<ChatState>()(
       setVeniceParams: (params) =>
         set((s) => ({ veniceParams: lockChatParams({ ...s.veniceParams, ...params }) })),
 
-      setSystemPrompt: (prompt) => set({ systemPrompt: prompt }),
+      setSystemPrompt: (prompt) => set({ systemPrompt: lockChatSystemPrompt(prompt) }),
       setTemperature: (t) => set({ temperature: t }),
       setTopP: (p) => set({ topP: p }),
       setMaxTokens: (t) => set({ maxTokens: t }),
@@ -141,16 +143,17 @@ export const useChatStore = create<ChatState>()(
     }),
     {
       name: 'venice-chat',
-      version: 5,
+      version: 6,
       storage: createJSONStorage(() => createSafeStorage()),
       migrate: (persisted) => {
         if (!persisted || typeof persisted !== 'object') return persisted as ChatState
         const s = persisted as Partial<ChatState>
         if (Array.isArray(s.conversations)) s.conversations = s.conversations.slice(0, 50)
         s.veniceParams = lockChatParams(s.veniceParams)
-        if (s.maxTokens === undefined || s.maxTokens < 2048) s.maxTokens = LOCKED_CHAT_MAX_TOKENS
-        if (s.temperature === undefined) s.temperature = LOCKED_CHAT_TEMPERATURE
-        if (s.topP === undefined) s.topP = LOCKED_CHAT_TOP_P
+        s.systemPrompt = lockChatSystemPrompt(s.systemPrompt)
+        s.maxTokens = LOCKED_CHAT_MAX_TOKENS
+        s.temperature = LOCKED_CHAT_TEMPERATURE
+        s.topP = LOCKED_CHAT_TOP_P
         delete (s as Record<string, unknown>).isStreaming
         return s as ChatState
       },
@@ -158,10 +161,10 @@ export const useChatStore = create<ChatState>()(
         conversations: state.conversations.slice(0, 50),
         activeConversationId: state.activeConversationId,
         veniceParams: lockChatParams(state.veniceParams),
-        systemPrompt: state.systemPrompt,
-        temperature: state.temperature,
-        topP: state.topP,
-        maxTokens: state.maxTokens,
+        systemPrompt: lockChatSystemPrompt(state.systemPrompt),
+        temperature: LOCKED_CHAT_TEMPERATURE,
+        topP: LOCKED_CHAT_TOP_P,
+        maxTokens: LOCKED_CHAT_MAX_TOKENS,
       }),
     },
   ),
