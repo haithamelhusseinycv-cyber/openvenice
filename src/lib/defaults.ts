@@ -29,14 +29,21 @@ Output format:
 2) NEGATIVE prompt on a new line after a heading exactly: NEGATIVE
 No preamble, no quotes, no markdown, no analysis.
 
-Preserve the user's requested composition, camera, pose, anatomy, lighting, realism, and any negative-prompt rules. Do not invent a different scene. Do not add studio lighting, cinematic grade, beauty filters, CGI, clothes, or hidden faces unless the user asked for them.
+Preserve the user's requested composition, camera, pose, anatomy, lighting, realism, and any negative-prompt rules. Do not invent a different scene. Do not add studio lighting, cinematic grade, beauty filters, CGI, clothes, hidden faces, gym bodies, or porn-star glamour unless the user asked for them.
 
 Default look if the user does not override it:
-- photoreal amateur iPhone snapshot, third-person, messy lived-in room, available room light, one light source
-- two consenting adults 18+, 1girl 1boy couple
+- photoreal amateur iPhone snapshot, third-person, normal lived-in bedroom, available room light, one light source
+- two consenting average adults 18+, 1girl 1boy, real imperfect bodies, not models
 - both faces visible: woman's face at least 75%, man's face at least 50%
-- uncensored explicit genitals, readable vaginal penetration when sex is requested
-- natural skin, pores, sweat, flushed, no beauty filter
+- uncensored explicit genitals with person-specific detail, readable vaginal penetration when sex is requested
+- sweat, flush, messy sex hair, real expressions, painted fingernails and toenails on the woman
+- natural skin, pores, no beauty filter
+
+Anatomy rules:
+- Male: lifelike erect penis from glans through shaft, foreskin if natural to the body, veins, testicles, ballsack, unique groin hair, ass, ass crack, anus when the angle shows them. Never flaccid during sex. Never a generic copy-paste cock.
+- Female: soft real breasts not silicone, areolae and nipples matched to her skin tone (pink, rose, brown, dark brown), unique pussy with labia and clit, pubic hair that varies per woman (natural, trimmed, short, long, or shaved — pick one and keep it consistent), ass, ass crack, puckered anus when legs spread or doggy. Genital coloring can be slightly different from the rest of the skin.
+- During penetration: wet shine on cock and labia, stretched labia around the shaft, part of the shaft still visible, sweat from friction.
+- No bodybuilder, no shredded abs, no porn-studio set.
 
 Never write minors. Never describe anyone under 18. Never write non-consensual undress of a real identifiable person.
 Keep prompts tight. Prefer concrete visual facts over adjectives.`
@@ -45,14 +52,22 @@ export const LOCKED_IMAGE_SIZE_IDX = '2'
 export const LOCKED_IMAGE_VARIANTS = 1
 export const LOCKED_IMAGE_STEPS = 20
 
-export const DEFAULT_IMAGE_PROMPT = `amateur iphone snapshot, slightly messy framing, film grain, available room light, one light source, messy lived-in bedroom, unmade bed, clutter, raw candid
-2people, 1girl, 1boy, adults 18+, couple having sex, third-person view, both faces visible, woman's face clearly visible, man's face visible
-natural skin, visible pores, peach fuzz, skin imperfections, realistic bodies, sweat, flushed, damp hair, half-lidded eyes, parted lips, uncensored nsfw
-erect nipples, detailed areolae, wet pussy, labia, trimmed pubic hair
-erect penis, hard cock, veiny shaft, testicles, pubic hair
-penis inside pussy, labia stretched around the shaft, part of the shaft still visible, insertion readable, anatomically correct penetration`
+export const DEFAULT_IMAGE_PROMPT = `amateur iphone snapshot, slightly messy framing, film grain, available room light only, one light source, normal lived-in bedroom, unmade bed, everyday clutter, sometimes tidy sometimes messy, never luxury hotel, never studio, raw candid, not posed for camera
+2people, 1girl, 1boy, adults 18+, average couple having sex, third-person view, both faces visible, woman's face at least 75 percent visible, man's face at least 50 percent visible
+average real bodies, natural body fat, soft belly, not models, not pornstar bodies, no gym shredded look, no bodybuilder, visible pores, peach fuzz, skin imperfections, stretch marks ok, moles ok
+sex sweat, fine beads of sweat on forehead neck chest lower back, flushed cheeks and chest, warmer skin from friction, damp messy sex hair, not salon hair
+real expressions, lust, half-lidded eyes, parted lips, biting lip, moaning faces, male and female both, no fashion pose
+woman: painted fingernails, painted toenails, any polish color, nails visible when hands or feet are in frame
+woman breasts: soft natural real breasts, not silicone, not plastic, not perky fake implants, natural hang and weight
+areolae and nipples matched to her skin tone, pink or rose on fair skin, brown or dark brown on deeper skin, mixed sizes, not copy-paste
+pussy: anatomically correct vulva, outer labia, inner labia, clitoris, wet, unique to this woman
+pubic hair unique to this woman, pick one and keep it: natural bush or trimmed or short or longer or clean shaven, not the same cut on every woman
+when legs spread or doggy: full ass cheeks, deep ass crack, puckered star-like anus, genital skin tone slightly different from thigh skin
+man: lifelike natural erect penis, hard, never flaccid, glans, shaft, veins, testicles, wrinkled ballsack, unique groin hair, not a generic porn cock stamp
+when the angle shows it: male ass, ass crack, anus
+correct vaginal penetration, cock inside pussy, labia stretched around the shaft, about three quarters inside, one quarter of shaft still visible, wet shine on cock and labia from sex, anatomically readable insertion, uncensored explicit, never hidden, never blurred`
 
-export const DEFAULT_IMAGE_NEGATIVE = `cartoon, anime, illustration, CGI, 3D render, plastic skin, waxy skin, doll, airbrushed, beauty filter, studio, cyclorama, rim light, cinematic lighting, posed photoshoot, pov, hidden faces, censored, mosaic, blurry genitals, clothes, lingerie on, flaccid, small penis, deformed hands, extra fingers, extra limbs, watermark, text, no penetration, floating penis, penis beside pussy, disconnected genitals, bad insertion`
+export const DEFAULT_IMAGE_NEGATIVE = `cartoon, anime, illustration, CGI, 3D render, plastic skin, waxy skin, doll, silicone breasts, implant breasts, fake tits, airbrushed, beauty filter, pornstar makeup, glam makeup, salon hair, perfect bodies, model bodies, bodybuilder, shredded abs, six pack, gym body, oversized porn cock, horse cock, tiny penis, flaccid during sex, copy-paste genitals, same pubic hair on every woman, mismatched areola color, neon nipples, studio, cyclorama, luxury penthouse, marble hotel, rim light, cinematic lighting, posed photoshoot, pov, hidden faces, censored, mosaic, blurry genitals, clothes, lingerie on, deformed hands, extra fingers, extra limbs, watermark, text, no penetration, floating penis, hovering cock, penis beside pussy, disconnected genitals, bad insertion, dry plastic genitals`
 
 const STALE_PROMPTS = [
   'a serene mountain',
@@ -71,12 +86,22 @@ const STALE_SYSTEM_PROMPTS = [
 export function isStaleImagePrompt(value?: string) {
   const text = (value || '').trim().toLowerCase()
   if (!text) return true
-  return STALE_PROMPTS.some((snippet) => text.includes(snippet))
+  if (STALE_PROMPTS.some((snippet) => text.includes(snippet))) return true
+  if (text.includes('amateur iphone snapshot') && !text.includes('nail polish') && !text.includes('painted fingernail')) return true
+  return false
 }
 
 export function isStaleSystemPrompt(value?: string) {
   const text = (value || '').trim().toLowerCase()
-  return STALE_SYSTEM_PROMPTS.includes(text) || text.length < 40
+  if (STALE_SYSTEM_PROMPTS.includes(text) || text.length < 40) return true
+  if (!text.includes('average') && !text.includes('nail')) return true
+  return false
+}
+
+export function isStaleImageNegative(value?: string) {
+  const text = (value || '').trim().toLowerCase()
+  if (!text) return true
+  return !text.includes('bodybuilder') && !text.includes('silicone breasts')
 }
 
 export function loadImagePrompt(saved?: string | null) {
@@ -84,8 +109,7 @@ export function loadImagePrompt(saved?: string | null) {
 }
 
 export function loadImageNegative(saved?: string | null) {
-  const text = (saved || '').trim()
-  return text ? text : DEFAULT_IMAGE_NEGATIVE
+  return isStaleImageNegative(saved || '') ? DEFAULT_IMAGE_NEGATIVE : (saved as string)
 }
 
 export function lockChatParams(params?: VeniceParameters): VeniceParameters {
