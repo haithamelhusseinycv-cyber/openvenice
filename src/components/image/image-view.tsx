@@ -6,6 +6,7 @@ import { useImageGenerate } from '../../hooks/use-image'
 import { useAuthStore } from '../../stores/auth-store'
 import { useImageWorkspace } from '../../stores/image-workspace-store'
 import { DEFAULT_IMAGE_MODEL_ID, isAllowedImageModel } from '../../lib/allowed-models'
+import { formatVeniceError } from '../../lib/venice-client'
 import { Label, TextArea, PrimaryButton, PillGroup, ErrorText } from '../ui/shared'
 import { GenerationView } from '../ui/generation-view'
 import type { ImageConstraints } from '../../types/venice'
@@ -19,12 +20,34 @@ penis inside pussy, labia stretched around the shaft, part of the shaft still vi
 
 const DEFAULT_NEGATIVE = `cartoon, anime, illustration, CGI, 3D render, plastic skin, waxy skin, doll, airbrushed, beauty filter, studio, cyclorama, rim light, cinematic lighting, posed photoshoot, pov, hidden faces, censored, mosaic, blurry genitals, clothes, lingerie on, flaccid, small penis, deformed hands, extra fingers, extra limbs, watermark, text, no penetration, floating penis, penis beside pussy, disconnected genitals, bad insertion`
 
+const GALLERY_KEY = 'venice-image-gallery'
+const GALLERY_MAX = 4
+
 function loadSaved(key: string, fallback: string) {
   try {
     const saved = localStorage.getItem(key)
     return saved ?? fallback
   } catch {
     return fallback
+  }
+}
+
+function loadGallery(): string[] {
+  try {
+    const raw = sessionStorage.getItem(GALLERY_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed.filter((x) => typeof x === 'string').slice(0, GALLERY_MAX) : []
+  } catch {
+    return []
+  }
+}
+
+function saveGallery(images: string[]) {
+  try {
+    sessionStorage.setItem(GALLERY_KEY, JSON.stringify(images.slice(0, GALLERY_MAX)))
+  } catch {
+    try { sessionStorage.removeItem(GALLERY_KEY) } catch { /* ignore */ }
   }
 }
 
@@ -72,30 +95,38 @@ export function ImageView() {
   const [negativePrompt, setNegativePrompt] = useState(() =>
     loadSaved('venice-image-negative', DEFAULT_NEGATIVE)
   )
-  const [sizeIdx, setSizeIdx] = useState('2')
-  const [aspectRatio, setAspectRatio] = useState('')
-  const [resolution, setResolution] = useState('')
-  const [steps, setSteps] = useState(defaultSteps)
+  const [sizeIdx, setSizeIdx] = useState(() => loadSaved('venice-image-size', '2'))
+  const [aspectRatio, setAspectRatio] = useState(() => loadSaved('venice-image-aspect', ''))
+  const [resolution, setResolution] = useState(() => loadSaved('venice-image-resolution', ''))
+  const [steps, setSteps] = useState(() => {
+    const saved = loadSaved('venice-image-steps', '')
+    const n = Number(saved)
+    return Number.isFinite(n) && n > 0 ? n : defaultSteps
+  })
+  const [seed, setSeed] = useState(() => loadSaved('venice-image-seed', ''))
   const [variants, setVariants] = useState(1)
-  const [images, setImages] = useState<string[]>([])
+  const [images, setImages] = useState<string[]>(() => loadGallery())
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
-  const modelResetKey = `${model}:${defaultSteps}`
-  const [boundModelKey, setBoundModelKey] = useState(modelResetKey)
-  if (boundModelKey !== modelResetKey) {
-    setBoundModelKey(modelResetKey)
-    setSteps(defaultSteps)
-    setAspectRatio('')
-    setResolution('')
-  }
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     try {
       localStorage.setItem('venice-image-prompt', prompt)
       localStorage.setItem('venice-image-negative', negativePrompt)
+      localStorage.setItem('venice-image-size', sizeIdx)
+      localStorage.setItem('venice-image-aspect', aspectRatio)
+      localStorage.setItem('venice-image-resolution', resolution)
+      localStorage.setItem('venice-image-steps', String(steps))
+      localStorage.setItem('venice-image-seed', seed)
     } catch {
       // Ignore quota / private-mode storage errors
     }
-  }, [prompt, negativePrompt])
+  }, [prompt, negativePrompt, sizeIdx, aspectRatio, resolution, steps, seed])
+
+  useEffect(() => {
+    saveGallery(images)
+  }, [images])
+
   const aspectOptions = useMemo(() => {
     if (!hasAspectRatios) return []
     return [
@@ -133,11 +164,23 @@ export function ImageView() {
     a.click()
   }
 
+  const copyPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(prompt)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      setCopied(false)
+    }
+  }
+
   const mutation = useImageGenerate()
 
   const handleGenerate = () => {
     if (!prompt.trim()) return
-    const size = DEFAULT_SIZE_MAP[Number(sizeIdx)]
+    const size = DEFAULT_SIZE_MAP[Number(sizeIdx)] || DEFAULT_SIZE_MAP[2]
+    const seedNum = seed.trim() === '' ? undefined : Number(seed)
+    const validSeed = seedNum !== undefined && Number.isFinite(seedNum) ? Math.trunc(seedNum) : undefined
 
     const req: Record<string, unknown> = {
       prompt: prompt.trim(),
@@ -149,6 +192,7 @@ export function ImageView() {
       enhance_prompt: false,
       steps,
     }
+    if (validSeed !== undefined) req.seed = validSeed
 
     if (hasAspectRatios && aspectRatio) {
       req.aspect_ratio = aspectRatio
@@ -166,7 +210,7 @@ export function ImageView() {
       {
         onSuccess: (data) => {
           const newImages = data.images.map((img) => typeof img === 'string' ? img : img.b64_json)
-          setImages((prev) => [...newImages, ...prev])
+          setImages((prev) => [...newImages, ...prev].slice(0, GALLERY_MAX))
         },
       },
     )
@@ -175,7 +219,12 @@ export function ImageView() {
   const controls = (
     <>
       <div>
-        <Label hint={`${prompt.length}/${promptLimit}`}>Prompt</Label>
+        <div className="flex items-center justify-between gap-2">
+          <Label hint={`${prompt.length}/${promptLimit}`}>Prompt</Label>
+          <button type="button" onClick={copyPrompt} className="text-[11px] text-white/40 hover:text-white/80">
+            {copied ? 'Copied' : 'Copy prompt'}
+          </button>
+        </div>
         <TextArea value={prompt} onChange={setPrompt} placeholder="Amateur couple sex still…" />
       </div>
       <div><Label>Negative prompt</Label><TextArea value={negativePrompt} onChange={setNegativePrompt} placeholder="blurry, clothes, CGI…" rows={2} /></div>
@@ -198,11 +247,31 @@ export function ImageView() {
         <Label hint={String(variants)}>Variants</Label>
         <input type="range" min={1} max={2} value={variants} onChange={(e) => setVariants(Number(e.target.value))} className="w-full" />
       </div>
+      <div>
+        <Label hint={seed.trim() === '' ? 'random' : seed}>Seed</Label>
+        <input
+          type="text"
+          inputMode="numeric"
+          value={seed}
+          onChange={(e) => setSeed(e.target.value.replace(/[^0-9-]/g, ''))}
+          placeholder="Leave empty for random"
+          className="w-full bg-white/[0.04] border border-white/[0.06] rounded-md px-2.5 py-1.5 text-[13px] text-white/85 outline-none focus:border-white/[0.2] placeholder:text-white/30"
+        />
+      </div>
 
       <PrimaryButton onClick={handleGenerate} disabled={!prompt.trim() || !apiKey} loading={mutation.isPending} size="lg">
         {mutation.isPending ? 'Generating…' : 'Generate'}
       </PrimaryButton>
-      {mutation.error && <ErrorText>{mutation.error.message}</ErrorText>}
+      {images.length > 0 && (
+        <button
+          type="button"
+          onClick={() => { setImages([]); setSelectedImage(null) }}
+          className="text-[13px] text-white/45 hover:text-white/80"
+        >
+          Clear gallery
+        </button>
+      )}
+      {mutation.error && <ErrorText>{formatVeniceError(mutation.error)}</ErrorText>}
     </>
   )
 
