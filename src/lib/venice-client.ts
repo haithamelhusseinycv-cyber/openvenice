@@ -61,7 +61,9 @@ interface VeniceFetchOptions extends RequestInit {
 }
 
 async function veniceFetch(path: string, options: VeniceFetchOptions): Promise<Response> {
-  const { stream, noAuth, retries = MAX_RETRIES, ...fetchOptions } = options
+  const { stream, noAuth, retries, ...fetchOptions } = options
+  const method = (fetchOptions.method || 'GET').toUpperCase()
+  const retryLimit = retries ?? (method === 'GET' || method === 'HEAD' ? MAX_RETRIES : 0)
   const headers = new Headers(fetchOptions.headers)
   if (!noAuth) headers.set('Authorization', `Bearer ${getApiKey()}`)
   if (fetchOptions.body && typeof fetchOptions.body === 'string') {
@@ -69,13 +71,13 @@ async function veniceFetch(path: string, options: VeniceFetchOptions): Promise<R
   }
 
   let lastErr: unknown
-  for (let attempt = 0; attempt <= retries; attempt++) {
+  for (let attempt = 0; attempt <= retryLimit; attempt++) {
     try {
       const res = await fetch(`${BASE_URL}${path}`, { ...fetchOptions, headers })
       if (res.ok) return res
 
-      // Don't retry client errors (auth, validation) or terminal failures
-      if (!RETRY_STATUSES.has(res.status) || attempt === retries) throw await parseError(res)
+      // Retry only idempotent requests by default. Paid/non-idempotent POSTs use zero retries.
+      if (!RETRY_STATUSES.has(res.status) || attempt === retryLimit) throw await parseError(res)
 
       // Drain body so connection can be reused
       try { await res.arrayBuffer() } catch { /* noop */ }
@@ -83,10 +85,9 @@ async function veniceFetch(path: string, options: VeniceFetchOptions): Promise<R
       continue
     } catch (err) {
       lastErr = err
-      // Network error: retry up to limit
       if (err instanceof VeniceAPIError) throw err
       if (err instanceof DOMException && err.name === 'AbortError') throw err
-      if (attempt === retries) break
+      if (attempt === retryLimit) break
       await sleep(backoffDelay(attempt))
     }
     void stream // suppress unused-var lint (kept for future per-call overrides)
