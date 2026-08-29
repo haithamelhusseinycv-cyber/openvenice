@@ -3,6 +3,12 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import type { ChatMessage, Conversation, VeniceParameters } from '../types/venice'
 import { generateId } from '../lib/utils'
 import { createSafeStorage } from '../lib/safe-storage'
+import {
+  LOCKED_CHAT_MAX_TOKENS,
+  LOCKED_CHAT_TEMPERATURE,
+  LOCKED_CHAT_TOP_P,
+  lockChatParams,
+} from '../lib/defaults'
 
 interface ChatState {
   conversations: Conversation[]
@@ -30,22 +36,17 @@ interface ChatState {
   getActiveConversation: () => Conversation | undefined
 }
 
-const DEFAULT_VENICE_PARAMS: VeniceParameters = {
-  include_venice_system_prompt: false,
-  enable_web_search: 'off',
-}
-
 export const useChatStore = create<ChatState>()(
   persist(
     (set, get) => ({
       conversations: [],
       activeConversationId: null,
       isStreaming: false,
-      veniceParams: { ...DEFAULT_VENICE_PARAMS },
+      veniceParams: lockChatParams(),
       systemPrompt: '',
-      temperature: 0.7,
-      topP: 1,
-      maxTokens: 2048,
+      temperature: LOCKED_CHAT_TEMPERATURE,
+      topP: LOCKED_CHAT_TOP_P,
+      maxTokens: LOCKED_CHAT_MAX_TOKENS,
 
       createConversation: (model) => {
         const id = generateId()
@@ -126,7 +127,7 @@ export const useChatStore = create<ChatState>()(
       setStreaming: (streaming) => set({ isStreaming: streaming }),
 
       setVeniceParams: (params) =>
-        set((s) => ({ veniceParams: { ...s.veniceParams, ...params } })),
+        set((s) => ({ veniceParams: lockChatParams({ ...s.veniceParams, ...params }) })),
 
       setSystemPrompt: (prompt) => set({ systemPrompt: prompt }),
       setTemperature: (t) => set({ temperature: t }),
@@ -140,37 +141,23 @@ export const useChatStore = create<ChatState>()(
     }),
     {
       name: 'venice-chat',
-      version: 4,
+      version: 5,
       storage: createJSONStorage(() => createSafeStorage()),
-      migrate: (persisted, version) => {
+      migrate: (persisted) => {
         if (!persisted || typeof persisted !== 'object') return persisted as ChatState
         const s = persisted as Partial<ChatState>
         if (Array.isArray(s.conversations)) s.conversations = s.conversations.slice(0, 50)
-        if (!s.veniceParams || typeof s.veniceParams !== 'object') {
-          s.veniceParams = { ...DEFAULT_VENICE_PARAMS }
-        }
-        if (version < 2) {
-          delete (s as Record<string, unknown>).isStreaming
-        }
-        if (version < 3) {
-          if (s.maxTokens === undefined || s.maxTokens === 4096) {
-            s.maxTokens = 1024
-          }
-        }
-        if (version < 4) {
-          s.maxTokens = 2048
-          s.veniceParams = {
-            ...(s.veniceParams || {}),
-            include_venice_system_prompt: false,
-            enable_web_search: 'off',
-          }
-        }
+        s.veniceParams = lockChatParams(s.veniceParams)
+        if (s.maxTokens === undefined || s.maxTokens < 2048) s.maxTokens = LOCKED_CHAT_MAX_TOKENS
+        if (s.temperature === undefined) s.temperature = LOCKED_CHAT_TEMPERATURE
+        if (s.topP === undefined) s.topP = LOCKED_CHAT_TOP_P
+        delete (s as Record<string, unknown>).isStreaming
         return s as ChatState
       },
       partialize: (state) => ({
         conversations: state.conversations.slice(0, 50),
         activeConversationId: state.activeConversationId,
-        veniceParams: state.veniceParams,
+        veniceParams: lockChatParams(state.veniceParams),
         systemPrompt: state.systemPrompt,
         temperature: state.temperature,
         topP: state.topP,
