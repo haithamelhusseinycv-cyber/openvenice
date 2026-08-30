@@ -15,7 +15,7 @@
  */
 
 import { venice } from './venice-client'
-import { NOUR_SYSTEM_PROMPT } from './nour-character'
+import { NOUR_SYSTEM_PROMPT, nourLanguagePrompt, type NourLanguageMode } from './nour-character'
 import { generateId } from './utils'
 import { NODE_SCHEMAS } from './workflow-schema'
 import type { WorkflowPatch } from './workflow-mutations'
@@ -259,6 +259,7 @@ export interface RunOptions {
   applyPatch: (patch: WorkflowPatch) => { ok: true; id?: string; edge_id?: string } | { error: string }
   /** Called after each tool execution (for streaming UI). */
   onStep?: (step: RunStep) => void
+  languageMode: NourLanguageMode
 }
 
 interface AssistantMessage {
@@ -449,7 +450,7 @@ function handleTool(name: string, args: Record<string, unknown>, opts: RunOption
 
 export async function runAgentTools(opts: RunOptions): Promise<RunResult> {
   const messages: ChatMessage[] = [
-    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'system', content: `${SYSTEM_PROMPT}\n\n${nourLanguagePrompt(opts.languageMode)}` },
     ...opts.history.map<UserMessage | AssistantMessage>((m) => (
       m.role === 'user' ? { role: 'user', content: m.content } : { role: 'assistant', content: m.content }
     )),

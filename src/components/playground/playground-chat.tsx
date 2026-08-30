@@ -6,7 +6,18 @@ import { useModelCatalog } from '../../hooks/use-model-catalog'
 import { useAgentModels } from '../../hooks/use-agent-models'
 import { callAgent, DEFAULT_AGENT_MODEL } from '../../lib/playground-agent'
 import { runAgentTools, type RunStep } from '../../lib/playground-agent-tools'
-import { NOUR_AGE, NOUR_NAME, NOUR_TAGLINE } from '../../lib/nour-character'
+import {
+  NOUR_AGE,
+  NOUR_LANGUAGE_LABELS,
+  NOUR_NAME,
+  NOUR_TAGLINE,
+  NOUR_TTS_MODEL,
+  NOUR_TTS_VOICE,
+  nourTtsLanguage,
+  prepareNourSpeechText,
+  type NourLanguageMode,
+} from '../../lib/nour-character'
+import { veniceBlob } from '../../lib/venice-client'
 import { applyPatch, type WorkflowPatch } from '../../lib/workflow-mutations'
 import { generateId } from '../../lib/utils'
 import { cn } from '../../lib/utils'
@@ -54,17 +65,80 @@ export function PlaygroundChat() {
   const { messages, draft, isThinking, addMessage, updateMessage, setThinking, applyAgentPatches } = usePlaygroundStore()
   const hasKey = useAuthStore((s) => s.apiKey !== null)
   const agentModelId = useSettingsStore((s) => s.playgroundAgentModel) || DEFAULT_AGENT_MODEL
+  const languageMode = useSettingsStore((s) => s.nourLanguageMode)
+  const setLanguageMode = useSettingsStore((s) => s.setNourLanguageMode)
   const { catalog } = useModelCatalog()
   const { models: agentModels } = useAgentModels()
   const agentCaps = agentModels.find((m) => m.id === agentModelId)?.capabilities
   const [input, setInput] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [speakingId, setSpeakingId] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const audioRef = useRef<{ audio: HTMLAudioElement; url: string } | null>(null)
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages, isThinking])
+
+  const stopVoice = () => {
+    const current = audioRef.current
+    if (current) {
+      current.audio.pause()
+      URL.revokeObjectURL(current.url)
+      audioRef.current = null
+    }
+    setSpeakingId(null)
+  }
+
+  useEffect(() => () => {
+    const current = audioRef.current
+    if (current) {
+      current.audio.pause()
+      URL.revokeObjectURL(current.url)
+    }
+  }, [])
+
+  const speak = async (id: string, transcript: string) => {
+    if (speakingId === id) {
+      stopVoice()
+      return
+    }
+    if (!hasKey) {
+      setError('Connect your Venice API key first.')
+      return
+    }
+
+    stopVoice()
+    setError(null)
+    setSpeakingId(id)
+    try {
+      const blob = await veniceBlob('/audio/speech', {
+        model: NOUR_TTS_MODEL,
+        voice: NOUR_TTS_VOICE,
+        input: prepareNourSpeechText(transcript).slice(0, 4096),
+        language: nourTtsLanguage(languageMode),
+        temperature: 0.85,
+        response_format: 'mp3',
+      })
+      const url = URL.createObjectURL(blob)
+      const audio = new Audio(url)
+      audioRef.current = { audio, url }
+      const finish = () => {
+        if (audioRef.current?.audio === audio) {
+          URL.revokeObjectURL(url)
+          audioRef.current = null
+          setSpeakingId(null)
+        }
+      }
+      audio.addEventListener('ended', finish, { once: true })
+      audio.addEventListener('error', finish, { once: true })
+      await audio.play()
+    } catch (e) {
+      stopVoice()
+      setError(e instanceof Error ? e.message : 'Could not generate Noor voice.')
+    }
+  }
 
   const send = async (text: string) => {
     const trimmed = text.trim()
@@ -105,6 +179,7 @@ export function PlaygroundChat() {
           agentModels,
           model: agentModelId,
           capabilities: agentCaps,
+          languageMode,
           signal: controller.signal,
           applyPatch: (patch: WorkflowPatch) => {
             try {
@@ -136,6 +211,7 @@ export function PlaygroundChat() {
           catalog,
           model: agentModelId,
           capabilities: agentCaps,
+          languageMode,
           signal: controller.signal,
         })
 
@@ -236,6 +312,17 @@ export function PlaygroundChat() {
                   )}
                 </div>
 
+                {m.role === 'assistant' && !m.pending && !m.error && m.content && (
+                  <button
+                    type="button"
+                    onClick={() => speak(m.id, m.content)}
+                    aria-label={speakingId === m.id ? 'Stop Noor voice' : 'Play Noor voice'}
+                    className="min-h-11 px-3 rounded-lg text-[12px] text-white/55 hover:text-white/85 hover:bg-white/[0.05] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
+                  >
+                    {speakingId === m.id ? '■ Stop voice' : '▶ Play Noor voice'}
+                  </button>
+                )}
+
                 {m.activity && m.activity.length > 0 && (
                   <div className="max-w-[88%] flex flex-col gap-px text-[11.5px] font-mono text-white/45 px-1">
                     {m.activity.map((a, i) => (
@@ -265,7 +352,29 @@ export function PlaygroundChat() {
       </div>
 
       <div className="shrink-0 border-t border-white/[0.06] p-3">
-        {error && <div className="mb-2 text-[13px] text-red-300/95">{error}</div>}
+        <div className="mb-2 flex items-center gap-2 overflow-x-auto pb-0.5" aria-label="Noor language mode">
+          {(Object.entries(NOUR_LANGUAGE_LABELS) as Array<[NourLanguageMode, string]>).map(([mode, label]) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => {
+                stopVoice()
+                setLanguageMode(mode)
+              }}
+              aria-pressed={languageMode === mode}
+              className={cn(
+                'min-h-11 shrink-0 rounded-full border px-3 text-[12px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]',
+                languageMode === mode
+                  ? 'border-fuchsia-300/40 bg-fuchsia-400/15 text-white'
+                  : 'border-white/[0.09] bg-white/[0.03] text-white/55 hover:text-white/85',
+              )}
+            >
+              {label}
+            </button>
+          ))}
+          <span className="shrink-0 text-[11px] text-white/35">Voice · {NOUR_TTS_VOICE}</span>
+        </div>
+        {error && <div role="alert" className="mb-2 text-[13px] text-red-300/95">{error}</div>}
         <div className="flex items-end gap-2">
           <textarea
             value={input}
@@ -279,12 +388,13 @@ export function PlaygroundChat() {
             placeholder={isThinking ? 'Nour is working…' : 'Message Nour or ask her to create something…'}
             rows={2}
             disabled={isThinking}
-            className="flex-1 bg-white/[0.03] border border-white/[0.08] rounded-lg px-3 py-2 text-[13.5px] text-white/90 outline-none resize-none placeholder:text-white/30 focus:border-white/[0.2] disabled:opacity-60"
+            aria-label="Message Noor"
+            className="flex-1 min-h-11 bg-white/[0.03] border border-white/[0.08] rounded-lg px-3 py-2 text-[13.5px] text-white/90 outline-none resize-none placeholder:text-white/30 focus:border-white/[0.2] disabled:opacity-60"
           />
           {isThinking ? (
             <button
               onClick={cancel}
-              className="shrink-0 px-3 py-2 text-[13px] text-white/85 hover:text-white border border-white/[0.12] hover:bg-white/[0.05] rounded-lg transition-colors"
+              className="shrink-0 min-h-11 px-3 py-2 text-[13px] text-white/85 hover:text-white border border-white/[0.12] hover:bg-white/[0.05] rounded-lg transition-colors"
             >
               Stop
             </button>
@@ -292,7 +402,7 @@ export function PlaygroundChat() {
             <button
               onClick={() => send(input)}
               disabled={!input.trim()}
-              className="shrink-0 px-4 py-2 text-[13px] font-medium bg-white text-black rounded-lg hover:bg-white/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              className="shrink-0 min-h-11 px-4 py-2 text-[13px] font-medium bg-white text-black rounded-lg hover:bg-white/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             >
               Send
             </button>
