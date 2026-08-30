@@ -90,10 +90,10 @@ export function ImageTools() {
 
   const [swapKind, setSwapKind] = useState<SwapKind>('face')
   const [swapPerson, setSwapPerson] = useState<SwapPerson>('woman')
-  const [scale, setScale] = useState(2)
-  const [enhance, setEnhance] = useState(false)
-  const [enhanceCreativity, setEnhanceCreativity] = useState(0.5)
-  const [enhancePrompt, setEnhancePrompt] = useState('')
+  const [scale] = useState(2)
+  const [enhance] = useState(false)
+  const [enhanceCreativity] = useState(0.5)
+  const [enhancePrompt] = useState('')
 
   const editMutation = useImageEdit()
   const swapMutation = useImageMultiEdit()
