@@ -147,3 +147,25 @@ export async function veniceBlob(path: string, body: object, init: { signal?: Ab
   }
   return res.blob()
 }
+
+
+/** Validate a candidate key before it is stored or marked connected. */
+export async function validateVeniceApiKey(key: string): Promise<void> {
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), 12_000)
+  try {
+    const res = await fetch(`${BASE_URL}/billing/balance`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${key.trim()}` },
+      signal: controller.signal,
+    })
+    if (!res.ok) throw await parseError(res)
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new VeniceAPIError('Venice key validation timed out. Check your connection and try again.', 408)
+    }
+    throw error
+  } finally {
+    window.clearTimeout(timeout)
+  }
+}
