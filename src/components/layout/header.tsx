@@ -89,7 +89,7 @@ export function Header({ onOpenApiKey, onOpenMobileSidebar }: Props) {
           options={modelOptions}
           searchable
           placeholder="Model"
-          className="order-4 basis-[calc(100%-0.5rem)] min-w-0 flex-1 max-w-none sm:order-none sm:basis-auto sm:w-52"
+          className="order-4 basis-[40%] min-w-0 flex-1 max-w-none sm:order-none sm:basis-auto sm:w-52"
         />
       )}
 
@@ -107,6 +107,8 @@ export function Header({ onOpenApiKey, onOpenMobileSidebar }: Props) {
           {apiKey ? 'Key' : 'Key'}
         </span>
       </button>
+
+      <div aria-hidden="true" className="order-3 basis-full h-0 sm:hidden" />
     </header>
   )
 }
