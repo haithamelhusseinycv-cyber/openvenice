@@ -15,13 +15,13 @@ export function BillingBar() {
   return (
     <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
       <div
-        className={`hidden xs:flex sm:flex flex-col leading-tight min-w-0 ${canConsume ? 'text-white/80' : 'text-red-300'}`}
+        className={`flex flex-col leading-tight min-w-0 rounded-md px-2 py-1 bg-white/[0.04] ${canConsume ? 'text-white/80' : 'text-red-300'}`}
         title={error || `USD ${money(usd)} · DIEM ${money(diem)}`}
       >
-        <span className="text-[12px] sm:text-[13px] font-medium tabular-nums">
+        <span className="text-[11px] sm:text-[13px] font-medium tabular-nums whitespace-nowrap">
           {money(remaining)} left
         </span>
-        <span className="text-[11px] text-white/50 tabular-nums">
+        <span className="hidden sm:block text-[11px] text-white/50 tabular-nums">
           {money(used)} used
         </span>
       </div>
