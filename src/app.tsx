@@ -7,6 +7,7 @@ import { Header } from './components/layout/header'
 import { ApiKeyDialog } from './components/layout/api-key-dialog'
 import { ChatView } from './components/chat/chat-view'
 import { ImagePage } from './components/image/image-page'
+import { PlaygroundView } from './components/playground/playground-view'
 import { ErrorBoundary } from './components/ui/error-boundary'
 import { Toaster } from './components/ui/toaster'
 import { isVisibleTab } from './lib/allowed-models'
@@ -14,9 +15,10 @@ import { isVisibleTab } from './lib/allowed-models'
 const views = {
   chat: ChatView,
   image: ImagePage,
+  playground: PlaygroundView,
 } as const
 
-const TAB_ORDER: Tab[] = ['chat', 'image']
+const TAB_ORDER: Tab[] = ['chat', 'image', 'playground']
 
 export function App() {
   const needsUnlock = useAuthStore((s) => s.hasEncrypted && !s.apiKey)
@@ -51,7 +53,7 @@ export function App() {
         setApiKeyOpen(false)
         return
       }
-      if (safeTab === 'image') {
+      if (safeTab !== 'chat') {
         setActiveTab('chat')
       }
     }
