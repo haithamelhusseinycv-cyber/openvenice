@@ -107,7 +107,7 @@ export function ImageTools() {
       const prepared: PreparedImage = await prepareImage(file)
       setUploadInfo((s) => ({
         ...s,
-        [slot]: `${prepared.width}×${prepared.height} · ${formatBytes(prepared.preparedBytes)}${prepared.preparedBytes < prepared.originalBytes ? ` (from ${formatBytes(prepared.originalBytes)})` : ''}`,
+        [slot]: `${prepared.format} · ${prepared.width}×${prepared.height} · ${formatBytes(prepared.preparedBytes)}${prepared.preparedBytes < prepared.originalBytes ? ` (from ${formatBytes(prepared.originalBytes)})` : ''}`,
       }))
       onDone(prepared.dataUrl, prepared.name)
     } catch (err) {
