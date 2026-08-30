@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAuthStore } from '../../stores/auth-store'
 import { VeniceLogo } from '../ui/logo'
 import { toast } from '../../stores/toast-store'
+import { formatVeniceError, validateVeniceApiKey } from '../../lib/venice-client'
 
 const MIN_PASSPHRASE = 8
 
@@ -36,11 +37,12 @@ export function ApiKeyDialog({ open, onClose }: { open: boolean; onClose: () => 
     setBusy(true)
     setError(null)
     try {
+      await validateVeniceApiKey(value.trim())
       await setApiKey(value.trim(), remember ? { passphrase } : undefined)
       toast.success(remember ? 'Key saved (encrypted)' : 'Key set for this session')
       onClose()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to save key')
+      setError(formatVeniceError(e))
     } finally {
       setBusy(false)
     }
@@ -184,7 +186,7 @@ export function ApiKeyDialog({ open, onClose }: { open: boolean; onClose: () => 
             aria-busy={busy || undefined}
             className="px-4 py-1.5 text-[14px] font-medium bg-white text-black rounded-md hover:bg-white/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/40 focus-visible:outline-offset-2"
           >
-            {busy ? '…' : isUnlockMode ? 'Unlock' : 'Connect'}
+            {busy ? 'Validating…' : isUnlockMode ? 'Unlock' : 'Connect'}
           </button>
         </div>
       </div>
