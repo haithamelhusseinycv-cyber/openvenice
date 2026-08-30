@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { createSafeStorage } from '../lib/safe-storage'
+import type { NourLanguageMode } from '../lib/nour-character'
 import {
   DEFAULT_CHAT_MODEL_ID,
   DEFAULT_IMAGE_MODEL_ID,
@@ -28,6 +29,8 @@ interface SettingsState {
   setSelectedModel: (tab: string, modelId: string) => void
   playgroundAgentModel: string
   setPlaygroundAgentModel: (modelId: string) => void
+  nourLanguageMode: NourLanguageMode
+  setNourLanguageMode: (mode: NourLanguageMode) => void
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -48,10 +51,12 @@ export const useSettingsStore = create<SettingsState>()(
         })),
       playgroundAgentModel: '',
       setPlaygroundAgentModel: (modelId) => set({ playgroundAgentModel: modelId }),
+      nourLanguageMode: 'american-egyptian',
+      setNourLanguageMode: (mode) => set({ nourLanguageMode: mode }),
     }),
     {
       name: 'venice-settings',
-      version: 5,
+      version: 6,
       storage: createJSONStorage(() => createSafeStorage()),
       migrate: (persisted) => {
         if (!persisted || typeof persisted !== 'object') return persisted as SettingsState
@@ -60,6 +65,9 @@ export const useSettingsStore = create<SettingsState>()(
         if (!isVisibleTab(s.activeTab)) s.activeTab = 'chat'
         // Reset stale agent selections once so Noor adopts the new uncensored default.
         s.playgroundAgentModel = ''
+        if (s.nourLanguageMode !== 'american-egyptian' && s.nourLanguageMode !== 'cairo-street') {
+          s.nourLanguageMode = 'american-egyptian'
+        }
         return s as SettingsState
       },
       partialize: (state) => ({
@@ -67,6 +75,7 @@ export const useSettingsStore = create<SettingsState>()(
         sidebarOpen: state.sidebarOpen,
         selectedModels: sanitizeSelectedModels(state.selectedModels),
         playgroundAgentModel: state.playgroundAgentModel,
+        nourLanguageMode: state.nourLanguageMode,
       }),
     },
   ),
