@@ -51,13 +51,15 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'venice-settings',
-      version: 4,
+      version: 5,
       storage: createJSONStorage(() => createSafeStorage()),
       migrate: (persisted) => {
         if (!persisted || typeof persisted !== 'object') return persisted as SettingsState
         const s = persisted as Partial<SettingsState>
         s.selectedModels = sanitizeSelectedModels(s.selectedModels)
         if (!isVisibleTab(s.activeTab)) s.activeTab = 'chat'
+        // Reset stale agent selections once so Noor adopts the new uncensored default.
+        s.playgroundAgentModel = ''
         return s as SettingsState
       },
       partialize: (state) => ({
