@@ -15,9 +15,9 @@ export interface AgentResponse {
 
 const VALID_OPS = new Set(['add_node', 'remove_node', 'set_params', 'move_node', 'connect', 'disconnect', 'clear'])
 
-// Empirically validated default — see scripts/agent-bench results.
-// qwen3-next-80b: ~2s, perfect output, supports response_format.
-export const DEFAULT_AGENT_MODEL = 'qwen3-next-80b'
+// Noor's preferred uncensored reasoning model, plus a conventional tool-capable fallback.
+export const DEFAULT_AGENT_MODEL = 'qwen-3-6-plus'
+export const FALLBACK_AGENT_MODEL = 'zai-org-glm-5-1'
 
 function nodeCatalog(): string {
   return Object.values(NODE_SCHEMAS)
@@ -193,6 +193,7 @@ async function singleCall(opts: {
     messages: opts.messages,
     temperature: opts.temperature,
     max_tokens: 4096,
+    venice_parameters: { include_venice_system_prompt: false },
   }
   if (opts.useResponseFormat) body.response_format = { type: 'json_object' }
   const resp = await venice<ChatCompletionResponse>('/chat/completions', {
@@ -214,7 +215,7 @@ export async function callAgent({ userMessage, draft, history, catalog, model, c
     { role: 'user' as const, content: `${describeDraft(draft)}\n\nUser: ${userMessage}\n\nReply with a single JSON object: {"say": "...", "patches": [...]}. No prose, no markdown fences.` },
   ]
 
-  const raw = await singleCall({ model: chosenModel, messages, temperature: 0.3, useResponseFormat: useRF, signal })
+  const raw = await singleCall({ model: chosenModel, messages, temperature: 0.55, useResponseFormat: useRF, signal })
   const parsed = parseAgentResponse(raw)
 
   if (parsed.patches.length === 0 && !parsed.say && raw.length > 0) {
