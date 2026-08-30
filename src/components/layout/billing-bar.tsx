@@ -8,23 +8,37 @@ function money(n: number) {
 }
 
 export function BillingBar() {
-  const { connected, remaining, used, usd, diem, canConsume, error } = useBilling()
+  const { connected, remaining, used, usd, diem, canConsume, error, refresh } = useBilling()
 
   if (!connected) return null
 
   return (
     <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-      <div
-        className={`flex flex-col leading-tight min-w-0 rounded-md px-2 py-1 bg-white/[0.04] ${canConsume ? 'text-white/80' : 'text-red-300'}`}
-        title={error || `USD ${money(usd)} · DIEM ${money(diem)}`}
-      >
-        <span className="text-[11px] sm:text-[13px] font-medium tabular-nums whitespace-nowrap">
-          {money(remaining)} left
-        </span>
-        <span className="hidden sm:block text-[11px] text-white/50 tabular-nums">
-          {money(used)} used
-        </span>
-      </div>
+      {error ? (
+        <button
+          type="button"
+          onClick={() => { void refresh() }}
+          aria-label="Balance unavailable. Retry"
+          className="min-h-11 rounded-md border border-amber-300/30 bg-amber-400/[0.08] px-2 text-left text-[11px] text-amber-200"
+        >
+          <span className="block font-medium">Balance unavailable</span>
+          <span className="block text-amber-200/70">Tap to retry</span>
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => { void refresh() }}
+          className={`min-h-11 flex flex-col justify-center leading-tight min-w-0 rounded-md px-2 py-1 bg-white/[0.04] ${canConsume ? 'text-white/80' : 'text-red-300'}`}
+          aria-label={`${money(remaining)} credits left; ${money(used)} used. Tap to refresh.`}
+        >
+          <span className="text-[11px] sm:text-[13px] font-medium tabular-nums whitespace-nowrap">
+            {money(remaining)} left
+          </span>
+          <span className="hidden sm:block text-[11px] text-white/50 tabular-nums">
+            {money(used)} used
+          </span>
+        </button>
+      )}
       <a
         href={VENICE_API_SETTINGS}
         target="_blank"
