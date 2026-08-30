@@ -152,14 +152,24 @@ export async function veniceBlob(path: string, body: object, init: { signal?: Ab
 /** Validate a candidate key before it is stored or marked connected. */
 export async function validateVeniceApiKey(key: string): Promise<void> {
   const controller = new AbortController()
-  const timeout = window.setTimeout(() => controller.abort(), 12_000)
+  const timeout = window.setTimeout(() => controller.abort(), 10_000)
+  const headers = { Authorization: `Bearer ${key.trim()}` }
   try {
-    const res = await fetch(`${BASE_URL}/billing/balance`, {
+    const billing = await fetch(`${BASE_URL}/billing/balance`, {
       method: 'GET',
-      headers: { Authorization: `Bearer ${key.trim()}` },
+      headers,
       signal: controller.signal,
     })
-    if (!res.ok) throw await parseError(res)
+    if (billing.ok) return
+
+    // Inference-only keys can be valid while the account billing endpoint is
+    // unavailable. Rate limits is the supported key-scoped validation route.
+    const limits = await fetch(`${BASE_URL}/api_keys/rate_limits`, {
+      method: 'GET',
+      headers,
+      signal: controller.signal,
+    })
+    if (!limits.ok) throw await parseError(limits)
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
       throw new VeniceAPIError('Venice key validation timed out. Check your connection and try again.', 408)

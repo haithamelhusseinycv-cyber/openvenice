@@ -15,6 +15,28 @@ export interface BillingBalance {
   diemEpochAllocation?: number | null
 }
 
+interface RateLimitBalance {
+  data?: {
+    accessPermitted?: boolean
+    balances?: {
+      USD?: number | string | null
+      DIEM?: number | string | null
+    }
+  }
+}
+
+function fromRateLimits(payload: RateLimitBalance): BillingBalance {
+  const raw = payload.data?.balances
+  return {
+    canConsume: payload.data?.accessPermitted ?? true,
+    consumptionCurrency: Number(raw?.DIEM || 0) > 0 ? 'DIEM' : 'USD',
+    balances: {
+      usd: Number(raw?.USD || 0),
+      diem: Number(raw?.DIEM || 0),
+    },
+  }
+}
+
 function n(v: number | null | undefined) {
   return typeof v === 'number' && Number.isFinite(v) ? v : 0
 }
@@ -55,7 +77,15 @@ export function useBilling() {
       return
     }
     try {
-      const data = await venice<BillingBalance>('/billing/balance')
+      let data: BillingBalance
+      try {
+        data = await venice<BillingBalance>('/billing/balance')
+      } catch {
+        // Some inference-only keys cannot read the account billing endpoint,
+        // but Venice exposes the same spendable balances with key rate limits.
+        const fallback = await venice<RateLimitBalance>('/api_keys/rate_limits')
+        data = fromRateLimits(fallback)
+      }
       setBalance(data)
       setError(null)
       const now = totalCredits(data)
