@@ -28,7 +28,7 @@ const navGroups: NavGroup[] = [
     items: [
       { id: 'chat', label: 'Chat', Icon: ChatIcon },
       { id: 'image', label: 'Create', Icon: ImageIcon },
-      { id: 'playground', label: 'Agent', Icon: AgentIcon },
+      { id: 'playground', label: 'Nour', Icon: AgentIcon },
     ],
   },
 ]
