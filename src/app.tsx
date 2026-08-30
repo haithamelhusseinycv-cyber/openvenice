@@ -107,7 +107,7 @@ export function App() {
           </ErrorBoundary>
         </main>
         <nav aria-label="Mobile navigation" className="md:hidden shrink-0 grid grid-cols-3 border-t border-white/[0.08] bg-[#0d0d11] pb-[env(safe-area-inset-bottom)]">
-          {([['chat', 'Chat'], ['image', 'Create'], ['playground', 'Agent']] as const).map(([id, label]) => (
+          {([['chat', 'Chat'], ['image', 'Create'], ['playground', 'Nour']] as const).map(([id, label]) => (
             <button key={id} type="button" onClick={() => setActiveTab(id)} aria-current={safeTab === id ? 'page' : undefined} className={`min-h-14 px-2 text-[13px] font-medium ${safeTab === id ? 'text-[var(--color-accent)] bg-white/[0.04]' : 'text-white/55'}`}>
               {label}
             </button>
