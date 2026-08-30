@@ -1,5 +1,5 @@
 import { venice } from './venice-client'
-import { NOUR_SYSTEM_PROMPT } from './nour-character'
+import { NOUR_SYSTEM_PROMPT, nourLanguagePrompt, type NourLanguageMode } from './nour-character'
 import { NODE_SCHEMAS } from './workflow-schema'
 import type { WorkflowPatch } from './workflow-mutations'
 import type { ChatCompletionResponse, ModelCapabilities } from '../types/venice'
@@ -79,8 +79,8 @@ RULES:
 Example response:
 {"say":"I built a pipeline that researches a topic, summarizes it, and narrates the summary.","patches":[{"op":"clear"},{"op":"add_node","nodeType":"textInput","id":"in","params":{"inputText":"Quantum computing progress in 2025"}},{"op":"add_node","nodeType":"chat","id":"research","params":{"prompt":"Research this topic thoroughly.","webSearch":"on"}},{"op":"add_node","nodeType":"chat","id":"summary","params":{"prompt":"Summarize into 5 bullet points.","temperature":0.3}},{"op":"add_node","nodeType":"tts","id":"narrate","params":{"voice":"af_sky"}},{"op":"add_node","nodeType":"output","id":"out"},{"op":"connect","source":"in","target":"research"},{"op":"connect","source":"research","target":"summary"},{"op":"connect","source":"summary","target":"narrate"},{"op":"connect","source":"narrate","target":"out"}]}`
 
-function buildSystemPrompt(catalog?: ModelCatalog): string {
-  return SYSTEM_PROMPT_BASE + modelMenu(catalog)
+function buildSystemPrompt(catalog: ModelCatalog | undefined, languageMode: NourLanguageMode): string {
+  return `${SYSTEM_PROMPT_BASE}\n\n${nourLanguagePrompt(languageMode)}${modelMenu(catalog)}`
 }
 
 function describeDraft(draft: { nodes: Node<VeniceNodeData>[]; edges: Edge[] }): string {
@@ -178,6 +178,7 @@ interface CallAgentOptions {
   model?: string
   /** Capabilities of the chosen model. Used to skip response_format on models that 400 on it. */
   capabilities?: ModelCapabilities
+  languageMode: NourLanguageMode
   signal?: AbortSignal
 }
 
@@ -204,13 +205,13 @@ async function singleCall(opts: {
   return resp.choices[0]?.message?.content ?? ''
 }
 
-export async function callAgent({ userMessage, draft, history, catalog, model, capabilities, signal }: CallAgentOptions): Promise<AgentResponse> {
+export async function callAgent({ userMessage, draft, history, catalog, model, capabilities, languageMode, signal }: CallAgentOptions): Promise<AgentResponse> {
   const chosenModel = model || DEFAULT_AGENT_MODEL
   // Only request structured output if the model supports it. Sending response_format
   // to llama-3.3-70b returns HTTP 400; sending it to gpt-4o-mini degrades quality.
   const useRF = capabilities?.supportsResponseSchema === true
   const messages = [
-    { role: 'system' as const, content: buildSystemPrompt(catalog) },
+    { role: 'system' as const, content: buildSystemPrompt(catalog, languageMode) },
     ...history.map((m) => ({ role: m.role, content: m.content })),
     { role: 'user' as const, content: `${describeDraft(draft)}\n\nUser: ${userMessage}\n\nReply with a single JSON object: {"say": "...", "patches": [...]}. No prose, no markdown fences.` },
   ]
