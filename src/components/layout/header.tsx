@@ -28,7 +28,7 @@ const tabLabels: Record<string, string> = {
 
 const tabSubtitles: Record<string, string> = {
   chat: 'Conversational AI',
-  image: 'Lustify stills',
+  image: 'Image generation and editing',
   audio: 'Text-to-speech and transcription',
   music: 'Generate music and sound',
   video: 'Generate video clips',
@@ -56,11 +56,11 @@ export function Header({ onOpenApiKey, onOpenMobileSidebar }: Props) {
   const modelOptions = hasOwnSelector ? [] : (models?.map((m) => ({ value: m.id, label: m.model_spec?.name || m.id })) ?? [])
 
   return (
-    <header className="flex items-center gap-2 sm:gap-3 h-14 px-2 sm:px-3 border-b border-white/[0.05] bg-[#0a0a0c] shrink-0 pt-[env(safe-area-inset-top)]">
+    <header className="flex flex-wrap sm:flex-nowrap items-center gap-x-2 gap-y-1 sm:gap-3 min-h-14 h-auto px-2 py-1 sm:py-0 sm:px-3 border-b border-white/[0.05] bg-[#0a0a0c] shrink-0 pt-[max(0.25rem,env(safe-area-inset-top))] sm:pt-[env(safe-area-inset-top)]">
       <button
         onClick={() => onOpenMobileSidebar?.()}
         aria-label="Open menu"
-        className="md:hidden text-white/80 hover:text-white transition-colors p-2 -ml-1 rounded-md min-h-11 min-w-11 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
+        className="order-1 md:hidden text-white/80 hover:text-white transition-colors p-2 -ml-1 rounded-md min-h-11 min-w-11 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
           <line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="20" y2="18" />
@@ -70,14 +70,14 @@ export function Header({ onOpenApiKey, onOpenMobileSidebar }: Props) {
       <button
         onClick={toggleSidebar}
         aria-label="Toggle sidebar"
-        className="hidden md:block text-white/55 hover:text-white transition-colors p-1.5 -ml-1 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
+        className="order-1 hidden md:block text-white/55 hover:text-white transition-colors p-1.5 -ml-1 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
           <path d="M3 4h18M3 12h12M3 20h18" />
         </svg>
       </button>
 
-      <div className="flex flex-col min-w-0 shrink-0">
+      <div className="order-2 flex flex-col min-w-0 shrink-0">
         <span className="text-[15px] font-semibold text-white leading-none">{tabLabels[activeTab]}</span>
         <span className="text-[11px] text-white/50 mt-0.5 leading-none truncate hidden sm:block">{tabSubtitles[activeTab]}</span>
       </div>
@@ -89,22 +89,26 @@ export function Header({ onOpenApiKey, onOpenMobileSidebar }: Props) {
           options={modelOptions}
           searchable
           placeholder="Model"
-          className="min-w-0 flex-1 max-w-[38vw] sm:max-w-none sm:w-52"
+          className="order-4 basis-[40%] min-w-0 flex-1 max-w-none sm:order-none sm:basis-auto sm:w-52"
         />
       )}
 
-      <BillingBar />
+      <div className="order-5 min-w-0 flex-1 sm:order-none sm:flex-none">
+        <BillingBar />
+      </div>
 
       <button
         onClick={onOpenApiKey}
         aria-label={apiKey ? 'API key connected, manage' : 'Connect API key'}
-        className="shrink-0 flex items-center gap-2 text-[13px] px-2.5 py-2 rounded-md border border-white/[0.12] hover:border-white/[0.25] min-h-11 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2"
+        className="order-3 ml-auto sm:order-none sm:ml-0 shrink-0 flex items-center gap-2 text-[13px] px-2.5 py-2 rounded-md border border-white/[0.12] hover:border-white/[0.25] min-h-11 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2"
       >
         <StatusDot tone={apiKey ? 'teal' : 'slate'} pulsing={!apiKey} />
         <span className={apiKey ? 'text-white font-medium hidden sm:inline' : 'text-white/80'}>
           {apiKey ? 'Key' : 'Key'}
         </span>
       </button>
+
+      <div aria-hidden="true" className="order-3 basis-full h-0 sm:hidden" />
     </header>
   )
 }
