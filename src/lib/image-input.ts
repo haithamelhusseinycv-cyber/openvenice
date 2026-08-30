@@ -9,6 +9,7 @@ export interface PreparedImage {
   preparedBytes: number
   width: number
   height: number
+  format: string
 }
 
 function dataUrlBytes(dataUrl: string): number {
@@ -21,11 +22,19 @@ export async function prepareImage(file: File): Promise<PreparedImage> {
   if (file.size === 0) throw new Error('This image file is empty.')
   if (file.size > MAX_INPUT_BYTES) throw new Error('Image is larger than 25 MB. Choose a smaller file.')
 
-  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+  const isHeic = /\.(heic|heif)$/i.test(file.name) || /image\/(heic|heif)/i.test(file.type)
+  let bitmap: ImageBitmap
+  try {
+    bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+  } catch {
+    if (isHeic) throw new Error('This device could not decode the HEIC/HEIF image. Export it as JPEG or PNG, then upload again.')
+    throw new Error('This image is corrupt or uses a format this browser cannot decode.')
+  }
   try {
     const ratio = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height))
     const width = Math.max(1, Math.round(bitmap.width * ratio))
     const height = Math.max(1, Math.round(bitmap.height * ratio))
+    if (width * height < 65_536) throw new Error('Image resolution is too small. Use an image with at least 65,536 total pixels.')
     const canvas = document.createElement('canvas')
     canvas.width = width
     canvas.height = height
@@ -41,6 +50,7 @@ export async function prepareImage(file: File): Promise<PreparedImage> {
       preparedBytes: dataUrlBytes(dataUrl),
       width,
       height,
+      format: type.replace('image/', '').toUpperCase(),
     }
   } finally {
     bitmap.close()
