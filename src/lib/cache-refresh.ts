@@ -25,6 +25,8 @@ async function refreshIfDue() {
   }
   if (Date.now() - last < SIX_HOURS) return
   if (document.visibilityState !== 'visible') return
+  // Never reload while an API job, upload or agent task is active.
+  if (document.querySelector('[aria-busy="true"]')) return
   markCheck()
   location.reload()
 }

@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuthStore } from '../../stores/auth-store'
 import { VeniceLogo } from '../ui/logo'
 import { toast } from '../../stores/toast-store'
+import { formatVeniceError, validateVeniceApiKey } from '../../lib/venice-client'
 
 const MIN_PASSPHRASE = 8
 
@@ -13,13 +14,38 @@ export function ApiKeyDialog({ open, onClose }: { open: boolean; onClose: () => 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [forceConnect, setForceConnect] = useState(false)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const returnFocusRef = useRef<HTMLElement | null>(null)
 
-  // Close on Escape, regardless of which input is focused.
+  // Trap keyboard focus inside the modal and restore it to the opener.
   useEffect(() => {
     if (!open) return
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose()
+        return
+      }
+      if (e.key !== 'Tab') return
+      const focusable = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), a[href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ) ?? [])
+      if (!focusable.length) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
     window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
+    return () => {
+      window.removeEventListener('keydown', handler)
+      returnFocusRef.current?.focus()
+    }
   }, [open, onClose])
 
   if (!open) return null
@@ -36,11 +62,12 @@ export function ApiKeyDialog({ open, onClose }: { open: boolean; onClose: () => 
     setBusy(true)
     setError(null)
     try {
+      await validateVeniceApiKey(value.trim())
       await setApiKey(value.trim(), remember ? { passphrase } : undefined)
       toast.success(remember ? 'Key saved (encrypted)' : 'Key set for this session')
       onClose()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to save key')
+      setError(formatVeniceError(e))
     } finally {
       setBusy(false)
     }
@@ -62,6 +89,7 @@ export function ApiKeyDialog({ open, onClose }: { open: boolean; onClose: () => 
     <div className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true" aria-labelledby={titleId}>
       <button aria-label="Close dialog" className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={onClose} />
       <div
+        ref={dialogRef}
         className="relative bg-[#0e0e0e] border border-white/[0.1] rounded-xl p-6 w-full max-w-sm mx-4 animate-scale-in shadow-2xl shadow-black/60"
         onClick={(e) => e.stopPropagation()}
       >
@@ -184,7 +212,7 @@ export function ApiKeyDialog({ open, onClose }: { open: boolean; onClose: () => 
             aria-busy={busy || undefined}
             className="px-4 py-1.5 text-[14px] font-medium bg-white text-black rounded-md hover:bg-white/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/40 focus-visible:outline-offset-2"
           >
-            {busy ? '…' : isUnlockMode ? 'Unlock' : 'Connect'}
+            {busy ? 'Validating…' : isUnlockMode ? 'Unlock' : 'Connect'}
           </button>
         </div>
       </div>

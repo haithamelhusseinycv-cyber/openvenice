@@ -133,11 +133,11 @@ export function isStaleImageNegative(value?: string) {
 }
 
 export function loadImagePrompt(saved?: string | null) {
-  return isStaleImagePrompt(saved || '') ? DEFAULT_IMAGE_PROMPT : (saved as string)
+  return saved ?? ''
 }
 
 export function loadImageNegative(saved?: string | null) {
-  return isStaleImageNegative(saved || '') ? DEFAULT_IMAGE_NEGATIVE : (saved as string)
+  return saved ?? ''
 }
 
 export function lockChatParams(params?: VeniceParameters): VeniceParameters {
