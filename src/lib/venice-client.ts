@@ -11,13 +11,15 @@ export class VeniceAPIError extends Error {
   status: number
   code?: string
   suggestedPrompt?: string
+  requestId?: string
 
-  constructor(message: string, status: number, code?: string, suggestedPrompt?: string) {
+  constructor(message: string, status: number, code?: string, suggestedPrompt?: string, requestId?: string) {
     super(message)
     this.name = 'VeniceAPIError'
     this.status = status
     this.code = code
     this.suggestedPrompt = suggestedPrompt
+    this.requestId = requestId
   }
 }
 
@@ -26,7 +28,7 @@ export function formatVeniceError(err: unknown): string {
     if (err.status === 402) return 'Venice credits empty. Top up on venice.ai, then retry.'
     if (err.status === 401) return 'API key missing or invalid. Tap Connected in the header.'
     if (err.status === 429) return 'Venice is rate-limiting. Wait a few seconds and retry.'
-    return err.message
+    return err.requestId ? `${err.message} · Request ${err.requestId}` : err.message
   }
   if (err instanceof Error) {
     const status = (err as { status?: number }).status
@@ -60,6 +62,7 @@ async function parseError(res: Response): Promise<VeniceAPIError> {
   let message = `HTTP ${res.status}`
   let code: string | undefined
   let suggestedPrompt: string | undefined
+  const requestId = res.headers.get('cf-ray') || res.headers.get('x-request-id') || undefined
   try {
     const err = (await res.json()) as VeniceError
     message = err.error?.message ?? message
@@ -73,7 +76,7 @@ async function parseError(res: Response): Promise<VeniceAPIError> {
     message = 'API key missing or invalid. Tap Connected in the header.'
   }
   if (res.status === 429) message = 'Venice is rate-limiting. Wait a few seconds and retry.'
-  return new VeniceAPIError(message, res.status, code, suggestedPrompt)
+  return new VeniceAPIError(message, res.status, code, suggestedPrompt, requestId)
 }
 
 interface VeniceFetchOptions extends RequestInit {
@@ -135,6 +138,12 @@ export async function veniceBlob(path: string, body: object, init: { signal?: Ab
     method: 'POST',
     body: JSON.stringify(body),
     signal: init.signal,
+    retries: 1,
   })
+  const contentType = res.headers.get('content-type') || ''
+  if (contentType.includes('application/json')) {
+    const payload = await res.json() as { error?: { message?: string } }
+    throw new VeniceAPIError(payload.error?.message || 'Image service returned an invalid response.', res.status, undefined, undefined, res.headers.get('cf-ray') || undefined)
+  }
   return res.blob()
 }

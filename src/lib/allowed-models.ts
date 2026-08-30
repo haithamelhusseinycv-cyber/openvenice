@@ -21,7 +21,7 @@ export const DEFAULT_CHAT_MODEL_ID = 'venice-uncensored-1-2'
 export const DEFAULT_IMAGE_MODEL_ID = 'lustify-v8'
 export const DEFAULT_EDIT_MODEL_ID = 'qwen-edit-uncensored'
 
-export const VISIBLE_TABS = ['chat', 'image'] as const
+export const VISIBLE_TABS = ['chat', 'image', 'playground'] as const
 export type VisibleTab = (typeof VISIBLE_TABS)[number]
 
 export function isAllowedChatModel(id?: string) {

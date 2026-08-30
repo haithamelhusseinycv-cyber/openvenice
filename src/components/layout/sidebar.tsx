@@ -10,6 +10,9 @@ import type { Conversation } from '../../types/venice'
 function ChatIcon() {
   return (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg>)
 }
+function AgentIcon() {
+  return (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v4M4.9 4.9l2.8 2.8M2 12h4M18 12h4M16.3 7.7l2.8-2.8" /><rect x="5" y="9" width="14" height="11" rx="3" /><circle cx="9" cy="14" r="1" fill="currentColor" /><circle cx="15" cy="14" r="1" fill="currentColor" /><path d="M9 17h6" /></svg>)
+}
 function ImageIcon() {
   return (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>)
 }
@@ -24,7 +27,8 @@ const navGroups: NavGroup[] = [
     label: 'App',
     items: [
       { id: 'chat', label: 'Chat', Icon: ChatIcon },
-      { id: 'image', label: 'Image', Icon: ImageIcon },
+      { id: 'image', label: 'Create', Icon: ImageIcon },
+      { id: 'playground', label: 'Agent', Icon: AgentIcon },
     ],
   },
 ]

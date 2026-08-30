@@ -7,6 +7,7 @@ import { Header } from './components/layout/header'
 import { ApiKeyDialog } from './components/layout/api-key-dialog'
 import { ChatView } from './components/chat/chat-view'
 import { ImagePage } from './components/image/image-page'
+import { PlaygroundView } from './components/playground/playground-view'
 import { ErrorBoundary } from './components/ui/error-boundary'
 import { Toaster } from './components/ui/toaster'
 import { isVisibleTab } from './lib/allowed-models'
@@ -14,9 +15,10 @@ import { isVisibleTab } from './lib/allowed-models'
 const views = {
   chat: ChatView,
   image: ImagePage,
+  playground: PlaygroundView,
 } as const
 
-const TAB_ORDER: Tab[] = ['chat', 'image']
+const TAB_ORDER: Tab[] = ['chat', 'image', 'playground']
 
 export function App() {
   const needsUnlock = useAuthStore((s) => s.hasEncrypted && !s.apiKey)
@@ -51,7 +53,7 @@ export function App() {
         setApiKeyOpen(false)
         return
       }
-      if (safeTab === 'image') {
+      if (safeTab !== 'chat') {
         setActiveTab('chat')
       }
     }
@@ -104,6 +106,13 @@ export function App() {
             <ActiveView />
           </ErrorBoundary>
         </main>
+        <nav aria-label="Mobile navigation" className="md:hidden shrink-0 grid grid-cols-3 border-t border-white/[0.08] bg-[#0d0d11] pb-[env(safe-area-inset-bottom)]">
+          {([['chat', 'Chat'], ['image', 'Create'], ['playground', 'Agent']] as const).map(([id, label]) => (
+            <button key={id} type="button" onClick={() => setActiveTab(id)} aria-current={safeTab === id ? 'page' : undefined} className={`min-h-14 px-2 text-[13px] font-medium ${safeTab === id ? 'text-[var(--color-accent)] bg-white/[0.04]' : 'text-white/55'}`}>
+              {label}
+            </button>
+          ))}
+        </nav>
       </div>
       <ApiKeyDialog open={apiKeyOpen} onClose={() => setApiKeyOpen(false)} />
       <Toaster />

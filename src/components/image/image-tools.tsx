@@ -8,6 +8,7 @@ import { Label, TextArea, PrimaryButton, ErrorText, EmptyState } from '../ui/sha
 import { cn } from '../../lib/utils'
 import { toast } from '../../stores/toast-store'
 import { buildSwapPrompt, UNDRESS_PROMPT, type SwapKind, type SwapPerson } from '../../lib/tool-prompts'
+import { prepareImage, formatBytes, type PreparedImage } from '../../lib/image-input'
 
 type Tool = 'edit' | 'swap' | 'undress' | 'upscale' | 'remove-bg'
 
@@ -63,9 +64,15 @@ export function ImageTools() {
   }, [pending])
   const [idImage, setIdImage] = useState<string | null>(null)
   const [idName, setIdName] = useState('')
+  const [secondIdImage, setSecondIdImage] = useState<string | null>(null)
+  const [secondIdName, setSecondIdName] = useState('')
+  const [dualSwap, setDualSwap] = useState(false)
+  const [uploadInfo, setUploadInfo] = useState<Record<string, string>>({})
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const [resultUrl, setResultBlob, resetResult] = useBlobUrl()
   const fileRef = useRef<HTMLInputElement>(null)
   const idFileRef = useRef<HTMLInputElement>(null)
+  const secondIdFileRef = useRef<HTMLInputElement>(null)
   const [sceneSize, setSceneSize] = useState('auto')
 
   const [editPrompt, setEditPrompt] = useState(() =>
@@ -83,10 +90,10 @@ export function ImageTools() {
 
   const [swapKind, setSwapKind] = useState<SwapKind>('face')
   const [swapPerson, setSwapPerson] = useState<SwapPerson>('woman')
-  const [scale, setScale] = useState(2)
-  const [enhance, setEnhance] = useState(false)
-  const [enhanceCreativity, setEnhanceCreativity] = useState(0.5)
-  const [enhancePrompt, setEnhancePrompt] = useState('')
+  const [scale] = useState(2)
+  const [enhance] = useState(false)
+  const [enhanceCreativity] = useState(0.5)
+  const [enhancePrompt] = useState('')
 
   const editMutation = useImageEdit()
   const swapMutation = useImageMultiEdit()
@@ -94,11 +101,22 @@ export function ImageTools() {
   const upscaleMutation = useImageUpscale()
   const bgRemoveMutation = useBackgroundRemove()
 
-  const readFile = (file: File, onDone: (data: string, name: string) => void) => {
-    const reader = new FileReader()
-    reader.onload = () => onDone(reader.result as string, file.name)
-    reader.readAsDataURL(file)
+  const readFile = async (file: File, slot: string, onDone: (data: string, name: string) => void) => {
+    setUploadError(null)
+    try {
+      const prepared: PreparedImage = await prepareImage(file)
+      setUploadInfo((s) => ({
+        ...s,
+        [slot]: `${prepared.width}×${prepared.height} · ${formatBytes(prepared.preparedBytes)}${prepared.preparedBytes < prepared.originalBytes ? ` (from ${formatBytes(prepared.originalBytes)})` : ''}`,
+      }))
+      onDone(prepared.dataUrl, prepared.name)
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Could not read this image.')
+    }
   }
+
+  const dualSwapPrompt = (kind: SwapKind) =>
+    `Reference 1 is the target scene and composition. Reference 2 is the replacement identity for the man. Reference 3 is the replacement identity for the woman. Replace both people using a ${kind} swap. Preserve the target pose, framing, camera angle, lighting, background, interaction and all non-identity details. Keep the two identities separate; do not blend or exchange them.`
 
   const aspectRatio = sceneSize || 'auto'
 
@@ -125,8 +143,8 @@ export function ImageTools() {
       if (!imageData || !idImage) return
       swapMutation.mutate(
         {
-          images: [imageData, idImage],
-          prompt: buildSwapPrompt(swapKind, swapPerson),
+          images: dualSwap && secondIdImage ? [imageData, idImage, secondIdImage] : [imageData, idImage],
+          prompt: dualSwap ? dualSwapPrompt(swapKind) : buildSwapPrompt(swapKind, swapPerson),
           modelId: 'qwen-edit-uncensored',
           aspect_ratio: aspectRatio,
           safe_mode: false,
@@ -187,7 +205,7 @@ export function ImageTools() {
     a.click()
   }
 
-  const swapReady = !!(imageData && idImage && apiKey && !isLoading)
+  const swapReady = !!(imageData && idImage && (!dualSwap || secondIdImage) && apiKey && !isLoading)
   const otherReady = !!(imageData && apiKey && !isLoading && (tool !== 'edit' || editPrompt.trim()))
 
   const removeSource = () => {
@@ -202,6 +220,13 @@ export function ImageTools() {
     setIdName('')
     resetResult()
     clearFileInput(idFileRef.current)
+  }
+
+  const removeSecondId = () => {
+    setSecondIdImage(null)
+    setSecondIdName('')
+    resetResult()
+    clearFileInput(secondIdFileRef.current)
   }
 
   return (
@@ -236,7 +261,7 @@ export function ImageTools() {
               >
                 Remove
               </button>
-              <span className="text-[13px] text-white/45 mt-1 block truncate">{imageName}</span>
+              <span className="text-[13px] text-white/45 mt-1 block truncate">{imageName}{uploadInfo.target ? ` · ${uploadInfo.target}` : ''}</span>
             </div>
           ) : (
             <button
@@ -247,7 +272,7 @@ export function ImageTools() {
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
                 const file = e.target.files?.[0]
                 if (!file) return
-                readFile(file, (data, name) => { setImageData(data); setImageName(name); resetResult() })
+                void readFile(file, 'target', (data, name) => { setImageData(data); setImageName(name); resetResult() })
                 clearFileInput(e.target)
               }} />
               <p className="text-[15px] text-white/60">
@@ -259,7 +284,12 @@ export function ImageTools() {
 
         {tool === 'swap' && (
           <div>
-            <Label>2. ID photo</Label>
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <Label>{dualSwap ? '2. Male identity' : '2. Identity photo'}</Label>
+              <button type="button" onClick={() => { setDualSwap(!dualSwap); resetResult() }} className="min-h-11 px-3 rounded-md bg-white/[0.06] text-[13px] text-white/80">
+                {dualSwap ? 'Dual-person on' : 'Dual-person off'}
+              </button>
+            </div>
             {idImage ? (
               <div className="relative">
                 <FitImg src={idImage} alt="ID" />
@@ -271,7 +301,7 @@ export function ImageTools() {
                 >
                   Remove
                 </button>
-                <span className="text-[13px] text-white/45 mt-1 block truncate">{idName}</span>
+                <span className="text-[13px] text-white/45 mt-1 block truncate">{idName}{uploadInfo.identity1 ? ` · ${uploadInfo.identity1}` : ''}</span>
               </div>
             ) : (
               <button
@@ -282,10 +312,33 @@ export function ImageTools() {
                 <input ref={idFileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
                   const file = e.target.files?.[0]
                   if (!file) return
-                  readFile(file, (data, name) => { setIdImage(data); setIdName(name); resetResult() })
+                  void readFile(file, 'identity1', (data, name) => { setIdImage(data); setIdName(name); resetResult() })
                   clearFileInput(e.target)
                 }} />
                 <p className="text-[15px] text-white/60">Front face / head / body ID</p>
+              </button>
+            )}
+          </div>
+        )}
+
+        {tool === 'swap' && dualSwap && (
+          <div>
+            <Label>3. Female identity</Label>
+            {secondIdImage ? (
+              <div className="relative">
+                <FitImg src={secondIdImage} alt="Female identity" />
+                <button type="button" onClick={removeSecondId} aria-label="Remove female identity" className="absolute top-1.5 right-1.5 px-2 min-h-11 bg-black/70 rounded-md text-white text-[14px]">Remove</button>
+                <span className="text-[13px] text-white/45 mt-1 block truncate">{secondIdName}{uploadInfo.identity2 ? ` · ${uploadInfo.identity2}` : ''}</span>
+              </div>
+            ) : (
+              <button type="button" onClick={() => secondIdFileRef.current?.click()} className="w-full border border-dashed border-white/[0.14] hover:border-white/[0.28] rounded-lg py-8 text-center min-h-24">
+                <input ref={secondIdFileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  void readFile(file, 'identity2', (data, name) => { setSecondIdImage(data); setSecondIdName(name); resetResult() })
+                  clearFileInput(e.target)
+                }} />
+                <p className="text-[15px] text-white/60">Upload female face / head / body identity</p>
               </button>
             )}
           </div>
@@ -300,7 +353,7 @@ export function ImageTools() {
 
         {tool === 'swap' && (
           <>
-            <div>
+            {!dualSwap && <div>
               <Label>3. Who to swap</Label>
               <div className="flex gap-1">
                 {(['woman', 'man'] as const).map((p) => (
@@ -317,9 +370,9 @@ export function ImageTools() {
                   </button>
                 ))}
               </div>
-            </div>
+            </div>}
             <div>
-              <Label>4. Swap type</Label>
+              <Label>{dualSwap ? '4. Swap type for both' : '4. Swap type'}</Label>
               <div className="flex gap-1">
                 {(['face', 'head', 'body'] as const).map((k) => (
                   <button
@@ -375,6 +428,7 @@ export function ImageTools() {
                   ? 'Upscale Image'
                   : 'Remove Background'}
         </PrimaryButton>
+        {uploadError && <ErrorText>{uploadError}</ErrorText>}
         {error && <ErrorText>{error.message}</ErrorText>}
       </div>
 

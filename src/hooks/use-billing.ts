@@ -75,13 +75,14 @@ export function useBilling() {
   }, [apiKey])
 
   useEffect(() => {
-    void refresh()
+    const initialId = window.setTimeout(() => { void refresh() }, 0)
     const id = window.setInterval(() => { void refresh() }, 30_000)
     const onFocus = () => { void refresh() }
     window.addEventListener('focus', onFocus)
     document.addEventListener('visibilitychange', onFocus)
     window.addEventListener('venice-usage', onFocus)
     return () => {
+      window.clearTimeout(initialId)
       window.clearInterval(id)
       window.removeEventListener('focus', onFocus)
       document.removeEventListener('visibilitychange', onFocus)
