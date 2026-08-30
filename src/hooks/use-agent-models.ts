@@ -22,9 +22,11 @@ export interface AgentModel {
  * anywhere in this OpenVenice build.
  */
 const ALLOWED_AGENT_MODELS = [
+  'qwen-3-6-plus',
+  'venice-uncensored',
   'venice-uncensored-1-2',
   'venice-uncensored-role-play',
-  'qwen-3-6-plus',
+  'zai-org-glm-5-1',
   'olafangensan-glm-4-7-flash-heretic',
 ] as const
 
