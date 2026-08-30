@@ -15,7 +15,6 @@ import {
   pickAspectFromPrompt,
   pickSizeFromPrompt,
 } from '../../lib/defaults'
-import { scoreImagePrompt } from '../../lib/prompt-gate'
 import { formatVeniceError } from '../../lib/venice-client'
 import { Label, TextArea, PrimaryButton, PillGroup, ErrorText } from '../ui/shared'
 import { GenerationView } from '../ui/generation-view'
@@ -107,8 +106,6 @@ export function ImageView() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
-  const gate = useMemo(() => scoreImagePrompt(prompt), [prompt])
-
   useEffect(() => {
     setAspectRatio(pickAspectFromPrompt(prompt))
   }, [prompt])
@@ -194,7 +191,7 @@ export function ImageView() {
   const mutation = useImageGenerate()
 
   const handleGenerate = () => {
-    if (!prompt.trim() || !gate.pass) return
+    if (!prompt.trim()) return
     const seedNum = seed.trim() === '' ? undefined : Number(seed)
     const validSeed = seedNum !== undefined && Number.isFinite(seedNum) ? Math.trunc(seedNum) : undefined
     const ratio = pickAspectFromPrompt(prompt)
@@ -240,11 +237,27 @@ export function ImageView() {
       <div>
         <div className="flex items-center justify-between gap-2">
           <Label hint={`${prompt.length}/${promptLimit}`}>Prompt</Label>
-          <button type="button" onClick={copyPrompt} className="text-[13px] text-white/60 hover:text-white min-h-11 px-2">
-            {copied ? 'Copied' : 'Copy'}
-          </button>
+          <div className="flex gap-1">
+            <button type="button" onClick={() => { setPrompt(''); setNegativePrompt('') }} className="text-[13px] text-white/60 hover:text-white min-h-11 px-2">
+              Clear
+            </button>
+            <button type="button" onClick={copyPrompt} className="text-[13px] text-white/60 hover:text-white min-h-11 px-2">
+              {copied ? 'Copied' : 'Copy'}
+            </button>
+          </div>
         </div>
-        <TextArea value={prompt} onChange={setPrompt} placeholder="Amateur couple sex still…" rows={5} />
+        <div className="mb-2 flex gap-2 overflow-x-auto pb-1" aria-label="Prompt presets">
+          {[
+            ['Portrait', 'Photorealistic full-body portrait, natural skin texture, realistic lighting, sharp eyes, accurate anatomy'],
+            ['Couple', 'Photorealistic adult couple together, natural interaction, both identities clear, realistic skin and anatomy'],
+            ['Repair', 'Repair anatomy and artifacts while preserving identity, pose, composition, lighting, clothing and background'],
+          ].map(([label, value]) => (
+            <button key={label} type="button" onClick={() => setPrompt(value)} className="min-h-11 shrink-0 rounded-full border border-white/[0.1] px-3 text-[13px] text-white/70">
+              {label}
+            </button>
+          ))}
+        </div>
+        <TextArea value={prompt} onChange={setPrompt} placeholder="Describe the image you want to create…" rows={5} />
       </div>
       <div><Label>Negative prompt</Label><TextArea value={negativePrompt} onChange={setNegativePrompt} placeholder="blurry, clothes, CGI…" rows={2} /></div>
 
@@ -278,12 +291,12 @@ export function ImageView() {
         />
       </div>
 
-      <div className={`text-[14px] leading-relaxed ${gate.pass ? 'text-white/60' : 'text-red-200'}`}>
-        Prompt review {gate.score}% {gate.pass ? '— ready' : `— blocked under 90%. Missing: ${gate.missing.join(', ')}`}
+      <div className="text-[14px] leading-relaxed text-white/60" role="status" aria-live="polite">
+        {prompt.trim() ? `Ready with ${model}` : 'Enter a prompt or choose a preset.'}
       </div>
 
-      <PrimaryButton onClick={handleGenerate} disabled={!prompt.trim() || !apiKey || !gate.pass} loading={mutation.isPending} size="lg">
-        {mutation.isPending ? 'Generating…' : gate.pass ? 'Generate' : 'Blocked under 90%'}
+      <PrimaryButton onClick={handleGenerate} disabled={!prompt.trim() || !apiKey} loading={mutation.isPending} size="lg">
+        {mutation.isPending ? 'Generating…' : 'Generate'}
       </PrimaryButton>
       {images.length > 0 && (
         <button
