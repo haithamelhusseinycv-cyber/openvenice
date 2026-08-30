@@ -8,7 +8,7 @@ function money(n: number) {
 }
 
 export function BillingBar() {
-  const { connected, remaining, used, usd, diem, canConsume, error, refresh } = useBilling()
+  const { connected, remaining, used, canConsume, error, refresh } = useBilling()
 
   if (!connected) return null
 
