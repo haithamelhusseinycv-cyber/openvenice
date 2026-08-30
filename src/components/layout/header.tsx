@@ -23,7 +23,7 @@ const tabLabels: Record<string, string> = {
   video: 'Video',
   embeddings: 'Embeddings',
   workflows: 'Workflows',
-  playground: 'Agent',
+  playground: 'Nour',
 }
 
 const tabSubtitles: Record<string, string> = {
@@ -34,7 +34,7 @@ const tabSubtitles: Record<string, string> = {
   video: 'Generate video clips',
   embeddings: 'Vector representations of text',
   workflows: 'Chain models visually',
-  playground: 'Chat, reason and create',
+  playground: 'Adult companion · reason and create',
 }
 
 const noModelSelector = new Set(['video', 'workflows', 'playground'])
