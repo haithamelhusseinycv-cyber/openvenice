@@ -18,11 +18,11 @@ export function BillingBar() {
         <button
           type="button"
           onClick={() => { void refresh() }}
-          aria-label="Balance unavailable. Retry"
-          className="min-h-11 rounded-md border border-amber-300/30 bg-amber-400/[0.08] px-2 text-left text-[11px] text-amber-200"
+          aria-label="Balance unavailable. Tap to retry."
+          title="Balance unavailable — tap to retry"
+          className="min-h-11 min-w-11 rounded-md border border-amber-300/30 bg-amber-400/[0.08] px-2 text-center text-[20px] font-semibold text-amber-200"
         >
-          <span className="block font-medium">Balance unavailable</span>
-          <span className="block text-amber-200/70">Tap to retry</span>
+          $
         </button>
       ) : (
         <button
@@ -30,12 +30,13 @@ export function BillingBar() {
           onClick={() => { void refresh() }}
           className={`min-h-11 flex flex-col justify-center leading-tight min-w-0 rounded-md px-2 py-1 bg-white/[0.04] ${canConsume ? 'text-white/80' : 'text-red-300'}`}
           aria-label={`${money(remaining)} credits left; ${money(used)} used. Tap to refresh.`}
+          title={`${money(remaining)} left · ${money(used)} used`}
         >
-          <span className="text-[11px] sm:text-[13px] font-medium tabular-nums whitespace-nowrap">
-            {money(remaining)} left
+          <span className="text-[13px] font-medium tabular-nums whitespace-nowrap">
+            ${money(remaining)}
           </span>
           <span className="hidden sm:block text-[11px] text-white/50 tabular-nums">
-            {money(used)} used
+            ${money(used)} used
           </span>
         </button>
       )}
