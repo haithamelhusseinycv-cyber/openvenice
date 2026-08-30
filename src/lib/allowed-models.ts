@@ -12,6 +12,7 @@ export const ALLOWED_CHAT_MODEL_IDS = [
  * newly enabled Venice model appear without another frontend release.
  */
 export const ALLOWED_IMAGE_MODEL_IDS = [
+  'flux',
   'flux-2-max',
   'flux-2-pro',
   'flux-dev',
@@ -48,6 +49,19 @@ export const DEFAULT_CHAT_MODEL_ID = 'venice-uncensored-1-2'
 export const DEFAULT_IMAGE_MODEL_ID = 'flux-2-max'
 export const DEFAULT_EDIT_MODEL_ID = 'qwen-edit-uncensored'
 
+// The API response remains authoritative and is already filtered by modality
+// and online status. These families allow compatible successors to appear
+// automatically without exposing unrelated model types.
+const IMAGE_MODEL_FAMILY_PREFIXES = ['flux-', 'nano-banana', 'seedream-v', 'qwen-image-'] as const
+const EDIT_MODEL_FAMILY_PREFIXES = [
+  'flux-',
+  'nano-banana',
+  'seedream-v',
+  'qwen-edit',
+  'qwen-image-',
+  'firered-image-edit',
+] as const
+
 export const VISIBLE_TABS = ['chat', 'image', 'playground'] as const
 export type VisibleTab = (typeof VISIBLE_TABS)[number]
 
@@ -56,7 +70,17 @@ export function isAllowedChatModel(id?: string) {
 }
 
 export function isAllowedImageModel(id?: string) {
-  return !!id && (ALLOWED_IMAGE_MODEL_IDS as readonly string[]).includes(id.toLowerCase())
+  if (!id) return false
+  const normalized = id.toLowerCase()
+  return (ALLOWED_IMAGE_MODEL_IDS as readonly string[]).includes(normalized)
+    || IMAGE_MODEL_FAMILY_PREFIXES.some((prefix) => normalized.startsWith(prefix))
+}
+
+export function isAllowedEditModel(id?: string) {
+  if (!id) return false
+  const normalized = id.toLowerCase()
+  return (ALLOWED_EDIT_MODEL_IDS as readonly string[]).includes(normalized)
+    || EDIT_MODEL_FAMILY_PREFIXES.some((prefix) => normalized.startsWith(prefix) && normalized.includes('edit'))
 }
 
 export function isVisibleTab(tab?: string): tab is VisibleTab {

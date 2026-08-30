@@ -17,13 +17,13 @@ const modelTypeMap: Record<string, string> = {
 
 const tabLabels: Record<string, string> = {
   chat: 'Chat',
-  image: 'Image',
+  image: 'Create',
   audio: 'Audio',
   music: 'Music',
   video: 'Video',
   embeddings: 'Embeddings',
   workflows: 'Workflows',
-  playground: 'Nour',
+  playground: 'Noor',
 }
 
 const tabSubtitles: Record<string, string> = {

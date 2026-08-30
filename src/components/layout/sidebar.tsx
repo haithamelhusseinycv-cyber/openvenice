@@ -28,7 +28,7 @@ const navGroups: NavGroup[] = [
     items: [
       { id: 'chat', label: 'Chat', Icon: ChatIcon },
       { id: 'image', label: 'Create', Icon: ImageIcon },
-      { id: 'playground', label: 'Nour', Icon: AgentIcon },
+      { id: 'playground', label: 'Noor', Icon: AgentIcon },
     ],
   },
 ]
@@ -190,7 +190,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: Props) {
         <div className="px-3 py-2.5 border-t border-white/[0.04]">
           <div className="text-[11px] text-white/35 space-y-0.5">
             <div className="flex justify-between"><span>New chat</span><kbd className="font-mono text-white/50">⌘N</kbd></div>
-            <div className="flex justify-between"><span>Switch tab</span><kbd className="font-mono text-white/50">⌘1-2</kbd></div>
+            <div className="flex justify-between"><span>Switch tab</span><kbd className="font-mono text-white/50">⌘1-3</kbd></div>
           </div>
         </div>
       )}

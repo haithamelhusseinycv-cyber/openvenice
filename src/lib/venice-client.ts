@@ -25,17 +25,17 @@ export class VeniceAPIError extends Error {
 
 export function formatVeniceError(err: unknown): string {
   if (err instanceof VeniceAPIError) {
-    if (err.status === 402) return 'Venice credits empty. Top up on venice.ai, then retry.'
+    if (err.status === 402) return 'Venice credits empty. Add credits on venice.ai, then retry.'
     if (err.status === 401) return 'API key missing or invalid. Tap Connected in the header.'
     if (err.status === 429) return 'Venice is rate-limiting. Wait a few seconds and retry.'
     return err.requestId ? `${err.message} · Request ${err.requestId}` : err.message
   }
   if (err instanceof Error) {
     const status = (err as { status?: number }).status
-    if (status === 402) return 'Venice credits empty. Top up on venice.ai, then retry.'
+    if (status === 402) return 'Venice credits empty. Add credits on venice.ai, then retry.'
     if (status === 401) return 'API key missing or invalid. Tap Connected in the header.'
     if (status === 429) return 'Venice is rate-limiting. Wait a few seconds and retry.'
-    if (/402|payment|credit/i.test(err.message)) return 'Venice credits empty. Top up on venice.ai, then retry.'
+    if (/402|payment|credit/i.test(err.message)) return 'Venice credits empty. Add credits on venice.ai, then retry.'
     return err.message
   }
   return 'Request failed'
@@ -71,7 +71,7 @@ async function parseError(res: Response): Promise<VeniceAPIError> {
   } catch {
     /* keep default */
   }
-  if (res.status === 402) message = 'Venice credits empty. Top up on venice.ai, then retry.'
+  if (res.status === 402) message = 'Venice credits empty. Add credits on venice.ai, then retry.'
   if (res.status === 401 && !message.toLowerCase().includes('api key')) {
     message = 'API key missing or invalid. Tap Connected in the header.'
   }
@@ -124,6 +124,17 @@ export async function venice<T>(path: string, options: VeniceFetchOptions = {}):
   return res.json() as Promise<T>
 }
 
+/** Run an authenticated Venice request with a hard, per-request deadline. */
+export async function veniceWithTimeout<T>(path: string, timeoutMs = 8_000): Promise<T> {
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await venice<T>(path, { signal: controller.signal })
+  } finally {
+    window.clearTimeout(timeout)
+  }
+}
+
 export async function veniceFormData<T>(path: string, formData: FormData, init: { signal?: AbortSignal } = {}): Promise<T> {
   const res = await veniceFetch(path, {
     method: 'POST',
@@ -149,33 +160,49 @@ export async function veniceBlob(path: string, body: object, init: { signal?: Ab
 }
 
 
-/** Validate a candidate key before it is stored or marked connected. */
-export async function validateVeniceApiKey(key: string): Promise<void> {
+async function validateCandidateEndpoint(path: string, key: string, timeoutMs = 8_000): Promise<void> {
   const controller = new AbortController()
-  const timeout = window.setTimeout(() => controller.abort(), 10_000)
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs)
   const headers = { Authorization: `Bearer ${key.trim()}` }
   try {
-    const billing = await fetch(`${BASE_URL}/billing/balance`, {
+    const response = await fetch(`${BASE_URL}${path}`, {
       method: 'GET',
       headers,
       signal: controller.signal,
     })
-    if (billing.ok) return
-
-    // Inference-only keys can be valid while the account billing endpoint is
-    // unavailable. Rate limits is the supported key-scoped validation route.
-    const limits = await fetch(`${BASE_URL}/api_keys/rate_limits`, {
-      method: 'GET',
-      headers,
-      signal: controller.signal,
-    })
-    if (!limits.ok) throw await parseError(limits)
-  } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new VeniceAPIError('Venice key validation timed out. Check your connection and try again.', 408)
-    }
-    throw error
+    // A 402 still proves that Venice authenticated the key; it only means the
+    // account cannot consume until funds are added.
+    if (response.ok || response.status === 402) return
+    throw await parseError(response)
   } finally {
     window.clearTimeout(timeout)
+  }
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === 'AbortError'
+}
+
+/** Validate a candidate key before it is stored or marked connected. */
+export async function validateVeniceApiKey(key: string): Promise<void> {
+  // This key-scoped route works for inference-only keys and also returns their
+  // spend limits/balances, so it is the most reliable validation route.
+  try {
+    await validateCandidateEndpoint('/api_keys/rate_limits', key)
+    return
+  } catch (error) {
+    if (error instanceof VeniceAPIError && error.status === 401) throw error
+  }
+
+  // Account-scoped keys can validate through billing when rate-limit details
+  // are unavailable. This fallback receives its own full timeout budget.
+  try {
+    await validateCandidateEndpoint('/billing/balance', key)
+  } catch (error) {
+    if (error instanceof VeniceAPIError) throw error
+    if (isAbortError(error)) {
+      throw new VeniceAPIError('Venice API did not respond. Check your connection and try again.', 408)
+    }
+    throw error
   }
 }

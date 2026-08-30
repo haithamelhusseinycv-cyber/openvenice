@@ -4,6 +4,9 @@ import {
   ALLOWED_CHAT_MODEL_IDS,
   ALLOWED_EDIT_MODEL_IDS,
   ALLOWED_IMAGE_MODEL_IDS,
+  isAllowedChatModel,
+  isAllowedEditModel,
+  isAllowedImageModel,
 } from '../lib/allowed-models'
 import type {
   ModelsResponse,
@@ -11,12 +14,6 @@ import type {
 } from '../types/venice'
 
 type VeniceType = 'text' | 'image' | 'inpaint'
-
-const ALLOWED_MODELS: Record<VeniceType, string[]> = {
-  image: [...ALLOWED_IMAGE_MODEL_IDS],
-  inpaint: [...ALLOWED_EDIT_MODEL_IDS],
-  text: [...ALLOWED_CHAT_MODEL_IDS],
-}
 
 const PRIORITY: Record<VeniceType, string[]> = {
   image: [...ALLOWED_IMAGE_MODEL_IDS],
@@ -41,8 +38,9 @@ function getBucket(type?: string): VeniceType | null {
 
 function isAllowed(model: VeniceModel, bucket: VeniceType | null) {
   if (!bucket) return false
-  const allowed = ALLOWED_MODELS[bucket].map(normalize)
-  return allowed.includes(normalize(model.id))
+  if (bucket === 'text') return isAllowedChatModel(model.id)
+  if (bucket === 'image') return isAllowedImageModel(model.id)
+  return isAllowedEditModel(model.id)
 }
 
 function getRank(model: VeniceModel, bucket: VeniceType | null) {

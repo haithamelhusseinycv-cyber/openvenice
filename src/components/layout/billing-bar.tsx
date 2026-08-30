@@ -44,9 +44,11 @@ export function BillingBar() {
         href={VENICE_API_SETTINGS}
         target="_blank"
         rel="noopener noreferrer"
+        aria-label="Add Venice credits"
+        title="Open Venice API settings to add credits"
         className="min-h-11 px-2.5 rounded-md border border-white/[0.14] text-[13px] font-medium text-white hover:border-white/40 hover:bg-white/[0.04] flex items-center"
       >
-        Top up
+        Add $
       </a>
     </div>
   )

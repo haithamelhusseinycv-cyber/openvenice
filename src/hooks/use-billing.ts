@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useAuthStore } from '../stores/auth-store'
-import { venice } from '../lib/venice-client'
+import { VeniceAPIError, veniceWithTimeout } from '../lib/venice-client'
 
 export const VENICE_API_SETTINGS = 'https://venice.ai/settings/api'
 const OPEN_KEY = 'venice-session-open-credits'
@@ -21,6 +21,8 @@ interface RateLimitBalance {
     balances?: {
       USD?: number | string | null
       DIEM?: number | string | null
+      usd?: number | string | null
+      diem?: number | string | null
     }
   }
 }
@@ -29,10 +31,10 @@ function fromRateLimits(payload: RateLimitBalance): BillingBalance {
   const raw = payload.data?.balances
   return {
     canConsume: payload.data?.accessPermitted ?? true,
-    consumptionCurrency: Number(raw?.DIEM || 0) > 0 ? 'DIEM' : 'USD',
+    consumptionCurrency: Number(raw?.DIEM ?? raw?.diem ?? 0) > 0 ? 'DIEM' : 'USD',
     balances: {
-      usd: Number(raw?.USD || 0),
-      diem: Number(raw?.DIEM || 0),
+      usd: Number(raw?.USD ?? raw?.usd ?? 0),
+      diem: Number(raw?.DIEM ?? raw?.diem ?? 0),
     },
   }
 }
@@ -79,12 +81,16 @@ export function useBilling() {
     try {
       let data: BillingBalance
       try {
-        data = await venice<BillingBalance>('/billing/balance')
-      } catch {
-        // Some inference-only keys cannot read the account billing endpoint,
-        // but Venice exposes the same spendable balances with key rate limits.
-        const fallback = await venice<RateLimitBalance>('/api_keys/rate_limits')
-        data = fromRateLimits(fallback)
+        // Rate limits is key-scoped, works for inference-only keys, and exposes
+        // the same spendable balances without requiring account-level access.
+        const limits = await veniceWithTimeout<RateLimitBalance>('/api_keys/rate_limits')
+        if (!limits.data?.balances) throw new Error('Balance missing from rate-limit response')
+        data = fromRateLimits(limits)
+      } catch (rateLimitError) {
+        if (rateLimitError instanceof VeniceAPIError && rateLimitError.status === 401) throw rateLimitError
+        // Give the account-level fallback its own timeout rather than sharing a
+        // single deadline with the first request.
+        data = await veniceWithTimeout<BillingBalance>('/billing/balance')
       }
       setBalance(data)
       setError(null)
