@@ -6,15 +6,16 @@ import { useModelCatalog } from '../../hooks/use-model-catalog'
 import { useAgentModels } from '../../hooks/use-agent-models'
 import { callAgent, DEFAULT_AGENT_MODEL } from '../../lib/playground-agent'
 import { runAgentTools, type RunStep } from '../../lib/playground-agent-tools'
+import { NOUR_AGE, NOUR_NAME, NOUR_TAGLINE } from '../../lib/nour-character'
 import { applyPatch, type WorkflowPatch } from '../../lib/workflow-mutations'
 import { generateId } from '../../lib/utils'
 import { cn } from '../../lib/utils'
 
 const STARTER_PROMPTS = [
-  'Build a workflow that makes a 9:16 reel using web search to research the topic, then writes a script and generates the video',
-  'Research a topic with web search, summarize into 5 bullets, and narrate it as audio',
-  'Turn a concept into a vivid image prompt, then generate the image',
-  'Write a short song with lyrics, then generate it as music',
+  'Create a polished 9:16 portrait from my idea and prepare it for generation',
+  'Edit an uploaded image while preserving the subject’s identity and composition',
+  'Build a two-person swap: map one male and one female reference to the matching people in the source image',
+  'Research a topic, write a short script, and turn it into a vertical video workflow',
 ]
 
 function summarizeStep(step: RunStep): PlaygroundActivity {
@@ -181,9 +182,21 @@ export function PlaygroundChat() {
     <div className="flex flex-col h-full bg-[#0c0c10]">
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
         {messages.length === 0 ? (
-          <div className="flex flex-col gap-3 pt-8">
-            <div className="text-[15px] text-white/85 font-semibold mb-1">What should I build?</div>
-            <div className="text-[13px] text-white/45 mb-4">Describe a workflow in plain language. I&apos;ll assemble it on the canvas in real time.</div>
+          <div className="flex flex-col gap-3 pt-5">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-200 via-rose-300 to-fuchsia-700 p-[1px] shadow-lg shadow-fuchsia-950/30" aria-hidden="true">
+                <div className="w-full h-full rounded-full bg-[#17131a] grid place-items-center text-[18px] font-semibold text-rose-100">N</div>
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-[16px] text-white font-semibold">{NOUR_NAME}</span>
+                  <span className="rounded-full border border-white/[0.1] bg-white/[0.04] px-2 py-0.5 text-[10px] text-white/55">{NOUR_AGE} · Adult</span>
+                </div>
+                <div className="text-[12px] text-white/45 truncate">{NOUR_TAGLINE}</div>
+              </div>
+            </div>
+            <div className="text-[15px] text-white/85 font-semibold mb-1">Tell me what you want done.</div>
+            <div className="text-[13px] text-white/45 mb-4">Chat naturally. I&apos;ll reason with you, assemble the right creative workflow, and keep every subject and reference clearly mapped.</div>
             <div className="flex flex-col gap-2">
               {STARTER_PROMPTS.map((p) => (
                 <button
@@ -263,7 +276,7 @@ export function PlaygroundChat() {
                 send(input)
               }
             }}
-            placeholder={isThinking ? 'Agent is working…' : 'Describe a workflow or change…'}
+            placeholder={isThinking ? 'Nour is working…' : 'Message Nour or ask her to create something…'}
             rows={2}
             disabled={isThinking}
             className="flex-1 bg-white/[0.03] border border-white/[0.08] rounded-lg px-3 py-2 text-[13.5px] text-white/90 outline-none resize-none placeholder:text-white/30 focus:border-white/[0.2] disabled:opacity-60"
