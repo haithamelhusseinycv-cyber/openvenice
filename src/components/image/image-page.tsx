@@ -20,7 +20,7 @@ export function ImagePage() {
             key={t.id}
             onClick={() => setTab(t.id)}
             className={cn(
-              'text-[14px] font-medium px-2.5 py-[3px] rounded-full transition-all duration-150',
+              'text-[14px] font-medium px-3 min-h-11 rounded-full transition-all duration-150',
               tab === t.id ? 'bg-white text-black' : 'bg-white/[0.03] text-white/20 hover:text-white/40 hover:bg-white/[0.05]',
             )}
           >
