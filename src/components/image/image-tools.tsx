@@ -9,13 +9,10 @@ import { cn } from '../../lib/utils'
 import { toast } from '../../stores/toast-store'
 import { buildSwapPrompt, UNDRESS_PROMPT, type SwapKind, type SwapPerson } from '../../lib/tool-prompts'
 import { prepareImage, formatBytes, type PreparedImage } from '../../lib/image-input'
+import { useModels } from '../../hooks/use-models'
+import { formatVeniceError } from '../../lib/venice-client'
 
 type Tool = 'edit' | 'swap' | 'undress' | 'upscale' | 'remove-bg'
-
-const EDIT_MODELS = [
-  { value: 'qwen-edit-uncensored', label: 'Qwen Edit Uncensored' },
-  { value: 'firered-image-edit', label: 'FireRed Edit' },
-]
 
 const SCENE_SIZES = [
   { value: 'auto', label: 'Scene' },
@@ -55,6 +52,8 @@ function FitImg({ src, alt, className }: { src: string; alt: string; className?:
 
 export function ImageTools() {
   const apiKey = useAuthStore((s) => s.apiKey)
+  const { data: availableEditModels } = useModels('inpaint')
+  const editModelOptions = availableEditModels?.map((m) => ({ value: m.id, label: m.model_spec?.name || m.id })) ?? []
   const [pending] = useState(() => useImageWorkspace.getState().pendingSource)
   const [tool, setTool] = useState<Tool>(pending?.tool ?? 'edit')
   const [imageData, setImageData] = useState<string | null>(pending?.data ?? null)
@@ -89,6 +88,7 @@ export function ImageTools() {
   }, [editPrompt])
 
   const [swapKind, setSwapKind] = useState<SwapKind>('face')
+  const [secondSwapKind, setSecondSwapKind] = useState<SwapKind>('face')
   const [swapPerson, setSwapPerson] = useState<SwapPerson>('woman')
   const [scale] = useState(2)
   const [enhance] = useState(false)
@@ -115,8 +115,8 @@ export function ImageTools() {
     }
   }
 
-  const dualSwapPrompt = (kind: SwapKind) =>
-    `Reference 1 is the target scene and composition. Reference 2 is the replacement identity for the man. Reference 3 is the replacement identity for the woman. Replace both people using a ${kind} swap. Preserve the target pose, framing, camera angle, lighting, background, interaction and all non-identity details. Keep the two identities separate; do not blend or exchange them.`
+  const dualSwapPrompt = (maleKind: SwapKind, femaleKind: SwapKind) =>
+    `Reference 1 is the target scene and composition. Reference 2 maps only to the male subject and requires a ${maleKind} swap. Reference 3 maps only to the female subject and requires a ${femaleKind} swap. Preserve the target pose, framing, camera angle, lighting, background, interaction and all non-identity details. Keep both identities separate; never blend, exchange or cross-map them.`
 
   const aspectRatio = sceneSize || 'auto'
 
@@ -144,8 +144,8 @@ export function ImageTools() {
       swapMutation.mutate(
         {
           images: dualSwap && secondIdImage ? [imageData, idImage, secondIdImage] : [imageData, idImage],
-          prompt: dualSwap ? dualSwapPrompt(swapKind) : buildSwapPrompt(swapKind, swapPerson),
-          modelId: 'qwen-edit-uncensored',
+          prompt: dualSwap ? dualSwapPrompt(swapKind, secondSwapKind) : buildSwapPrompt(swapKind, swapPerson),
+          modelId: editModel,
           aspect_ratio: aspectRatio,
           safe_mode: false,
           enhance_prompt: false,
@@ -159,7 +159,7 @@ export function ImageTools() {
         {
           images: [imageData],
           prompt: UNDRESS_PROMPT,
-          modelId: 'qwen-edit-uncensored',
+          modelId: editModel,
           aspect_ratio: aspectRatio,
           safe_mode: false,
           enhance_prompt: false,
@@ -345,10 +345,14 @@ export function ImageTools() {
         )}
 
         {tool === 'edit' && (
-          <>
-            <div><Label>Edit prompt</Label><TextArea value={editPrompt} onChange={setEditPrompt} placeholder="Keep identity. Change only what I type…" rows={3} /></div>
-            <div><Label>Model</Label><Select value={editModel} onChange={setEditModel} options={EDIT_MODELS} searchable /></div>
-          </>
+          <div><Label>Edit prompt</Label><TextArea value={editPrompt} onChange={setEditPrompt} placeholder="Keep identity. Change only what I type…" rows={3} /></div>
+        )}
+
+        {(tool === 'edit' || tool === 'swap' || tool === 'undress') && (
+          <div>
+            <Label>Model</Label>
+            <Select value={editModel} onChange={setEditModel} options={editModelOptions} searchable />
+          </div>
         )}
 
         {tool === 'swap' && (
@@ -372,7 +376,7 @@ export function ImageTools() {
               </div>
             </div>}
             <div>
-              <Label>{dualSwap ? '4. Swap type for both' : '4. Swap type'}</Label>
+              <Label>{dualSwap ? '4. Male swap type' : '4. Swap type'}</Label>
               <div className="flex gap-1">
                 {(['face', 'head', 'body'] as const).map((k) => (
                   <button
@@ -389,6 +393,29 @@ export function ImageTools() {
                 ))}
               </div>
             </div>
+            {dualSwap && (
+              <div>
+                <Label>5. Female swap type</Label>
+                <div className="flex gap-1">
+                  {(['face', 'head', 'body'] as const).map((k) => (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => setSecondSwapKind(k)}
+                      className={cn(
+                        'flex-1 min-h-11 py-2 text-[15px] rounded-lg capitalize',
+                        secondSwapKind === k ? 'bg-white text-black' : 'bg-white/[0.06] text-white/70',
+                      )}
+                    >
+                      {k}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-2 rounded-lg border border-white/[0.08] bg-white/[0.03] p-3 text-[13px] leading-relaxed text-white/60" role="status" aria-live="polite">
+                  Reference 2 → male {swapKind} · Reference 3 → female {secondSwapKind}
+                </div>
+              </div>
+            )}
           </>
         )}
 
@@ -421,7 +448,7 @@ export function ImageTools() {
           {tool === 'edit'
             ? 'Edit Image'
             : tool === 'swap'
-              ? `Swap ${swapKind}`
+              ? dualSwap ? `Swap male ${swapKind} + female ${secondSwapKind}` : `Swap ${swapKind}`
               : tool === 'undress'
                 ? 'Undress'
                 : tool === 'upscale'
@@ -429,7 +456,14 @@ export function ImageTools() {
                   : 'Remove Background'}
         </PrimaryButton>
         {uploadError && <ErrorText>{uploadError}</ErrorText>}
-        {error && <ErrorText>{error.message}</ErrorText>}
+        {error && (
+          <>
+            <ErrorText>{formatVeniceError(error)}</ErrorText>
+            <button type="button" onClick={handleProcess} disabled={isLoading} className="min-h-11 rounded-lg border border-white/[0.14] px-3 text-[14px] text-white/80">
+              Retry with prepared images
+            </button>
+          </>
+        )}
       </div>
 
       <div className="flex-1 p-3 sm:p-6 overflow-y-auto flex flex-col min-w-0 min-h-0">
