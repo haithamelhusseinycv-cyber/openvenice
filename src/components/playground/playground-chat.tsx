@@ -184,8 +184,8 @@ export function PlaygroundChat() {
         {messages.length === 0 ? (
           <div className="flex flex-col gap-3 pt-5">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-200 via-rose-300 to-fuchsia-700 p-[1px] shadow-lg shadow-fuchsia-950/30" aria-hidden="true">
-                <div className="w-full h-full rounded-full bg-[#17131a] grid place-items-center text-[18px] font-semibold text-rose-100">N</div>
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-200 via-rose-300 to-fuchsia-700 p-[1px] shadow-lg shadow-fuchsia-950/30 shrink-0">
+                <img src="/nour-portrait.png" alt="Nour" className="w-full h-full rounded-full object-cover object-[50%_18%]" />
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
