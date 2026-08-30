@@ -458,22 +458,41 @@ export async function runAgentTools(opts: RunOptions): Promise<RunResult> {
 
   let toolCallCount = 0
   let askedUser = false
+  let activeModel = opts.model
+  let usedFallback = false
+  const fallbackModel = opts.agentModels?.find((m) => m.id === 'zai-org-glm-5-1' && m.capabilities.supportsFunctionCalling)?.id
 
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
     if (opts.signal?.aborted) throw new DOMException('Aborted', 'AbortError')
 
-    const resp = await venice<ToolCallResponse>('/chat/completions', {
+    const request = (model: string) => venice<ToolCallResponse>('/chat/completions', {
       method: 'POST',
       body: JSON.stringify({
-        model: opts.model,
+        model,
         messages,
-        temperature: 0.2,
+        temperature: 0.45,
         max_tokens: 4096,
         tools: TOOLS,
         tool_choice: 'auto',
+        venice_parameters: { include_venice_system_prompt: false },
       }),
       signal: opts.signal,
     })
+
+    let resp: ToolCallResponse
+    try {
+      resp = await request(activeModel)
+    } catch (error) {
+      const status = typeof error === 'object' && error !== null && 'status' in error
+        ? Number((error as { status?: number }).status)
+        : 0
+      const canFallback = !usedFallback && fallbackModel && activeModel !== fallbackModel
+        && status !== 401 && status !== 402 && !opts.signal?.aborted
+      if (!canFallback) throw error
+      activeModel = fallbackModel
+      usedFallback = true
+      resp = await request(activeModel)
+    }
 
     const message = resp.choices[0]?.message
     if (!message) {
