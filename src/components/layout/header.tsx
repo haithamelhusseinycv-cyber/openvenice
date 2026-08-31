@@ -60,7 +60,7 @@ export function Header({ onOpenApiKey, onOpenMobileSidebar }: Props) {
       <button
         onClick={() => onOpenMobileSidebar?.()}
         aria-label="Open menu"
-        className="order-1 md:hidden text-white/80 hover:text-white transition-colors p-2 -ml-1 rounded-md min-h-11 min-w-11 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
+        className="order-1 lg:hidden text-white/80 hover:text-white transition-colors p-2 -ml-1 rounded-md min-h-11 min-w-11 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
           <line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="20" y2="18" />
@@ -70,7 +70,7 @@ export function Header({ onOpenApiKey, onOpenMobileSidebar }: Props) {
       <button
         onClick={toggleSidebar}
         aria-label="Toggle sidebar"
-        className="order-1 hidden md:block text-white/55 hover:text-white transition-colors p-1.5 -ml-1 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
+        className="order-1 hidden lg:block text-white/55 hover:text-white transition-colors p-1.5 -ml-1 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
           <path d="M3 4h18M3 12h12M3 20h18" />

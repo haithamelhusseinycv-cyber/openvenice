@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { validateVeniceApiKey, VeniceAPIError } from './venice-client'
+import { formatVeniceError, validateVeniceApiKey, VeniceAPIError, veniceBlob } from './venice-client'
+import { useAuthStore } from '../stores/auth-store'
 
 function response(status: number, message = `HTTP ${status}`): Response {
   if (status >= 200 && status < 300) return new Response(null, { status })
@@ -24,6 +25,7 @@ describe('validateVeniceApiKey', () => {
 
   beforeEach(() => {
     vi.stubGlobal('fetch', fetchMock)
+    useAuthStore.setState({ apiKey: 'sk-test' })
   })
 
   afterEach(() => {
@@ -128,5 +130,31 @@ describe('validateVeniceApiKey', () => {
     fetchMock.mockResolvedValueOnce(response(401, 'Invalid API key'))
 
     await expect(validateVeniceApiKey('sk-invalid')).rejects.toBeInstanceOf(VeniceAPIError)
+  })
+
+  it('shows the string and field details returned by image endpoint validation', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({
+      error: 'Invalid request body',
+      details: { scale: { _errors: ['Expected 2 or 4'] } },
+    }), {
+      status: 400,
+      headers: {
+        'Content-Type': 'application/json',
+        'x-request-id': 'request-123',
+      },
+    }))
+
+    const request = veniceBlob('/image/upscale', { image: 'abc', scale: 3 })
+    await expect(request).rejects.toMatchObject({
+      status: 400,
+      message: 'Invalid request body: scale: Expected 2 or 4',
+      requestId: 'request-123',
+    })
+
+    try {
+      await request
+    } catch (error) {
+      expect(formatVeniceError(error)).toBe('Invalid request body: scale: Expected 2 or 4 · Request request-123')
+    }
   })
 })

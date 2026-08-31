@@ -13,7 +13,6 @@ import {
   loadImageNegative,
   loadImagePrompt,
   pickAspectFromPrompt,
-  pickSizeFromPrompt,
 } from '../../lib/defaults'
 import { formatVeniceError } from '../../lib/venice-client'
 import { Label, TextArea, PrimaryButton, PillGroup, ErrorText } from '../ui/shared'
@@ -65,6 +64,13 @@ const DEFAULT_SIZES = [
   { value: '2', label: '1024' },
   { value: '3', label: '1280' },
 ]
+
+function pixelSizeForSelection(prompt: string, sizeIdx: string) {
+  const longEdge = Number(DEFAULT_SIZES.find((size) => size.value === sizeIdx)?.label || 1024)
+  const isCouple = pickAspectFromPrompt(prompt) === '3:2'
+  const shortEdge = Math.max(320, Math.round((longEdge * 0.65) / 64) * 64)
+  return isCouple ? { w: longEdge, h: shortEdge } : { w: shortEdge, h: longEdge }
+}
 
 export function ImageView() {
   const apiKey = useAuthStore((s) => s.apiKey)
@@ -192,11 +198,10 @@ export function ImageView() {
 
   const handleGenerate = () => {
     if (!prompt.trim()) return
+    mutation.reset()
     const seedNum = seed.trim() === '' ? undefined : Number(seed)
     const validSeed = seedNum !== undefined && Number.isFinite(seedNum) ? Math.trunc(seedNum) : undefined
-    const ratio = pickAspectFromPrompt(prompt)
-    const size = pickSizeFromPrompt(prompt)
-    setAspectRatio(ratio)
+    const size = pixelSizeForSelection(prompt, sizeIdx)
 
     const req: Record<string, unknown> = {
       prompt: prompt.trim(),
@@ -211,7 +216,7 @@ export function ImageView() {
     if (validSeed !== undefined) req.seed = validSeed
 
     if (hasAspectRatios) {
-      req.aspect_ratio = ratio
+      req.aspect_ratio = aspectRatio
     } else {
       req.width = size.w
       req.height = size.h
@@ -238,7 +243,7 @@ export function ImageView() {
         <div className="flex items-center justify-between gap-2">
           <Label hint={`${prompt.length}/${promptLimit}`}>Prompt</Label>
           <div className="flex gap-1">
-            <button type="button" onClick={() => { setPrompt(''); setNegativePrompt('') }} className="text-[13px] text-white/60 hover:text-white min-h-11 px-2">
+            <button type="button" onClick={() => { setPrompt(''); setNegativePrompt(''); mutation.reset() }} className="text-[13px] text-white/60 hover:text-white min-h-11 px-2">
               Clear
             </button>
             <button type="button" onClick={copyPrompt} className="text-[13px] text-white/60 hover:text-white min-h-11 px-2">
@@ -252,7 +257,15 @@ export function ImageView() {
             ['Couple', 'Photorealistic adult couple together, natural interaction, both identities clear, realistic skin and anatomy'],
             ['Repair', 'Repair anatomy and artifacts while preserving identity, pose, composition, lighting, clothing and background'],
           ].map(([label, value]) => (
-            <button key={label} type="button" onClick={() => setPrompt(value)} className="min-h-11 shrink-0 rounded-full border border-white/[0.1] px-3 text-[13px] text-white/70">
+            <button
+              key={label}
+              type="button"
+              aria-pressed={prompt === value}
+              onClick={() => { setPrompt(value); mutation.reset() }}
+              className={prompt === value
+                ? 'min-h-11 shrink-0 rounded-full border border-white bg-white px-3 text-[13px] text-black'
+                : 'min-h-11 shrink-0 rounded-full border border-white/[0.1] px-3 text-[13px] text-white/70 hover:border-white/25 hover:text-white'}
+            >
               {label}
             </button>
           ))}

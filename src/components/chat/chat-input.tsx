@@ -23,7 +23,6 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
     onSend(trimmed, images.length > 0 ? images : undefined)
     setValue('')
     setImages([])
-    if (textareaRef.current) textareaRef.current.style.height = 'auto'
   }
 
   const handleImageUpload = (files: FileList | null) => {
@@ -36,7 +35,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
   }
 
   return (
-    <div className="px-4 sm:px-6 pb-5 pt-2">
+    <div className="shrink-0 bg-[#0a0a0c] px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 sm:px-6 sm:pb-5">
       <div className="w-full max-w-[860px] mx-auto">
         {images.length > 0 && (
           <div className="flex gap-2 mb-2 overflow-x-auto pb-1">
@@ -44,6 +43,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
               <div key={i} className="relative group shrink-0">
                 <img src={img} alt={`Attachment ${i + 1}`} className="h-16 w-16 object-cover rounded-lg border border-white/[0.08]" />
                 <button
+                  type="button"
                   onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}
                   aria-label={`Remove attachment ${i + 1}`}
                   className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-black/85 hover:bg-black border border-white/15 rounded-full flex items-center justify-center text-white/70 hover:text-white transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-white/50"
@@ -87,15 +87,17 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
               }
             }}
             placeholder={disabled ? 'Connect an API key to start…' : dragOver ? 'Drop image to attach' : 'Ask anything — Enter to send, Shift+Enter for newline'}
-            rows={1}
+            rows={2}
+            enterKeyHint="send"
             aria-label="Message input"
-            className="w-full bg-transparent px-5 pt-4 pb-1 text-[16px] text-white outline-none resize-none max-h-48 placeholder:text-white/30 leading-relaxed"
+            className="min-h-[72px] max-h-32 w-full resize-none overflow-y-auto bg-transparent px-4 pb-1 pt-3 text-[16px] leading-relaxed text-white outline-none placeholder:text-white/30 sm:px-5 sm:pt-4"
             disabled={disabled}
           />
           <div className="flex items-center justify-between px-3 pb-2.5">
             <div className="flex items-center gap-1">
               <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleImageUpload(e.target.files)} />
               <button
+                type="button"
                 onClick={() => fileRef.current?.click()}
                 disabled={disabled}
                 aria-label="Attach image"
@@ -109,6 +111,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
             </div>
             {isStreaming ? (
               <button
+                type="button"
                 onClick={onStop}
                 aria-label="Stop generating"
                 className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-white/85 bg-white/[0.08] hover:bg-white/[0.14] border border-white/[0.12] rounded-lg transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
@@ -118,6 +121,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
               </button>
             ) : (
               <button
+                type="button"
                 onClick={handleSubmit}
                 disabled={!value.trim() || disabled}
                 aria-label="Send message"

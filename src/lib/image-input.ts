@@ -17,6 +17,13 @@ function dataUrlBytes(dataUrl: string): number {
   return Math.floor(base64.length * 0.75)
 }
 
+/** Venice's single-image endpoints expect the base64 payload without a data-URL prefix. */
+export function stripImageDataUrl(image: string): string {
+  if (!image.startsWith('data:')) return image
+  const comma = image.indexOf(',')
+  return comma >= 0 ? image.slice(comma + 1) : image
+}
+
 export async function prepareImage(file: File): Promise<PreparedImage> {
   if (!file.type.startsWith('image/')) throw new Error('Select a supported image file.')
   if (file.size === 0) throw new Error('This image file is empty.')

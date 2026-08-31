@@ -64,10 +64,26 @@ async function parseError(res: Response): Promise<VeniceAPIError> {
   let suggestedPrompt: string | undefined
   const requestId = res.headers.get('cf-ray') || res.headers.get('x-request-id') || undefined
   try {
-    const err = (await res.json()) as VeniceError
-    message = err.error?.message ?? message
-    code = err.error?.code
-    suggestedPrompt = err.error?.suggested_prompt
+    const err = (await res.json()) as Omit<VeniceError, 'error'> & {
+      error?: VeniceError['error'] | string
+      message?: string
+      details?: unknown
+    }
+    if (typeof err.error === 'string') {
+      message = err.error
+    } else if (err.error?.message) {
+      message = err.error.message
+      code = err.error.code
+      suggestedPrompt = err.error.suggested_prompt
+    } else if (typeof err.message === 'string' && err.message.trim()) {
+      message = err.message
+    }
+
+    const detailMessages = collectDetailMessages(err.details)
+    if (detailMessages.length > 0) {
+      const details = detailMessages.slice(0, 3).join('; ')
+      message = message === `HTTP ${res.status}` ? details : `${message}: ${details}`
+    }
   } catch {
     /* keep default */
   }
@@ -77,6 +93,17 @@ async function parseError(res: Response): Promise<VeniceAPIError> {
   }
   if (res.status === 429) message = 'Venice is rate-limiting. Wait a few seconds and retry.'
   return new VeniceAPIError(message, res.status, code, suggestedPrompt, requestId)
+}
+
+function collectDetailMessages(value: unknown, path = ''): string[] {
+  if (typeof value === 'string' && value.trim()) return [path ? `${path}: ${value}` : value]
+  if (Array.isArray(value)) return value.flatMap((item) => collectDetailMessages(item, path))
+  if (!value || typeof value !== 'object') return []
+
+  return Object.entries(value as Record<string, unknown>).flatMap(([key, item]) => {
+    const nextPath = key === '_errors' ? path : path ? `${path}.${key}` : key
+    return collectDetailMessages(item, nextPath)
+  })
 }
 
 interface VeniceFetchOptions extends RequestInit {
@@ -153,8 +180,18 @@ export async function veniceBlob(path: string, body: object, init: { signal?: Ab
   })
   const contentType = res.headers.get('content-type') || ''
   if (contentType.includes('application/json')) {
-    const payload = await res.json() as { error?: { message?: string } }
-    throw new VeniceAPIError(payload.error?.message || 'Image service returned an invalid response.', res.status, undefined, undefined, res.headers.get('cf-ray') || undefined)
+    const payload = await res.json() as { error?: { message?: string } | string; message?: string; details?: unknown }
+    const baseMessage = typeof payload.error === 'string'
+      ? payload.error
+      : payload.error?.message || payload.message || 'Image service returned an invalid response.'
+    const details = collectDetailMessages(payload.details).slice(0, 3).join('; ')
+    throw new VeniceAPIError(
+      details ? `${baseMessage}: ${details}` : baseMessage,
+      res.status,
+      undefined,
+      undefined,
+      res.headers.get('cf-ray') || res.headers.get('x-request-id') || undefined,
+    )
   }
   return res.blob()
 }

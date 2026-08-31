@@ -31,18 +31,32 @@ export function ChatView() {
       : models?.find((m) => m.id === DEFAULT_CHAT_MODEL_ID)?.id || models?.[0]?.id || DEFAULT_CHAT_MODEL_ID
   const { send, stop, regenerate, isStreaming } = useChat()
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const shouldStickToBottomRef = useRef(true)
 
   const messageCount = conversation?.messages.length ?? 0
   const lastContent = conversation?.messages[messageCount - 1]?.content
   const lastLen = typeof lastContent === 'string' ? lastContent.length : 0
   const scrollTrigger = `${messageCount}-${Math.floor(lastLen / 200)}`
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    if (!shouldStickToBottomRef.current) return
+    const frame = requestAnimationFrame(() => {
+      const scroller = scrollRef.current
+      if (scroller) scroller.scrollTop = scroller.scrollHeight
+    })
+    return () => cancelAnimationFrame(frame)
   }, [scrollTrigger])
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+      <div
+        ref={scrollRef}
+        className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y"
+        onScroll={(event) => {
+          const element = event.currentTarget
+          shouldStickToBottomRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 120
+        }}
+      >
         {!conversation || conversation.messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center px-6 gap-6">
             <div className="flex flex-col items-center gap-3">
@@ -78,7 +92,7 @@ export function ChatView() {
             <div className="border-b border-white/[0.04]">
               <VeniceParams />
             </div>
-            <div className="w-full max-w-[960px] mx-auto py-5 px-4 sm:px-5 flex flex-col gap-5">
+            <div className="mx-auto flex w-full max-w-[960px] min-w-0 flex-col gap-5 px-3 py-4 sm:px-5 sm:py-5">
               {conversation.messages.map((msg, i) => (
                 <MessageBubble
                   key={i}

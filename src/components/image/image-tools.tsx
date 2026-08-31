@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useAuthStore } from '../../stores/auth-store'
 import { useImageWorkspace } from '../../stores/image-workspace-store'
 import { useImageEdit, useImageMultiEdit, useImageUpscale, useBackgroundRemove } from '../../hooks/use-image-tools'
@@ -11,6 +11,7 @@ import { buildSwapPrompt, UNDRESS_PROMPT, type SwapKind, type SwapPerson } from 
 import { prepareImage, formatBytes, type PreparedImage } from '../../lib/image-input'
 import { useModels } from '../../hooks/use-models'
 import { formatVeniceError } from '../../lib/venice-client'
+import { DEFAULT_EDIT_MODEL_ID } from '../../lib/allowed-models'
 
 type Tool = 'edit' | 'swap' | 'undress' | 'upscale' | 'remove-bg'
 
@@ -45,15 +46,18 @@ function FitImg({ src, alt, className }: { src: string; alt: string; className?:
       src={src}
       alt={alt}
       className={cn('w-full h-auto max-w-full object-contain rounded-lg border border-white/[0.08]', className)}
-      style={{ maxHeight: 'min(52dvh, 720px)', touchAction: 'pinch-zoom' }}
+      style={{ maxHeight: 'min(70dvh, 720px)', touchAction: 'pinch-zoom' }}
     />
   )
 }
 
 export function ImageTools() {
   const apiKey = useAuthStore((s) => s.apiKey)
-  const { data: availableEditModels } = useModels('inpaint')
-  const editModelOptions = availableEditModels?.map((m) => ({ value: m.id, label: m.model_spec?.name || m.id })) ?? []
+  const { data: availableEditModels, isLoading: modelsLoading, error: modelsError } = useModels('inpaint')
+  const editModelOptions = useMemo(
+    () => availableEditModels?.map((m) => ({ value: m.id, label: m.model_spec?.name || m.id })) ?? [],
+    [availableEditModels],
+  )
   const [pending] = useState(() => useImageWorkspace.getState().pendingSource)
   const [tool, setTool] = useState<Tool>(pending?.tool ?? 'edit')
   const [imageData, setImageData] = useState<string | null>(pending?.data ?? null)
@@ -77,7 +81,10 @@ export function ImageTools() {
   const [editPrompt, setEditPrompt] = useState(() =>
     loadSaved('venice-edit-prompt', '')
   )
-  const [editModel, setEditModel] = useState('qwen-edit-uncensored')
+  const [preferredEditModel, setPreferredEditModel] = useState(DEFAULT_EDIT_MODEL_ID)
+  const editModel = editModelOptions.some((option) => option.value === preferredEditModel)
+    ? preferredEditModel
+    : editModelOptions[0]?.value || preferredEditModel
 
   useEffect(() => {
     try {
@@ -90,16 +97,21 @@ export function ImageTools() {
   const [swapKind, setSwapKind] = useState<SwapKind>('face')
   const [secondSwapKind, setSecondSwapKind] = useState<SwapKind>('face')
   const [swapPerson, setSwapPerson] = useState<SwapPerson>('woman')
-  const [scale] = useState(2)
-  const [enhance] = useState(false)
-  const [enhanceCreativity] = useState(0.5)
-  const [enhancePrompt] = useState('')
+  const [scale] = useState<2 | 4>(2)
 
   const editMutation = useImageEdit()
   const swapMutation = useImageMultiEdit()
   const undressMutation = useImageEdit()
   const upscaleMutation = useImageUpscale()
   const bgRemoveMutation = useBackgroundRemove()
+
+  const resetMutations = () => {
+    editMutation.reset()
+    swapMutation.reset()
+    undressMutation.reset()
+    upscaleMutation.reset()
+    bgRemoveMutation.reset()
+  }
 
   const readFile = async (file: File, slot: string, onDone: (data: string, name: string) => void) => {
     setUploadError(null)
@@ -122,6 +134,7 @@ export function ImageTools() {
 
   const handleProcess = () => {
     resetResult()
+    resetMutations()
     const opts = {
       onSuccess: (blob: Blob) => setResultBlob(blob),
       onError: (err: unknown) => toast.fromError(err, 'Image tool failed'),
@@ -173,9 +186,7 @@ export function ImageTools() {
         {
           image: imageData,
           scale,
-          enhance,
-          enhanceCreativity: enhance ? enhanceCreativity : undefined,
-          enhancePrompt: enhance && enhancePrompt.trim() ? enhancePrompt.trim() : undefined,
+          creativity: 0.01,
         },
         opts,
       )
@@ -190,12 +201,15 @@ export function ImageTools() {
     undressMutation.isPending ||
     upscaleMutation.isPending ||
     bgRemoveMutation.isPending
-  const error =
-    editMutation.error ||
-    swapMutation.error ||
-    undressMutation.error ||
-    upscaleMutation.error ||
-    bgRemoveMutation.error
+  const error = tool === 'edit'
+    ? editMutation.error
+    : tool === 'swap'
+      ? swapMutation.error
+      : tool === 'undress'
+        ? undressMutation.error
+        : tool === 'upscale'
+          ? upscaleMutation.error
+          : bgRemoveMutation.error
 
   const downloadResult = () => {
     if (!resultUrl) return
@@ -205,8 +219,16 @@ export function ImageTools() {
     a.click()
   }
 
-  const swapReady = !!(imageData && idImage && (!dualSwap || secondIdImage) && apiKey && !isLoading)
-  const otherReady = !!(imageData && apiKey && !isLoading && (tool !== 'edit' || editPrompt.trim()))
+  const selectedEditModelReady = editModelOptions.some((option) => option.value === editModel)
+  const swapReady = !!(imageData && idImage && (!dualSwap || secondIdImage) && apiKey && !isLoading && selectedEditModelReady)
+  const needsEditModel = tool === 'edit' || tool === 'swap' || tool === 'undress'
+  const otherReady = !!(
+    imageData &&
+    apiKey &&
+    !isLoading &&
+    (tool !== 'edit' || editPrompt.trim()) &&
+    (!needsEditModel || selectedEditModelReady)
+  )
 
   const removeSource = () => {
     setImageData(null)
@@ -230,16 +252,16 @@ export function ImageTools() {
   }
 
   return (
-    <div className="flex flex-col md:flex-row h-full min-h-0">
-      <div className="w-full md:w-96 border-b md:border-b-0 md:border-r border-white/[0.06] p-4 sm:p-6 flex flex-col gap-4 overflow-y-auto shrink-0 max-h-[48vh] md:max-h-none">
-        <div className="flex flex-wrap gap-1 bg-white/[0.02] rounded-lg p-1 border border-white/[0.06]">
+    <div className="flex h-full min-h-0 flex-col overflow-y-auto overscroll-contain touch-pan-y lg:flex-row lg:overflow-hidden">
+      <div className="flex w-full shrink-0 flex-col gap-4 border-b border-white/[0.06] p-4 sm:p-6 lg:w-[400px] lg:overflow-y-auto lg:border-b-0 lg:border-r">
+        <div className="grid grid-cols-5 gap-1 rounded-lg border border-white/[0.06] bg-white/[0.02] p-1">
           {([['edit', 'Edit'], ['swap', 'Swap'], ['undress', 'Undress'], ['upscale', 'Upscale'], ['remove-bg', 'BG']] as const).map(([id, label]) => (
             <button
               key={id}
               type="button"
-              onClick={() => { setTool(id); resetResult() }}
+              onClick={() => { setTool(id); resetResult(); resetMutations() }}
               className={cn(
-                'flex-1 min-w-[4.5rem] min-h-11 px-2 py-2 text-[14px] font-medium rounded-md transition-all duration-150',
+                'min-h-11 min-w-0 rounded-md px-1 py-2 text-[12px] font-medium transition-all duration-150 sm:px-2 sm:text-[14px]',
                 tool === id ? 'bg-white text-black' : 'text-white/55 hover:text-white',
               )}
             >
@@ -351,7 +373,9 @@ export function ImageTools() {
         {(tool === 'edit' || tool === 'swap' || tool === 'undress') && (
           <div>
             <Label>Model</Label>
-            <Select value={editModel} onChange={setEditModel} options={editModelOptions} searchable />
+            <Select value={editModel} onChange={setPreferredEditModel} options={editModelOptions} searchable />
+            {modelsLoading && <div className="mt-2 text-[13px] text-white/45" role="status">Loading compatible edit models…</div>}
+            {modelsError && <ErrorText>{formatVeniceError(modelsError)}</ErrorText>}
           </div>
         )}
 
@@ -466,7 +490,7 @@ export function ImageTools() {
         )}
       </div>
 
-      <div className="flex-1 p-3 sm:p-6 overflow-y-auto flex flex-col min-w-0 min-h-0">
+      <div className="flex min-h-[30vh] min-w-0 flex-1 flex-col p-3 sm:p-6 lg:min-h-0 lg:overflow-y-auto">
         {resultUrl ? (
           <div className="animate-fade-in flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2">

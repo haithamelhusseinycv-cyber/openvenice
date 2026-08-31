@@ -34,6 +34,7 @@ function CodeBlock({ children, className, ...props }: ComponentPropsWithoutRef<'
         <div className="absolute top-0 left-0 px-3 py-1.5 text-[13px] text-white/15 font-mono uppercase tracking-wider select-none">{lang}</div>
       )}
       <button
+        type="button"
         onClick={() => { navigator.clipboard.writeText(codeStr); setCodeCopied(true); setTimeout(() => setCodeCopied(false), 1500) }}
         className="absolute top-1.5 right-1.5 px-2 py-1 text-[13px] font-medium text-white/15 hover:text-white/40 bg-white/[0.03] hover:bg-white/[0.06] rounded-md transition-all opacity-0 group-hover/code:opacity-100"
       >
@@ -101,9 +102,9 @@ export function MessageBubble({ message, onCopy, onDelete, onRegenerate }: Messa
   if (isUser) {
     return (
       <div className="flex justify-end" onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)}>
-        <div className="flex items-end gap-1.5 max-w-[78%]">
+        <div className="flex max-w-[90%] min-w-0 items-end gap-1.5 sm:max-w-[78%]">
           {actions}
-          <div className="bg-white/[0.07] border border-white/[0.05] rounded-2xl rounded-br-md px-4 py-2.5 shadow-sm">
+          <div className="min-w-0 rounded-2xl rounded-br-md border border-white/[0.05] bg-white/[0.07] px-3 py-2.5 shadow-sm sm:px-4">
             {images.length > 0 && (
               <div className="flex gap-1.5 mb-2">
                 {images.map((img, i) => (
@@ -121,8 +122,8 @@ export function MessageBubble({ message, onCopy, onDelete, onRegenerate }: Messa
   }
 
   return (
-    <div className="flex gap-3" onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)}>
-      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-white/95 to-white/75 flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+    <div className="flex min-w-0 gap-2 sm:gap-3" onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)}>
+      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-white/95 to-white/75 shadow-sm sm:h-8 sm:w-8">
         <svg viewBox="0 0 32 32" width="14" height="14" fill="none">
           <g fill="#0a0a0c">
             <rect x="6.2" y="7.5" width="1.6" height="18" rx="0.8" transform="rotate(-42 6.2 7.5)" />
@@ -143,6 +144,7 @@ export function MessageBubble({ message, onCopy, onDelete, onRegenerate }: Messa
         {message.reasoning_content && (
           <div className="mb-2">
             <button
+              type="button"
               onClick={() => setReasoningOpen(!reasoningOpen)}
               className="flex items-center gap-1.5 text-[14px] text-white/20 hover:text-white/35 transition-colors mb-1"
             >
@@ -191,6 +193,7 @@ export function MessageBubble({ message, onCopy, onDelete, onRegenerate }: Messa
 function ActionBtn({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       title={label}
       className="p-1 text-white/15 hover:text-white/40 transition-colors rounded-md hover:bg-white/[0.04]"

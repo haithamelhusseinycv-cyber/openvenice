@@ -10,18 +10,18 @@ interface Props {
 
 export function GenerationView({ controls, output, history, className }: Props) {
   return (
-    <div className={cn('flex flex-col md:flex-row h-full bg-[#0a0a0c]', className)}>
-      <aside className="md:w-[360px] lg:w-[400px] shrink-0 border-b md:border-b-0 md:border-r border-white/[0.05] flex flex-col bg-[#0c0c10] max-h-[38vh] md:max-h-none">
-        <div className="p-3 sm:p-5 flex flex-col gap-3 sm:gap-4 overflow-y-auto overscroll-contain">
+    <div className={cn('flex h-full min-h-0 flex-col overflow-y-auto overscroll-contain touch-pan-y bg-[#0a0a0c] lg:flex-row lg:overflow-hidden', className)}>
+      <aside className="w-full shrink-0 border-b border-white/[0.05] bg-[#0c0c10] lg:flex lg:w-[400px] lg:flex-col lg:border-b-0 lg:border-r">
+        <div className="flex flex-col gap-3 p-3 sm:gap-4 sm:p-5 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain">
           {controls}
         </div>
         {history && (
-          <div className="border-t border-white/[0.05] flex-1 min-h-0 overflow-y-auto p-3">
+          <div className="border-t border-white/[0.05] p-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
             {history}
           </div>
         )}
       </aside>
-      <main className="flex-1 min-w-0 overflow-y-auto overscroll-contain p-3 sm:p-5 md:p-7">
+      <main className="min-w-0 flex-1 p-3 sm:p-5 lg:overflow-y-auto lg:overscroll-contain lg:p-7">
         {output}
       </main>
     </div>

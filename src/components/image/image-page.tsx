@@ -13,11 +13,12 @@ export function ImagePage() {
   const setTab = useImageWorkspace((s) => s.setImageSubTab)
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full min-h-0 min-w-0 flex-col">
       <div className="flex items-center gap-1 px-4 py-2.5 border-b border-white/[0.04]">
         {TABS.map((t) => (
           <button
             key={t.id}
+            type="button"
             onClick={() => setTab(t.id)}
             className={cn(
               'text-[14px] font-medium px-3 min-h-11 rounded-full transition-all duration-150',

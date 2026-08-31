@@ -178,11 +178,8 @@ export interface ImageEditRequest {
 
 export interface ImageUpscaleRequest {
   image: string
-  scale?: number
-  enhance?: boolean
-  enhanceCreativity?: number
-  enhancePrompt?: string
-  replication?: number
+  scale?: 2 | 4
+  creativity?: number
 }
 
 export interface StylesResponse {
