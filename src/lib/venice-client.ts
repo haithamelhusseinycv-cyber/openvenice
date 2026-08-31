@@ -185,6 +185,11 @@ function isAbortError(error: unknown) {
 
 /** Validate a candidate key before it is stored or marked connected. */
 export async function validateVeniceApiKey(key: string): Promise<void> {
+  // Defensive guard: reject empty or whitespace-only keys.
+  if (!key.trim()) {
+    throw new VeniceAPIError('API key cannot be empty.', 401)
+  }
+
   // This key-scoped route works for inference-only keys and also returns their
   // spend limits/balances, so it is the most reliable validation route.
   try {
