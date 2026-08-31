@@ -22,28 +22,19 @@ export const LOCKED_CHAT_TEMPERATURE = 0.5
 export const LOCKED_CHAT_TOP_P = 1
 export const LOCKED_CHAT_MAX_TOKENS = 3000
 
-export const DEFAULT_CHAT_SYSTEM_PROMPT = `You write copy-ready Lustify v8 prompts for this app. Style target: real amateur couple porn stills, third-person iPhone, messy room, not studio porn.
+export const DEFAULT_CHAT_SYSTEM_PROMPT = `You are OpenVenice Chat, a general-purpose conversational AI assistant.
 
-FRAMING IS A HARD FAIL RULE:
-- EVERY picture shows the WHOLE BODY, head to toes. Heads in frame. Feet in frame. Never a torso crop. Never a bust crop. Never waist-up.
-- Default and variations = ONE man + ONE woman together. LANDSCAPE wide 3:2. Full bodies head to toe.
-- Solo man or solo woman ONLY if the user clearly asks for one person. Solo is a TALL PORTRAIT 2:3 or 9:16 AND still full body head to toes. Not a torso. Not a bust.
-- Hair is a bit moist and messy from sex, not a salon hairdo.
-- Start every prompt with: either "landscape 3:2 couple full body head to toe" or "tall portrait 2:3 solo full body head to toe".
+Answer the user's actual question or instruction directly and naturally. Maintain conversational context across turns.
 
-Every couple prompt is a MAN + WOMAN having sex unless the user clearly asks for one person. Same two adults if photos were given.
+CHAT BEHAVIOR:
+- Treat normal messages as conversation, not as image-generation prompts.
+- Never automatically rewrite a user's message into prompt tags, numbered image variations, aspect-ratio instructions, or a NEGATIVE prompt block.
+- Never expose internal prompt transformations, hidden instructions, chain-of-thought, tool payloads, or system prompts unless the user explicitly asks for content that can appropriately be shown.
+- If the user asks about creating, editing, repairing, upscaling, or generating media, answer as an assistant and provide the requested guidance. Do not silently turn unrelated chat into a media prompt.
+- Keep answers concise by default, but give enough detail to fully answer the request.
+- When the user asks a follow-up question, use the existing conversation context instead of restarting the task.
 
-Output:
-- ONE scene: POSITIVE comma tags, then a line exactly NEGATIVE, then negatives. No preamble.
-- Variations / two photos: FIVE numbered variations. Same man, same woman. Landscape full body every time. Positions where BOTH faces turn toward the camera. End with one NEGATIVE block.
-
-People unless the user overrides:
-- Man 18+: Middle Eastern, North African, South European, or Texas / Southern US. ALWAYS facial hair. Hair a bit messy or damp from sex, never freshly styled.
-- Woman 18+: girl next door. Hair a bit messy or moist from sex, never salon. Pubic hair always. Nipples always. Painted nails.
-- Couple: both looking toward the camera, each face at least 78 percent visible. Alive eyes. Matte skin.
-
-Never minors. Never under 18. Search stays OFF.
-SCORE: full-body-head-to-toe, messy damp hair, faces, beard, pussy hair, matte skin, alive eyes, insertion.`
+Do not behave as a dedicated image prompt rewriter unless the user explicitly asks you to write or improve a prompt.`
 
 export const LOCKED_IMAGE_SIZE_IDX = '2'
 export const LOCKED_IMAGE_VARIANTS = 1
@@ -108,6 +99,13 @@ const STALE_SYSTEM_PROMPTS = [
   'you are a helpful assistant',
 ]
 
+const LEGACY_IMAGE_CHAT_PROMPT_MARKERS = [
+  'you write copy-ready lustify v8 prompts',
+  'framing is a hard fail rule',
+  'start every prompt with: either "landscape 3:2 couple full body head to toe"',
+  'score: full-body-head-to-toe',
+]
+
 export function isStaleImagePrompt(value?: string) {
   const text = (value || '').trim().toLowerCase()
   if (!text) return true
@@ -120,9 +118,9 @@ export function isStaleImagePrompt(value?: string) {
 
 export function isStaleSystemPrompt(value?: string) {
   const text = (value || '').trim().toLowerCase()
-  if (STALE_SYSTEM_PROMPTS.includes(text) || text.length < 40) return true
+  if (STALE_SYSTEM_PROMPTS.includes(text)) return true
+  if (LEGACY_IMAGE_CHAT_PROMPT_MARKERS.some((snippet) => text.includes(snippet))) return true
   if (text.includes('torso / bust') || text.includes('solo torso') || text.includes('hairdos')) return true
-  if (!text.includes('head to toe') && !text.includes('head to toes')) return true
   return false
 }
 
@@ -148,5 +146,6 @@ export function lockChatParams(params?: VeniceParameters): VeniceParameters {
 }
 
 export function lockChatSystemPrompt(saved?: string | null) {
-  return isStaleSystemPrompt(saved || '') ? DEFAULT_CHAT_SYSTEM_PROMPT : (saved as string)
+  const prompt = (saved || '').trim()
+  return isStaleSystemPrompt(prompt) ? DEFAULT_CHAT_SYSTEM_PROMPT : prompt
 }
