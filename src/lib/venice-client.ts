@@ -127,11 +127,11 @@ export async function venice<T>(path: string, options: VeniceFetchOptions = {}):
 /** Run an authenticated Venice request with a hard, per-request deadline. */
 export async function veniceWithTimeout<T>(path: string, timeoutMs = 8_000): Promise<T> {
   const controller = new AbortController()
-  const timeout = window.setTimeout(() => controller.abort(), timeoutMs)
+  const timeout = globalThis.setTimeout(() => controller.abort(), timeoutMs)
   try {
     return await venice<T>(path, { signal: controller.signal })
   } finally {
-    window.clearTimeout(timeout)
+    globalThis.clearTimeout(timeout)
   }
 }
 
@@ -162,7 +162,7 @@ export async function veniceBlob(path: string, body: object, init: { signal?: Ab
 
 async function validateCandidateEndpoint(path: string, key: string, timeoutMs = 8_000): Promise<void> {
   const controller = new AbortController()
-  const timeout = window.setTimeout(() => controller.abort(), timeoutMs)
+  const timeout = globalThis.setTimeout(() => controller.abort(), timeoutMs)
   const headers = { Authorization: `Bearer ${key.trim()}` }
   try {
     const response = await fetch(`${BASE_URL}${path}`, {
@@ -175,7 +175,7 @@ async function validateCandidateEndpoint(path: string, key: string, timeoutMs = 
     if (response.ok || response.status === 402) return
     throw await parseError(response)
   } finally {
-    window.clearTimeout(timeout)
+    globalThis.clearTimeout(timeout)
   }
 }
 
@@ -185,15 +185,15 @@ function isAbortError(error: unknown) {
 
 /** Validate a candidate key before it is stored or marked connected. */
 export async function validateVeniceApiKey(key: string): Promise<void> {
-  // Defensive guard: reject empty or whitespace-only keys.
-  if (!key.trim()) {
+  const trimmedKey = key.trim()
+  if (!trimmedKey) {
     throw new VeniceAPIError('API key cannot be empty.', 401)
   }
 
   // This key-scoped route works for inference-only keys and also returns their
   // spend limits/balances, so it is the most reliable validation route.
   try {
-    await validateCandidateEndpoint('/api_keys/rate_limits', key)
+    await validateCandidateEndpoint('/api_keys/rate_limits', trimmedKey)
     return
   } catch (error) {
     if (error instanceof VeniceAPIError && error.status === 401) throw error
@@ -202,7 +202,7 @@ export async function validateVeniceApiKey(key: string): Promise<void> {
   // Account-scoped keys can validate through billing when rate-limit details
   // are unavailable. This fallback receives its own full timeout budget.
   try {
-    await validateCandidateEndpoint('/billing/balance', key)
+    await validateCandidateEndpoint('/billing/balance', trimmedKey)
   } catch (error) {
     if (error instanceof VeniceAPIError) throw error
     if (isAbortError(error)) {
