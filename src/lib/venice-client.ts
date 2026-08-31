@@ -26,14 +26,14 @@ export class VeniceAPIError extends Error {
 export function formatVeniceError(err: unknown): string {
   if (err instanceof VeniceAPIError) {
     if (err.status === 402) return 'Venice credits empty. Add credits on venice.ai, then retry.'
-    if (err.status === 401) return 'API key missing or invalid. Tap Connected in the header.'
+    if (err.status === 401) return 'Venice rejected this API key. Tap the key-status dot and reconnect it.'
     if (err.status === 429) return 'Venice is rate-limiting. Wait a few seconds and retry.'
     return err.requestId ? `${err.message} · Request ${err.requestId}` : err.message
   }
   if (err instanceof Error) {
     const status = (err as { status?: number }).status
     if (status === 402) return 'Venice credits empty. Add credits on venice.ai, then retry.'
-    if (status === 401) return 'API key missing or invalid. Tap Connected in the header.'
+    if (status === 401) return 'Venice rejected this API key. Tap the key-status dot and reconnect it.'
     if (status === 429) return 'Venice is rate-limiting. Wait a few seconds and retry.'
     if (/402|payment|credit/i.test(err.message)) return 'Venice credits empty. Add credits on venice.ai, then retry.'
     return err.message
@@ -45,6 +45,11 @@ function getApiKey(): string {
   const key = useAuthStore.getState().apiKey
   if (!key) throw new VeniceAPIError('API key not set. Click "API Key" in the header to connect.', 401)
   return key
+}
+
+function invalidateRejectedKey() {
+  useAuthStore.getState().clearApiKey()
+  window.dispatchEvent(new Event('venice-auth-invalid'))
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -89,7 +94,7 @@ async function parseError(res: Response): Promise<VeniceAPIError> {
   }
   if (res.status === 402) message = 'Venice credits empty. Add credits on venice.ai, then retry.'
   if (res.status === 401 && !message.toLowerCase().includes('api key')) {
-    message = 'API key missing or invalid. Tap Connected in the header.'
+    message = 'Venice rejected this API key. Tap the key-status dot and reconnect it.'
   }
   if (res.status === 429) message = 'Venice is rate-limiting. Wait a few seconds and retry.'
   return new VeniceAPIError(message, res.status, code, suggestedPrompt, requestId)
@@ -128,7 +133,11 @@ async function veniceFetch(path: string, options: VeniceFetchOptions): Promise<R
       const res = await fetch(`${BASE_URL}${path}`, { ...fetchOptions, headers })
       if (res.ok) return res
 
-      if (!RETRY_STATUSES.has(res.status) || attempt === retryLimit) throw await parseError(res)
+      if (!RETRY_STATUSES.has(res.status) || attempt === retryLimit) {
+        const error = await parseError(res)
+        if (res.status === 401 && !noAuth) invalidateRejectedKey()
+        throw error
+      }
 
       try { await res.arrayBuffer() } catch { /* noop */ }
       await sleep(backoffDelay(attempt, res.headers.get('Retry-After')))

@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { isStaleBuildError, recoverFromStaleBuild } from '../../lib/app-update'
 
 interface Props {
   children: ReactNode
@@ -20,6 +21,7 @@ export class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, info: ErrorInfo) {
     if (this.props.onError) this.props.onError(error, info)
     console.error('[OpenVenice ErrorBoundary]', error, info)
+    if (isStaleBuildError(error)) void recoverFromStaleBuild()
   }
 
   reset = () => this.setState({ error: null })
@@ -37,12 +39,15 @@ export class ErrorBoundary extends Component<Props, State> {
 
 // eslint-disable-next-line react-refresh/only-export-components
 function DefaultFallback({ error, reset }: { error: Error; reset: () => void }) {
+  const staleBuild = isStaleBuildError(error)
   return (
     <div className="flex flex-col items-center justify-center h-full px-6 text-center" role="alert">
       <div className="max-w-md">
         <div className="text-[20px] font-semibold text-white/85 mb-2">Something went wrong</div>
         <p className="text-[14px] text-white/40 mb-4">
-          The app hit an unexpected error and couldn&apos;t render this view. Your work is safe — refresh to recover.
+          {staleBuild
+            ? 'A newer app version is available. OpenVenice is clearing the old cached files and updating now.'
+            : 'The app hit an unexpected error and couldn\'t render this view. Your work is safe — refresh to recover.'}
         </p>
         <details className="mb-5 text-left">
           <summary className="text-[13px] text-white/30 cursor-pointer hover:text-white/55">Show details</summary>
@@ -53,10 +58,10 @@ function DefaultFallback({ error, reset }: { error: Error; reset: () => void }) 
         </details>
         <div className="flex gap-2 justify-center">
           <button
-            onClick={reset}
+            onClick={() => staleBuild ? void recoverFromStaleBuild(true) : reset()}
             className="px-4 py-2 text-[14px] font-medium bg-white text-black rounded-md hover:bg-white/90 transition-colors"
           >
-            Try again
+            {staleBuild ? 'Update app' : 'Try again'}
           </button>
           <button
             onClick={() => window.location.reload()}

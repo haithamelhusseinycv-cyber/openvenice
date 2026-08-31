@@ -35,6 +35,12 @@ export function App() {
   }, [activeTab, setActiveTab])
 
   useEffect(() => {
+    const onInvalidKey = () => setApiKeyOpen(true)
+    window.addEventListener('venice-auth-invalid', onInvalidKey)
+    return () => window.removeEventListener('venice-auth-invalid', onInvalidKey)
+  }, [])
+
+  useEffect(() => {
     const stay = () => {
       if (window.history.state?.venice !== 1) {
         window.history.pushState({ venice: 1 }, '')

@@ -17,11 +17,16 @@ RUN printf '%s\n' \
   '  root /usr/share/nginx/html;' \
   '  index index.html;' \
   '  gzip on; gzip_types text/plain application/javascript text/css application/json image/svg+xml;' \
-  '  location = /index.html {' \
-  '    add_header Cache-Control "public, max-age=21600, must-revalidate";' \
+  '  location = / {' \
+  '    add_header Cache-Control "no-store, no-cache, must-revalidate";' \
+  '    try_files /index.html =404;' \
   '  }' \
+  '  location = /index.html {' \
+  '    add_header Cache-Control "no-store, no-cache, must-revalidate";' \
+  '  }' \
+  '  location = /sw.js { add_header Cache-Control "no-store, no-cache, must-revalidate"; }' \
   '  location = /manifest.webmanifest {' \
-  '    add_header Cache-Control "public, max-age=21600, must-revalidate";' \
+  '    add_header Cache-Control "no-cache, must-revalidate";' \
   '  }' \
   '  location / { try_files $uri $uri/ /index.html; }' \
   '  location ~* \.(?:js|css|woff2?)$ { expires 1y; add_header Cache-Control "public, immutable"; }' \

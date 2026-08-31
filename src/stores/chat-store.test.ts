@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { useChatStore } from './chat-store'
+import { conversationsForStorage, useChatStore } from './chat-store'
 import type { Conversation } from '../types/venice'
 
 const conversations: Conversation[] = [
@@ -22,5 +22,21 @@ describe('chat history actions', () => {
     useChatStore.getState().clearConversations()
     expect(useChatStore.getState().conversations).toEqual([])
     expect(useChatStore.getState().activeConversationId).toBeNull()
+  })
+
+  it('omits base64 image attachments from persisted chat history', () => {
+    const stored = conversationsForStorage([{
+      ...conversations[0],
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'text', text: 'Describe this image' },
+          { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,very-large-payload' } },
+        ],
+      }],
+    }])
+
+    expect(stored[0].messages[0].content).toBe('Describe this image')
+    expect(JSON.stringify(stored)).not.toContain('very-large-payload')
   })
 })

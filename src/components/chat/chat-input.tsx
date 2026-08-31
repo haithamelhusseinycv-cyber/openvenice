@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { cn } from '../../lib/utils'
+import { prepareImage } from '../../lib/image-input'
 
 interface ChatInputProps {
   onSend: (message: string, images?: string[]) => void
@@ -12,6 +13,8 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
   const [value, setValue] = useState('')
   const [images, setImages] = useState<string[]>([])
   const [dragOver, setDragOver] = useState(false)
+  const [isPreparing, setIsPreparing] = useState(false)
+  const [attachmentError, setAttachmentError] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -19,19 +22,32 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
 
   const handleSubmit = () => {
     const trimmed = value.trim()
-    if (!trimmed || disabled) return
+    if (!trimmed || disabled || isPreparing) return
     onSend(trimmed, images.length > 0 ? images : undefined)
     setValue('')
     setImages([])
   }
 
-  const handleImageUpload = (files: FileList | null) => {
+  const handleImageUpload = async (files: FileList | File[] | null) => {
     if (!files) return
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader()
-      reader.onload = () => setImages((prev) => [...prev, reader.result as string])
-      reader.readAsDataURL(file)
-    })
+    setAttachmentError(null)
+    setIsPreparing(true)
+    try {
+      const available = Math.max(0, 4 - images.length)
+      const sourceFiles = Array.from(files)
+      const selected = sourceFiles.slice(0, available)
+      const prepared: string[] = []
+      for (const file of selected) {
+        prepared.push((await prepareImage(file)).dataUrl)
+      }
+      if (prepared.length) setImages((prev) => [...prev, ...prepared].slice(0, 4))
+      if (sourceFiles.length > selected.length) setAttachmentError('You can attach up to four images.')
+    } catch (error) {
+      setAttachmentError(error instanceof Error ? error.message : 'Could not prepare this image.')
+    } finally {
+      setIsPreparing(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
   }
 
   return (
@@ -63,7 +79,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
           )}
           onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(true) }}
           onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(false) }}
-          onDrop={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(false); handleImageUpload(e.dataTransfer.files) }}
+          onDrop={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(false); void handleImageUpload(e.dataTransfer.files) }}
         >
           <textarea
             ref={textareaRef}
@@ -79,14 +95,12 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
                 if (item.type.startsWith('image/')) {
                   const file = item.getAsFile()
                   if (file) {
-                    const reader = new FileReader()
-                    reader.onload = () => setImages((prev) => [...prev, reader.result as string])
-                    reader.readAsDataURL(file)
+                    void handleImageUpload([file])
                   }
                 }
               }
             }}
-            placeholder={disabled ? 'Connect an API key to start…' : dragOver ? 'Drop image to attach' : 'Ask anything — Enter to send, Shift+Enter for newline'}
+            placeholder={disabled ? 'Connect an API key to start…' : isPreparing ? 'Preparing image…' : dragOver ? 'Drop image to attach' : 'Ask anything — Enter to send, Shift+Enter for newline'}
             rows={2}
             enterKeyHint="send"
             aria-label="Message input"
@@ -95,11 +109,11 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
           />
           <div className="flex items-center justify-between px-3 pb-2.5">
             <div className="flex items-center gap-1">
-              <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleImageUpload(e.target.files)} />
+              <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { void handleImageUpload(e.target.files) }} />
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
-                disabled={disabled}
+                disabled={disabled || isPreparing || images.length >= 4}
                 aria-label="Attach image"
                 className="flex items-center gap-1.5 px-2 py-1.5 text-white/50 hover:text-white text-[13px] transition-colors rounded-lg hover:bg-white/[0.05] disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
                 title="Attach image (or drag/paste)"
@@ -123,11 +137,11 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={!value.trim() || disabled}
+                disabled={!value.trim() || disabled || isPreparing}
                 aria-label="Send message"
                 className={cn(
                   'w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2',
-                  value.trim() && !disabled
+                  value.trim() && !disabled && !isPreparing
                     ? 'bg-white text-black hover:bg-white/95 active:scale-95 shadow-sm'
                     : 'bg-white/[0.06] text-white/25',
                 )}
@@ -139,6 +153,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
             )}
           </div>
         </div>
+        {attachmentError && <div role="alert" className="mt-1.5 px-1 text-[12px] text-red-300/90">{attachmentError}</div>}
       </div>
     </div>
   )

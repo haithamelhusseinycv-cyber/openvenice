@@ -2,6 +2,7 @@ import { useCallback, useRef } from 'react'
 import { venice } from '../lib/venice-client'
 import { parseSSEStream } from '../lib/stream'
 import { useChatStore } from '../stores/chat-store'
+import { lockChatSystemPrompt } from '../lib/defaults'
 import type { ChatCompletionRequest, ChatMessage, ContentPart } from '../types/venice'
 
 export function useChat() {
@@ -14,7 +15,6 @@ export function useChat() {
     setStreaming,
     isStreaming,
     veniceParams,
-    systemPrompt,
     temperature,
     topP,
     maxTokens,
@@ -30,8 +30,9 @@ export function useChat() {
         if (typeof m.content === 'string') return m.content !== ''
         return true
       })
-      if (systemPrompt.trim()) {
-        messages.unshift({ role: 'system', content: systemPrompt.trim() })
+      const safeSystemPrompt = lockChatSystemPrompt(useChatStore.getState().systemPrompt)
+      if (safeSystemPrompt) {
+        messages.unshift({ role: 'system', content: safeSystemPrompt })
       }
 
       const body: ChatCompletionRequest = {
@@ -61,7 +62,7 @@ export function useChat() {
         }
       }
     },
-    [appendToLastAssistant, appendReasoningToLastAssistant, veniceParams, systemPrompt, temperature, topP, maxTokens],
+    [appendToLastAssistant, appendReasoningToLastAssistant, veniceParams, temperature, topP, maxTokens],
   )
 
   const send = useCallback(

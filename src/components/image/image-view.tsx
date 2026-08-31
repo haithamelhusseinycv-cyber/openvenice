@@ -19,7 +19,6 @@ import { Label, TextArea, PrimaryButton, PillGroup, ErrorText } from '../ui/shar
 import { GenerationView } from '../ui/generation-view'
 import type { ImageConstraints } from '../../types/venice'
 
-const GALLERY_KEY = 'venice-image-gallery'
 const GALLERY_MAX = 4
 
 function loadSaved(key: string, fallback: string) {
@@ -28,25 +27,6 @@ function loadSaved(key: string, fallback: string) {
     return saved ?? fallback
   } catch {
     return fallback
-  }
-}
-
-function loadGallery(): string[] {
-  try {
-    const raw = sessionStorage.getItem(GALLERY_KEY)
-    if (!raw) return []
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed.filter((x) => typeof x === 'string').slice(0, GALLERY_MAX) : []
-  } catch {
-    return []
-  }
-}
-
-function saveGallery(images: string[]) {
-  try {
-    sessionStorage.setItem(GALLERY_KEY, JSON.stringify(images.slice(0, GALLERY_MAX)))
-  } catch {
-    try { sessionStorage.removeItem(GALLERY_KEY) } catch { /* ignore */ }
   }
 }
 
@@ -108,9 +88,13 @@ export function ImageView() {
   })
   const [seed, setSeed] = useState(() => loadSaved('venice-image-seed', ''))
   const [variants, setVariants] = useState(LOCKED_IMAGE_VARIANTS)
-  const [images, setImages] = useState<string[]>(() => loadGallery())
+  const [images, setImages] = useState<string[]>([])
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    try { sessionStorage.removeItem('venice-image-gallery') } catch { /* private mode */ }
+  }, [])
 
   useEffect(() => {
     setAspectRatio(pickAspectFromPrompt(prompt))
@@ -129,10 +113,6 @@ export function ImageView() {
       // Ignore quota / private-mode storage errors
     }
   }, [prompt, negativePrompt, sizeIdx, aspectRatio, resolution, steps, seed])
-
-  useEffect(() => {
-    saveGallery(images)
-  }, [images])
 
   const sendToTool = useImageWorkspace((s) => s.sendToTool)
   const [undressTarget, setUndressTarget] = useState<{ src: string; name: string } | null>(null)

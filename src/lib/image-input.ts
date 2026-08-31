@@ -1,6 +1,6 @@
-const MAX_EDGE = 2048
+const MAX_EDGE = 1600
 const MAX_INPUT_BYTES = 25 * 1024 * 1024
-const OUTPUT_QUALITY = 0.9
+const OUTPUT_QUALITY = 0.85
 
 export interface PreparedImage {
   dataUrl: string
@@ -15,6 +15,25 @@ export interface PreparedImage {
 function dataUrlBytes(dataUrl: string): number {
   const base64 = dataUrl.split(',', 2)[1] || ''
   return Math.floor(base64.length * 0.75)
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(reader.error || new Error('Could not prepare this image.'))
+    reader.readAsDataURL(blob)
+  })
+}
+
+function htmlCanvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => blob ? resolve(blob) : reject(new Error('This browser could not encode the image.')),
+      type,
+      quality,
+    )
+  })
 }
 
 /** Venice's single-image endpoints expect the base64 payload without a data-URL prefix. */
@@ -42,19 +61,33 @@ export async function prepareImage(file: File): Promise<PreparedImage> {
     const width = Math.max(1, Math.round(bitmap.width * ratio))
     const height = Math.max(1, Math.round(bitmap.height * ratio))
     if (width * height < 65_536) throw new Error('Image resolution is too small. Use an image with at least 65,536 total pixels.')
-    const canvas = document.createElement('canvas')
-    canvas.width = width
-    canvas.height = height
-    const ctx = canvas.getContext('2d', { alpha: false })
-    if (!ctx) throw new Error('This browser could not prepare the image.')
-    ctx.drawImage(bitmap, 0, 0, width, height)
-    const type = file.type === 'image/png' && file.size < 4 * 1024 * 1024 ? 'image/png' : 'image/jpeg'
-    const dataUrl = canvas.toDataURL(type, type === 'image/jpeg' ? OUTPUT_QUALITY : undefined)
+    const type = 'image/jpeg'
+    let output: Blob
+
+    if (typeof OffscreenCanvas !== 'undefined') {
+      const canvas = new OffscreenCanvas(width, height)
+      const ctx = canvas.getContext('2d', { alpha: false })
+      if (!ctx) throw new Error('This browser could not prepare the image.')
+      ctx.drawImage(bitmap, 0, 0, width, height)
+      output = await canvas.convertToBlob({ type, quality: OUTPUT_QUALITY })
+    } else {
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d', { alpha: false })
+      if (!ctx) throw new Error('This browser could not prepare the image.')
+      ctx.drawImage(bitmap, 0, 0, width, height)
+      output = await htmlCanvasToBlob(canvas, type, OUTPUT_QUALITY)
+      canvas.width = 1
+      canvas.height = 1
+    }
+
+    const dataUrl = await blobToDataUrl(output)
     return {
       dataUrl,
       name: file.name,
       originalBytes: file.size,
-      preparedBytes: dataUrlBytes(dataUrl),
+      preparedBytes: output.size || dataUrlBytes(dataUrl),
       width,
       height,
       format: type.replace('image/', '').toUpperCase(),

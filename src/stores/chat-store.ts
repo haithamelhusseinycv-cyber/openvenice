@@ -39,6 +39,24 @@ interface ChatState {
   getActiveConversation: () => Conversation | undefined
 }
 
+export function conversationsForStorage(conversations: Conversation[]): Conversation[] {
+  return conversations.slice(0, 50).map((conversation) => ({
+    ...conversation,
+    messages: conversation.messages.map((message) => {
+      if (typeof message.content === 'string') return message
+      const text = message.content
+        .filter((part) => part.type === 'text' && typeof part.text === 'string')
+        .map((part) => part.text)
+        .join('\n')
+        .trim()
+      return {
+        ...message,
+        content: text || '[Image attachment omitted from saved history]',
+      }
+    }),
+  }))
+}
+
 export const useChatStore = create<ChatState>()(
   persist(
     (set, get) => ({
@@ -146,12 +164,12 @@ export const useChatStore = create<ChatState>()(
     }),
     {
       name: 'venice-chat',
-      version: 13,
+      version: 14,
       storage: createJSONStorage(() => createSafeStorage()),
       migrate: (persisted) => {
         if (!persisted || typeof persisted !== 'object') return persisted as ChatState
         const s = persisted as Partial<ChatState>
-        if (Array.isArray(s.conversations)) s.conversations = s.conversations.slice(0, 50)
+        if (Array.isArray(s.conversations)) s.conversations = conversationsForStorage(s.conversations)
         s.veniceParams = lockChatParams(s.veniceParams)
         s.systemPrompt = lockChatSystemPrompt(s.systemPrompt)
         s.maxTokens = LOCKED_CHAT_MAX_TOKENS
@@ -161,7 +179,7 @@ export const useChatStore = create<ChatState>()(
         return s as ChatState
       },
       partialize: (state) => ({
-        conversations: state.conversations.slice(0, 50),
+        conversations: conversationsForStorage(state.conversations),
         activeConversationId: state.activeConversationId,
         veniceParams: lockChatParams(state.veniceParams),
         systemPrompt: lockChatSystemPrompt(state.systemPrompt),

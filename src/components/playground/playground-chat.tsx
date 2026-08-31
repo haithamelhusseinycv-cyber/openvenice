@@ -17,7 +17,7 @@ import {
   prepareNourSpeechText,
   type NourLanguageMode,
 } from '../../lib/nour-character'
-import { veniceBlob } from '../../lib/venice-client'
+import { formatVeniceError, veniceBlob } from '../../lib/venice-client'
 import { applyPatch, type WorkflowPatch } from '../../lib/workflow-mutations'
 import { generateId } from '../../lib/utils'
 import { cn } from '../../lib/utils'
@@ -63,13 +63,15 @@ function summarizeStep(step: RunStep): PlaygroundActivity {
 
 export function PlaygroundChat() {
   const { messages, draft, isThinking, addMessage, updateMessage, setThinking, applyAgentPatches } = usePlaygroundStore()
-  const hasKey = useAuthStore((s) => s.apiKey !== null)
+  const hasKey = useAuthStore((s) => Boolean(s.apiKey?.trim()))
   const agentModelId = useSettingsStore((s) => s.playgroundAgentModel) || DEFAULT_AGENT_MODEL
   const languageMode = useSettingsStore((s) => s.nourLanguageMode)
   const setLanguageMode = useSettingsStore((s) => s.setNourLanguageMode)
   const { catalog } = useModelCatalog()
-  const { models: agentModels } = useAgentModels()
-  const agentCaps = agentModels.find((m) => m.id === agentModelId)?.capabilities
+  const { models: agentModels, isLoading: agentModelsLoading } = useAgentModels()
+  const activeAgentModel = agentModels.find((m) => m.id === agentModelId) || agentModels[0]
+  const activeAgentModelId = activeAgentModel?.id || agentModelId
+  const agentCaps = activeAgentModel?.capabilities
   const [input, setInput] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [speakingId, setSpeakingId] = useState<string | null>(null)
@@ -136,7 +138,7 @@ export function PlaygroundChat() {
       await audio.play()
     } catch (e) {
       stopVoice()
-      setError(e instanceof Error ? e.message : 'Could not generate Noor voice.')
+      setError(formatVeniceError(e))
     }
   }
 
@@ -145,6 +147,14 @@ export function PlaygroundChat() {
     if (!trimmed || isThinking) return
     if (!hasKey) {
       setError('Connect your Venice API key first.')
+      return
+    }
+    if (agentModelsLoading) {
+      setError('Noor is still loading the available models. Try again in a moment.')
+      return
+    }
+    if (!activeAgentModel) {
+      setError('No compatible Noor model is currently available from Venice.')
       return
     }
     setError(null)
@@ -177,7 +187,7 @@ export function PlaygroundChat() {
           history,
           catalog,
           agentModels,
-          model: agentModelId,
+          model: activeAgentModelId,
           capabilities: agentCaps,
           languageMode,
           signal: controller.signal,
@@ -209,7 +219,7 @@ export function PlaygroundChat() {
           draft,
           history,
           catalog,
-          model: agentModelId,
+          model: activeAgentModelId,
           capabilities: agentCaps,
           languageMode,
           signal: controller.signal,
@@ -241,7 +251,7 @@ export function PlaygroundChat() {
       if (controller.signal.aborted) {
         updateMessage(pendingMsg.id, { content: '', error: 'Cancelled', pending: false })
       } else {
-        const message = e instanceof Error ? e.message : 'Agent request failed'
+        const message = formatVeniceError(e)
         updateMessage(pendingMsg.id, { content: '', error: message, pending: false })
       }
     } finally {
@@ -401,7 +411,7 @@ export function PlaygroundChat() {
           ) : (
             <button
               onClick={() => send(input)}
-              disabled={!input.trim()}
+              disabled={!input.trim() || !hasKey || agentModelsLoading || !activeAgentModel}
               className="shrink-0 min-h-11 px-4 py-2 text-[13px] font-medium bg-white text-black rounded-lg hover:bg-white/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             >
               Send
