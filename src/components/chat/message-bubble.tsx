@@ -80,7 +80,7 @@ export function MessageBubble({ message, onCopy, onDelete, onRegenerate }: Messa
   }
 
   const actions = (
-    <div className={`flex items-center gap-0.5 h-6 transition-opacity duration-150 ${hovering ? 'opacity-100' : 'opacity-0'}`}>
+    <div className={`flex h-7 items-center gap-0.5 opacity-100 transition-opacity duration-150 lg:h-6 ${hovering ? 'lg:opacity-100' : 'lg:opacity-0'}`}>
       <ActionBtn label={copied ? 'Copied' : 'Copy'} onClick={handleCopy}>
         {copied ? (
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
@@ -196,7 +196,7 @@ function ActionBtn({ label, onClick, children }: { label: string; onClick: () =>
       type="button"
       onClick={onClick}
       title={label}
-      className="p-1 text-white/15 hover:text-white/40 transition-colors rounded-md hover:bg-white/[0.04]"
+      className="min-h-7 min-w-7 rounded-md p-1 text-white/35 transition-colors hover:bg-white/[0.04] hover:text-white/60 lg:min-h-0 lg:min-w-0 lg:text-white/15 lg:hover:text-white/40"
     >
       {children}
     </button>

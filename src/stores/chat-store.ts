@@ -25,6 +25,7 @@ interface ChatState {
   createConversation: (model: string) => string
   setActiveConversation: (id: string | null) => void
   deleteConversation: (id: string) => void
+  clearConversations: () => void
   addMessage: (conversationId: string, message: ChatMessage) => void
   appendToLastAssistant: (conversationId: string, token: string) => void
   appendReasoningToLastAssistant: (conversationId: string, token: string) => void
@@ -74,6 +75,8 @@ export const useChatStore = create<ChatState>()(
           activeConversationId:
             s.activeConversationId === id ? null : s.activeConversationId,
         })),
+
+      clearConversations: () => set({ conversations: [], activeConversationId: null }),
 
       addMessage: (conversationId, message) =>
         set((s) => ({

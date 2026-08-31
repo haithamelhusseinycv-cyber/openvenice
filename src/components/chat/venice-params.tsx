@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useChatStore } from '../../stores/chat-store'
 import { cn } from '../../lib/utils'
+import { DEFAULT_CHAT_SYSTEM_PROMPT } from '../../lib/defaults'
 
 export function VeniceParams() {
   const { veniceParams, setVeniceParams, systemPrompt, setSystemPrompt, temperature, setTemperature, topP, setTopP, maxTokens, setMaxTokens } = useChatStore()
@@ -41,7 +42,7 @@ export function VeniceParams() {
       {showSettings && (
         <div className="mt-2.5 pb-2 flex flex-col gap-2.5 rounded-xl border border-white/[0.06] bg-black/30 p-3">
           <div className="flex items-center justify-between gap-2">
-            <div className="text-[12px] uppercase tracking-[0.08em] text-white/35">Locked writer settings</div>
+            <div className="text-[12px] uppercase tracking-[0.08em] text-white/35">Chat behavior</div>
             <button
               type="button"
               onClick={() => setShowSettings(false)}
@@ -51,11 +52,14 @@ export function VeniceParams() {
             </button>
           </div>
           <div>
-            <label className="text-[13px] text-white/35 font-medium mb-1 block uppercase tracking-[0.08em]">System Prompt</label>
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <label className="text-[13px] text-white/35 font-medium uppercase tracking-[0.08em]">System prompt</label>
+              <button type="button" onClick={() => setSystemPrompt(DEFAULT_CHAT_SYSTEM_PROMPT)} className="min-h-8 rounded-md px-2 text-[12px] text-white/45 hover:bg-white/[0.05] hover:text-white/75">Reset default</button>
+            </div>
             <textarea
               value={systemPrompt}
               onChange={(e) => setSystemPrompt(e.target.value)}
-              placeholder="Lustify prompt writer…"
+              placeholder="Describe how Chat should answer…"
               rows={6}
               className="w-full bg-white/[0.02] border border-white/[0.05] rounded-lg px-3 py-2 text-[15px] text-white/50 outline-none resize-y min-h-[6rem] max-h-[40vh] placeholder:text-white/8 focus:border-white/[0.1] transition-colors"
             />

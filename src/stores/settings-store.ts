@@ -56,11 +56,14 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'venice-settings',
-      version: 6,
+      version: 7,
       storage: createJSONStorage(() => createSafeStorage()),
       migrate: (persisted) => {
         if (!persisted || typeof persisted !== 'object') return persisted as SettingsState
         const s = persisted as Partial<SettingsState>
+        if (s.selectedModels?.chat === 'venice-uncensored-1-2') {
+          s.selectedModels = { ...s.selectedModels, chat: DEFAULT_CHAT_MODEL_ID }
+        }
         s.selectedModels = sanitizeSelectedModels(s.selectedModels)
         if (!isVisibleTab(s.activeTab)) s.activeTab = 'chat'
         // Reset stale agent selections once so Noor adopts the new uncensored default.

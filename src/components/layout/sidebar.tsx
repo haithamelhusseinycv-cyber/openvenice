@@ -3,7 +3,6 @@ import { cn } from '../../lib/utils'
 import { useSettingsStore, type Tab } from '../../stores/settings-store'
 import { useChatStore } from '../../stores/chat-store'
 import { toast } from '../../stores/toast-store'
-import { DEFAULT_CHAT_MODEL_ID } from '../../lib/allowed-models'
 import { VeniceLogo, VeniceWordmark } from '../ui/logo'
 import type { Conversation } from '../../types/venice'
 
@@ -45,9 +44,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: Props) {
   const conversations = useChatStore((s) => s.conversations)
   const activeConversationId = useChatStore((s) => s.activeConversationId)
   const setActiveConversation = useChatStore((s) => s.setActiveConversation)
-  const createConversation = useChatStore((s) => s.createConversation)
   const deleteConversation = useChatStore((s) => s.deleteConversation)
-  const selectedModel = useSettingsStore((s) => s.selectedModels.chat)
   const [search, setSearch] = useState('')
 
   const filtered = useMemo(() => {
@@ -144,7 +141,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: Props) {
           <div className="flex items-center justify-between px-3 pt-3 pb-1.5">
             <span className="text-[10.5px] font-semibold text-white/40 uppercase tracking-[0.1em]">History</span>
             <button
-              onClick={() => createConversation(selectedModel || DEFAULT_CHAT_MODEL_ID)}
+              onClick={() => { setActiveConversation(null); onMobileClose?.() }}
               aria-label="New chat"
               className="text-white/55 hover:text-white transition-colors p-1 rounded-md hover:bg-white/[0.05] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
               title="New chat (⌘N)"
@@ -174,7 +171,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: Props) {
                   key={conv.id}
                   conv={conv}
                   isActive={conv.id === activeConversationId}
-                  onSelect={() => setActiveConversation(conv.id)}
+                  onSelect={() => { setActiveConversation(conv.id); onMobileClose?.() }}
                   onDelete={() => handleDelete(conv)}
                   onExport={() => exportConversation(conv)}
                 />
@@ -219,7 +216,7 @@ function ConversationRow({ conv, isActive, onSelect, onDelete, onExport }: {
       onClick={onSelect}
     >
       <span className="truncate flex-1">{conv.title || 'Untitled'}</span>
-      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+      <div className="flex items-center gap-0.5 opacity-100 transition-opacity lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100">
         <button
           onClick={(e) => { e.stopPropagation(); onExport() }}
           aria-label={`Export ${conv.title}`}

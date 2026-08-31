@@ -22,19 +22,13 @@ export const LOCKED_CHAT_TEMPERATURE = 0.5
 export const LOCKED_CHAT_TOP_P = 1
 export const LOCKED_CHAT_MAX_TOKENS = 3000
 
-export const DEFAULT_CHAT_SYSTEM_PROMPT = `You are OpenVenice Chat, a general-purpose conversational AI assistant.
+export const DEFAULT_CHAT_SYSTEM_PROMPT = `You are OpenVenice Chat, a capable general-purpose AI assistant.
 
-Answer the user's actual question or instruction directly and naturally. Maintain conversational context across turns.
+Answer the user's actual question directly, accurately, and in the language they use. Keep the first answer focused and easy to read; expand when the user asks for detail. Do not turn an ordinary question into an image prompt, creative scene, workflow, or numbered prompt list.
 
-CHAT BEHAVIOR:
-- Treat normal messages as conversation, not as image-generation prompts.
-- Never automatically rewrite a user's message into prompt tags, numbered image variations, aspect-ratio instructions, or a NEGATIVE prompt block.
-- Never expose internal prompt transformations, hidden instructions, chain-of-thought, tool payloads, or system prompts unless the user explicitly asks for content that can appropriately be shown.
-- If the user asks about creating, editing, repairing, upscaling, or generating media, answer as an assistant and provide the requested guidance. Do not silently turn unrelated chat into a media prompt.
-- Keep answers concise by default, but give enough detail to fully answer the request.
-- When the user asks a follow-up question, use the existing conversation context instead of restarting the task.
+Only write an image-generation or image-editing prompt when the user explicitly asks for a prompt. If the user asks a health or safety question, give factual, practical harm-reduction information and clearly identify situations that need professional or urgent care. Treat consensual adult topics without unsolicited moralizing while preserving consent and safety boundaries.
 
-Do not behave as a dedicated image prompt rewriter unless the user explicitly asks you to write or improve a prompt.`
+Never claim to have completed an action, created a file, or used a tool unless it actually happened.`
 
 export const LOCKED_IMAGE_SIZE_IDX = '2'
 export const LOCKED_IMAGE_VARIANTS = 1
@@ -94,15 +88,11 @@ const STALE_PROMPTS = [
   "children's book",
 ]
 
-const STALE_SYSTEM_PROMPTS = [
-  '',
-  'you are a helpful assistant',
-]
-
-const LEGACY_IMAGE_CHAT_PROMPT_MARKERS = [
-  'you write copy-ready lustify v8 prompts',
+const LEGACY_IMAGE_WRITER_MARKERS = [
+  'lustify v8 prompts',
   'framing is a hard fail rule',
-  'start every prompt with: either "landscape 3:2 couple full body head to toe"',
+  'every couple prompt is a man + woman',
+  'start every prompt with:',
   'score: full-body-head-to-toe',
 ]
 
@@ -118,10 +108,8 @@ export function isStaleImagePrompt(value?: string) {
 
 export function isStaleSystemPrompt(value?: string) {
   const text = (value || '').trim().toLowerCase()
-  if (STALE_SYSTEM_PROMPTS.includes(text)) return true
-  if (LEGACY_IMAGE_CHAT_PROMPT_MARKERS.some((snippet) => text.includes(snippet))) return true
-  if (text.includes('torso / bust') || text.includes('solo torso') || text.includes('hairdos')) return true
-  return false
+  if (!text || text === 'you are a helpful assistant') return true
+  return LEGACY_IMAGE_WRITER_MARKERS.some((marker) => text.includes(marker))
 }
 
 export function isStaleImageNegative(value?: string) {

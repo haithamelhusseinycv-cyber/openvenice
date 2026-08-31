@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useChatStore } from '../../stores/chat-store'
 import { useSettingsStore } from '../../stores/settings-store'
 import { useModels } from '../../hooks/use-models'
@@ -9,15 +9,20 @@ import { MessageBubble } from './message-bubble'
 import { ChatInput } from './chat-input'
 import { VeniceParams } from './venice-params'
 import { VeniceLogo } from '../ui/logo'
+import { ChatHistoryDialog } from './chat-history-dialog'
+import { toast } from '../../stores/toast-store'
 
 const STARTER_PROMPTS = [
-  'Write a short explicit amateur couple sex scene I can paste into Lustify v8.',
-  'Tighten this image prompt for readable vaginal penetration and visible faces.',
-  'Turn this scene into a negative prompt that blocks clothes, CGI, and failed insertion.',
+  'Explain a difficult topic in simple language.',
+  'Help me write a clear professional message.',
+  'Compare two options and recommend the better one.',
 ]
 
 export function ChatView() {
   const deleteMessage = useChatStore((s) => s.deleteMessage)
+  const conversations = useChatStore((s) => s.conversations)
+  const setActiveConversation = useChatStore((s) => s.setActiveConversation)
+  const deleteConversation = useChatStore((s) => s.deleteConversation)
   const conversation = useChatStore((s) => {
     const id = s.activeConversationId
     return id ? s.conversations.find((c) => c.id === id) : undefined
@@ -33,6 +38,7 @@ export function ChatView() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const shouldStickToBottomRef = useRef(true)
+  const [historyOpen, setHistoryOpen] = useState(false)
 
   const messageCount = conversation?.messages.length ?? 0
   const lastContent = conversation?.messages[messageCount - 1]?.content
@@ -47,8 +53,43 @@ export function ChatView() {
     return () => cancelAnimationFrame(frame)
   }, [scrollTrigger])
 
+  const startNewChat = () => {
+    if (isStreaming) stop()
+    setActiveConversation(null)
+    shouldStickToBottomRef.current = true
+  }
+
+  const deleteCurrentChat = () => {
+    if (!conversation) return
+    if (isStreaming) stop()
+    const deleted = conversation
+    deleteConversation(deleted.id)
+    toast.error('Chat deleted', deleted.title || 'Untitled', {
+      label: 'Undo',
+      onClick: () => useChatStore.setState((state) => ({
+        conversations: [deleted, ...state.conversations],
+        activeConversationId: deleted.id,
+      })),
+    })
+  }
+
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+      <div className="flex shrink-0 items-center gap-1.5 border-b border-white/[0.05] bg-[#0a0a0c] px-2 py-1.5 sm:px-4">
+        <button type="button" onClick={startNewChat} className="flex min-h-10 items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-white/70 hover:bg-white/[0.06] hover:text-white">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+          New chat
+        </button>
+        <button type="button" onClick={() => setHistoryOpen(true)} className="flex min-h-10 items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-white/70 hover:bg-white/[0.06] hover:text-white">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8" /><path d="M3 3v5h5M12 7v5l3 2" /></svg>
+          History{conversations.length ? ` (${conversations.length})` : ''}
+        </button>
+        {conversation && (
+          <button type="button" onClick={deleteCurrentChat} className="ml-auto flex min-h-10 items-center rounded-lg px-3 text-[13px] font-medium text-rose-200/65 hover:bg-rose-500/10 hover:text-rose-200">
+            Delete chat
+          </button>
+        )}
+      </div>
       <div
         ref={scrollRef}
         className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y"
@@ -64,7 +105,7 @@ export function ChatView() {
               <div className="text-[20px] font-semibold text-white/85">How can I help today?</div>
               <p className="text-[14px] text-white/45 max-w-sm">
                 {apiKey
-                  ? 'Uncensored 1.2 is the default writer. Use it to draft Lustify prompts, then generate on Image.'
+                  ? 'Ask a question, analyze an idea, draft text, or attach an image.'
                   : 'Connect a Venice API key from the header above to get started.'}
               </p>
             </div>
@@ -109,6 +150,7 @@ export function ChatView() {
         )}
       </div>
       <ChatInput onSend={(msg, images) => send(msg, model, images)} onStop={stop} isStreaming={isStreaming} disabled={!apiKey} />
+      <ChatHistoryDialog open={historyOpen} onClose={() => setHistoryOpen(false)} />
     </div>
   )
 }

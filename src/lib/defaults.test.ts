@@ -6,22 +6,25 @@ import {
 } from './defaults'
 
 describe('chat system prompt migration', () => {
-  it('replaces the legacy image-prompt-writer chat instruction', () => {
+  it('replaces the legacy image-writer instruction', () => {
     const legacy = 'You write copy-ready Lustify v8 prompts for this app. FRAMING IS A HARD FAIL RULE.'
 
     expect(isStaleSystemPrompt(legacy)).toBe(true)
     expect(lockChatSystemPrompt(legacy)).toBe(DEFAULT_CHAT_SYSTEM_PROMPT)
   })
 
-  it('preserves a legitimate custom conversational system prompt', () => {
-    const custom = 'Be concise and answer the user directly.'
+  it('keeps a user-defined general chat instruction', () => {
+    const custom = 'Answer directly, use concise bullet points, and ask before making assumptions.'
 
     expect(isStaleSystemPrompt(custom)).toBe(false)
     expect(lockChatSystemPrompt(custom)).toBe(custom)
   })
 
-  it('uses the conversational default when no prompt is stored', () => {
+  it('defaults an empty saved instruction', () => {
     expect(lockChatSystemPrompt('')).toBe(DEFAULT_CHAT_SYSTEM_PROMPT)
-    expect(DEFAULT_CHAT_SYSTEM_PROMPT).toContain('general-purpose conversational AI assistant')
+  })
+
+  it('explicitly prevents ordinary questions becoming image prompts', () => {
+    expect(DEFAULT_CHAT_SYSTEM_PROMPT).toContain('Do not turn an ordinary question into an image prompt')
   })
 })
