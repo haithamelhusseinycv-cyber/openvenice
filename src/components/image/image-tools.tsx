@@ -5,10 +5,11 @@ import { useImageEdit, useImageMultiEdit, useImageUpscale, useBackgroundRemove }
 import { useBlobUrl } from '../../hooks/use-blob-url'
 import { Select } from '../ui/select'
 import { Label, TextArea, PrimaryButton, ErrorText, EmptyState } from '../ui/shared'
+import { TaskProgress } from '../ui/task-progress'
 import { cn } from '../../lib/utils'
 import { toast } from '../../stores/toast-store'
 import { buildSwapPrompt, UNDRESS_PROMPT, type SwapKind, type SwapPerson } from '../../lib/tool-prompts'
-import { prepareImage, formatBytes, type PreparedImage } from '../../lib/image-input'
+import { prepareImage, formatBytes, type ImagePreparationStage, type PreparedImage } from '../../lib/image-input'
 import { useModels } from '../../hooks/use-models'
 import { formatVeniceError } from '../../lib/venice-client'
 import { DEFAULT_EDIT_MODEL_ID } from '../../lib/allowed-models'
@@ -72,6 +73,10 @@ export function ImageTools() {
   const [dualSwap, setDualSwap] = useState(false)
   const [uploadInfo, setUploadInfo] = useState<Record<string, string>>({})
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [isPreparing, setIsPreparing] = useState(false)
+  const [preparationStatus, setPreparationStatus] = useState('')
+  const [preparationPercent, setPreparationPercent] = useState(0)
+  const preparationAbortRef = useRef<AbortController | null>(null)
   const [resultUrl, setResultBlob, resetResult] = useBlobUrl()
   const fileRef = useRef<HTMLInputElement>(null)
   const idFileRef = useRef<HTMLInputElement>(null)
@@ -99,6 +104,8 @@ export function ImageTools() {
   const [swapPerson, setSwapPerson] = useState<SwapPerson>('woman')
   const [scale] = useState<2 | 4>(2)
 
+  useEffect(() => () => preparationAbortRef.current?.abort(), [])
+
   const editMutation = useImageEdit()
   const swapMutation = useImageMultiEdit()
   const undressMutation = useImageEdit()
@@ -114,16 +121,48 @@ export function ImageTools() {
   }
 
   const readFile = async (file: File, slot: string, onDone: (data: string, name: string) => void) => {
+    preparationAbortRef.current?.abort()
+    const controller = new AbortController()
+    preparationAbortRef.current = controller
     setUploadError(null)
+    setIsPreparing(true)
     try {
-      const prepared: PreparedImage = await prepareImage(file)
+      const stageLabel: Record<ImagePreparationStage, string> = {
+        decoding: 'Decoding',
+        resizing: 'Resizing',
+        compressing: 'Compressing',
+        finalizing: 'Finalizing',
+      }
+      const stagePercent: Record<ImagePreparationStage, number> = {
+        decoding: 12,
+        resizing: 35,
+        compressing: 68,
+        finalizing: 92,
+      }
+      const prepared: PreparedImage = await prepareImage(file, {
+        signal: controller.signal,
+        onProgress: (stage) => {
+          setPreparationStatus(`${formatBytes(file.size)} · ${stageLabel[stage]}`)
+          setPreparationPercent(stagePercent[stage])
+        },
+      })
+      setPreparationPercent(100)
       setUploadInfo((s) => ({
         ...s,
         [slot]: `${prepared.format} · ${prepared.width}×${prepared.height} · ${formatBytes(prepared.preparedBytes)}${prepared.preparedBytes < prepared.originalBytes ? ` (from ${formatBytes(prepared.originalBytes)})` : ''}`,
       }))
       onDone(prepared.dataUrl, prepared.name)
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : 'Could not read this image.')
+      if (!(err instanceof DOMException && err.name === 'AbortError')) {
+        setUploadError(err instanceof Error ? err.message : 'Could not read this image.')
+      }
+    } finally {
+      if (preparationAbortRef.current === controller) {
+        preparationAbortRef.current = null
+        setIsPreparing(false)
+        setPreparationStatus('')
+        setPreparationPercent(0)
+      }
     }
   }
 
@@ -220,12 +259,13 @@ export function ImageTools() {
   }
 
   const selectedEditModelReady = editModelOptions.some((option) => option.value === editModel)
-  const swapReady = !!(imageData && idImage && (!dualSwap || secondIdImage) && apiKey && !isLoading && selectedEditModelReady)
+  const swapReady = !!(imageData && idImage && (!dualSwap || secondIdImage) && apiKey && !isLoading && !isPreparing && selectedEditModelReady)
   const needsEditModel = tool === 'edit' || tool === 'swap' || tool === 'undress'
   const otherReady = !!(
     imageData &&
     apiKey &&
     !isLoading &&
+    !isPreparing &&
     (tool !== 'edit' || editPrompt.trim()) &&
     (!needsEditModel || selectedEditModelReady)
   )
@@ -289,6 +329,7 @@ export function ImageTools() {
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
+              disabled={isPreparing}
               className="w-full border border-dashed border-white/[0.14] hover:border-white/[0.28] rounded-lg py-8 text-center min-h-24"
             >
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
@@ -329,6 +370,7 @@ export function ImageTools() {
               <button
                 type="button"
                 onClick={() => idFileRef.current?.click()}
+                disabled={isPreparing}
                 className="w-full border border-dashed border-white/[0.14] hover:border-white/[0.28] rounded-lg py-8 text-center min-h-24"
               >
                 <input ref={idFileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
@@ -353,7 +395,7 @@ export function ImageTools() {
                 <span className="text-[13px] text-white/45 mt-1 block truncate">{secondIdName}{uploadInfo.identity2 ? ` · ${uploadInfo.identity2}` : ''}</span>
               </div>
             ) : (
-              <button type="button" onClick={() => secondIdFileRef.current?.click()} className="w-full border border-dashed border-white/[0.14] hover:border-white/[0.28] rounded-lg py-8 text-center min-h-24">
+              <button type="button" onClick={() => secondIdFileRef.current?.click()} disabled={isPreparing} className="w-full border border-dashed border-white/[0.14] hover:border-white/[0.28] rounded-lg py-8 text-center min-h-24 disabled:opacity-45">
                 <input ref={secondIdFileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
                   const file = e.target.files?.[0]
                   if (!file) return
@@ -479,6 +521,22 @@ export function ImageTools() {
                   ? 'Upscale Image'
                   : 'Remove Background'}
         </PrimaryButton>
+        {isPreparing && (
+          <div className="flex items-center gap-2">
+            <TaskProgress className="min-w-0 flex-1" label="Optimizing upload" detail={preparationStatus || 'Starting'} value={preparationPercent} />
+            <button type="button" onClick={() => preparationAbortRef.current?.abort()} className="shrink-0 px-2 py-2 text-[12px] text-white/80">
+              Cancel
+            </button>
+          </div>
+        )}
+        {isLoading && (
+          <TaskProgress
+            label={tool === 'upscale' ? 'Upscaling image' : tool === 'remove-bg' ? 'Removing background' : `Processing ${tool}`}
+            detail="Venice is processing the compressed working copy"
+            indeterminate
+            showElapsed
+          />
+        )}
         {uploadError && <ErrorText>{uploadError}</ErrorText>}
         {error && (
           <>

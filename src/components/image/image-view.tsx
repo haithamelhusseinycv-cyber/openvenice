@@ -17,9 +17,10 @@ import {
 import { formatVeniceError } from '../../lib/venice-client'
 import { Label, TextArea, PrimaryButton, PillGroup, ErrorText } from '../ui/shared'
 import { GenerationView } from '../ui/generation-view'
+import { TaskProgress } from '../ui/task-progress'
 import type { ImageConstraints } from '../../types/venice'
 
-const GALLERY_MAX = 4
+const GALLERY_MAX = 2
 
 function loadSaved(key: string, fallback: string) {
   try {
@@ -189,6 +190,7 @@ export function ImageView() {
       model,
       variants,
       hide_watermark: true,
+      format: 'jpeg',
       safe_mode: false,
       enhance_prompt: false,
       steps,
@@ -291,6 +293,9 @@ export function ImageView() {
       <PrimaryButton onClick={handleGenerate} disabled={!prompt.trim() || !apiKey} loading={mutation.isPending} size="lg">
         {mutation.isPending ? 'Generating…' : 'Generate'}
       </PrimaryButton>
+      {mutation.isPending && (
+        <TaskProgress label="Generating image" detail="Venice is rendering a compressed JPEG result" indeterminate showElapsed />
+      )}
       {images.length > 0 && (
         <button
           type="button"
@@ -323,10 +328,7 @@ export function ImageView() {
       {images.length === 0 ? (
         <div className="flex items-center justify-center h-full min-h-[30vh]">
           {mutation.isPending ? (
-            <div className="flex flex-col items-center gap-3" role="status" aria-live="polite">
-              <div className="w-8 h-8 border-2 border-white/[0.08] border-t-[var(--color-accent)] rounded-full animate-spin" />
-              <span className="text-[15px] text-white/60">Generating…</span>
-            </div>
+            <TaskProgress className="max-w-sm" label="Generating image" detail="Keep this screen open while Venice finishes" indeterminate showElapsed />
           ) : null}
         </div>
       ) : (

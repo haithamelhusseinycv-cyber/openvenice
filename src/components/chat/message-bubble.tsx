@@ -80,7 +80,7 @@ export function MessageBubble({ message, onCopy, onDelete, onRegenerate }: Messa
   }
 
   const actions = (
-    <div className={`flex h-7 items-center gap-0.5 opacity-100 transition-opacity duration-150 lg:h-6 ${hovering ? 'lg:opacity-100' : 'lg:opacity-0'}`}>
+    <div className={`flex min-h-11 flex-wrap items-center gap-1 opacity-100 transition-opacity duration-150 ${hovering ? 'lg:opacity-100' : 'lg:opacity-60'}`}>
       <ActionBtn label={copied ? 'Copied' : 'Copy'} onClick={handleCopy}>
         {copied ? (
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
@@ -102,8 +102,7 @@ export function MessageBubble({ message, onCopy, onDelete, onRegenerate }: Messa
   if (isUser) {
     return (
       <div className="flex justify-end" onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)}>
-        <div className="flex max-w-[90%] min-w-0 items-end gap-1.5 sm:max-w-[78%]">
-          {actions}
+        <div className="flex max-w-[90%] min-w-0 flex-col items-end sm:max-w-[78%]">
           <div className="min-w-0 rounded-2xl rounded-br-md border border-white/[0.05] bg-white/[0.07] px-3 py-2.5 shadow-sm sm:px-4">
             {images.length > 0 && (
               <div className="flex gap-1.5 mb-2">
@@ -116,6 +115,7 @@ export function MessageBubble({ message, onCopy, onDelete, onRegenerate }: Messa
               {content}
             </div>
           </div>
+          {actions}
         </div>
       </div>
     )
@@ -196,9 +196,11 @@ function ActionBtn({ label, onClick, children }: { label: string; onClick: () =>
       type="button"
       onClick={onClick}
       title={label}
-      className="min-h-7 min-w-7 rounded-md p-1 text-white/35 transition-colors hover:bg-white/[0.04] hover:text-white/60 lg:min-h-0 lg:min-w-0 lg:text-white/15 lg:hover:text-white/40"
+      aria-label={label}
+      className="inline-flex min-h-10 items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-medium text-white/50 transition-colors hover:bg-white/[0.05] hover:text-white/80"
     >
       {children}
+      <span>{label}</span>
     </button>
   )
 }

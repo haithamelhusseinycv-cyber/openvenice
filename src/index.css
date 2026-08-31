@@ -68,9 +68,16 @@ body {
   0% { background-position: -1000px 0; }
   100% { background-position: 1000px 0; }
 }
+
+@keyframes progress-indeterminate {
+  0% { transform: translateX(-120%); }
+  50% { transform: translateX(110%); }
+  100% { transform: translateX(280%); }
+}
 .animate-fade-in { animation: fade-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .animate-scale-in { animation: scale-in 0.14s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .animate-pulse-dot { animation: pulse-dot 1.4s ease-in-out infinite; }
+.animate-progress-indeterminate { animation: progress-indeterminate 1.25s ease-in-out infinite; }
 
 .skeleton {
   background: linear-gradient(90deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.07) 50%, rgba(255,255,255,0.03) 100%);

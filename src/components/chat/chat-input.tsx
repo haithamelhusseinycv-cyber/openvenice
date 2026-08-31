@@ -1,24 +1,30 @@
 import { useState, useRef, useEffect } from 'react'
 import { cn } from '../../lib/utils'
-import { prepareImage } from '../../lib/image-input'
+import { formatBytes, prepareImage, type ImagePreparationStage } from '../../lib/image-input'
+import { TaskProgress } from '../ui/task-progress'
 
 interface ChatInputProps {
   onSend: (message: string, images?: string[]) => void
   onStop: () => void
   isStreaming: boolean
   disabled?: boolean
+  onOpenHistory: () => void
 }
 
-export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputProps) {
+export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory }: ChatInputProps) {
   const [value, setValue] = useState('')
   const [images, setImages] = useState<string[]>([])
   const [dragOver, setDragOver] = useState(false)
   const [isPreparing, setIsPreparing] = useState(false)
+  const [preparationStatus, setPreparationStatus] = useState('')
+  const [preparationPercent, setPreparationPercent] = useState(0)
   const [attachmentError, setAttachmentError] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const preparationAbortRef = useRef<AbortController | null>(null)
 
   useEffect(() => { textareaRef.current?.focus() }, [])
+  useEffect(() => () => preparationAbortRef.current?.abort(), [])
 
   const handleSubmit = () => {
     const trimmed = value.trim()
@@ -29,23 +35,51 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
   }
 
   const handleImageUpload = async (files: FileList | File[] | null) => {
-    if (!files) return
+    if (!files || isPreparing) return
     setAttachmentError(null)
     setIsPreparing(true)
+    const controller = new AbortController()
+    preparationAbortRef.current = controller
     try {
       const available = Math.max(0, 4 - images.length)
       const sourceFiles = Array.from(files)
       const selected = sourceFiles.slice(0, available)
       const prepared: string[] = []
-      for (const file of selected) {
-        prepared.push((await prepareImage(file)).dataUrl)
+      for (const [index, file] of selected.entries()) {
+        const label = `${index + 1}/${selected.length} · ${formatBytes(file.size)}`
+        const stageLabel: Record<ImagePreparationStage, string> = {
+          decoding: 'Decoding',
+          resizing: 'Resizing',
+          compressing: 'Compressing',
+          finalizing: 'Finalizing',
+        }
+        const stagePercent: Record<ImagePreparationStage, number> = {
+          decoding: 12,
+          resizing: 35,
+          compressing: 68,
+          finalizing: 92,
+        }
+        const result = await prepareImage(file, {
+          signal: controller.signal,
+          onProgress: (stage) => {
+            setPreparationStatus(`${label} · ${stageLabel[stage]}`)
+            setPreparationPercent(((index * 100) + stagePercent[stage]) / selected.length)
+          },
+        })
+        prepared.push(result.dataUrl)
+        setPreparationPercent(((index + 1) * 100) / selected.length)
       }
       if (prepared.length) setImages((prev) => [...prev, ...prepared].slice(0, 4))
       if (sourceFiles.length > selected.length) setAttachmentError('You can attach up to four images.')
     } catch (error) {
-      setAttachmentError(error instanceof Error ? error.message : 'Could not prepare this image.')
+      if (!(error instanceof DOMException && error.name === 'AbortError')) {
+        setAttachmentError(error instanceof Error ? error.message : 'Could not prepare this image.')
+      }
     } finally {
       setIsPreparing(false)
+      setPreparationStatus('')
+      setPreparationPercent(0)
+      preparationAbortRef.current = null
       if (fileRef.current) fileRef.current.value = ''
     }
   }
@@ -80,6 +114,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
           onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(true) }}
           onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(false) }}
           onDrop={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(false); void handleImageUpload(e.dataTransfer.files) }}
+          aria-busy={isPreparing || undefined}
         >
           <textarea
             ref={textareaRef}
@@ -122,6 +157,13 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
                   <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
                 </svg>
               </button>
+              <button
+                type="button"
+                onClick={onOpenHistory}
+                className="min-h-10 rounded-lg px-2 text-[12px] font-medium text-white/55 hover:bg-white/[0.05] hover:text-white"
+              >
+                History
+              </button>
             </div>
             {isStreaming ? (
               <button
@@ -153,6 +195,18 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: ChatInputPr
             )}
           </div>
         </div>
+        {isPreparing && (
+          <div className="mt-1.5 flex items-center gap-2 px-1">
+            <TaskProgress className="min-w-0 flex-1" label="Optimizing upload" detail={preparationStatus || 'Starting'} value={preparationPercent} />
+            <button
+              type="button"
+              onClick={() => preparationAbortRef.current?.abort()}
+              className="shrink-0 rounded-md border border-white/[0.12] px-3 py-2 text-[12px] text-white/75"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
         {attachmentError && <div role="alert" className="mt-1.5 px-1 text-[12px] text-red-300/90">{attachmentError}</div>}
       </div>
     </div>

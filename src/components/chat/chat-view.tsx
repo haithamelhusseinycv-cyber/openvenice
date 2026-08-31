@@ -149,7 +149,13 @@ export function ChatView() {
           </>
         )}
       </div>
-      <ChatInput onSend={(msg, images) => send(msg, model, images)} onStop={stop} isStreaming={isStreaming} disabled={!apiKey} />
+      <ChatInput
+        onSend={(msg, images) => send(msg, model, images)}
+        onStop={stop}
+        isStreaming={isStreaming}
+        disabled={!apiKey}
+        onOpenHistory={() => setHistoryOpen(true)}
+      />
       <ChatHistoryDialog open={historyOpen} onClose={() => setHistoryOpen(false)} />
     </div>
   )
