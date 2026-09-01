@@ -292,8 +292,8 @@ export function ImageTools() {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-y-auto overscroll-contain touch-pan-y lg:flex-row lg:overflow-hidden">
-      <div className="flex w-full shrink-0 flex-col gap-4 border-b border-white/[0.06] p-4 sm:p-6 lg:w-[400px] lg:overflow-y-auto lg:border-b-0 lg:border-r">
+    <div className="flex h-full max-w-full min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-auto overscroll-contain touch-pan-y lg:flex-row lg:overflow-hidden">
+      <div className="flex w-full max-w-full min-w-0 shrink-0 flex-col gap-4 overflow-x-hidden border-b border-white/[0.06] p-4 sm:p-6 lg:w-[400px] lg:overflow-y-auto lg:overscroll-contain lg:touch-pan-y lg:border-b-0 lg:border-r">
         <div className="grid grid-cols-5 gap-1 rounded-lg border border-white/[0.06] bg-white/[0.02] p-1">
           {([['edit', 'Edit'], ['swap', 'Swap'], ['undress', 'Undress'], ['upscale', 'Upscale'], ['remove-bg', 'BG']] as const).map(([id, label]) => (
             <button
@@ -548,7 +548,7 @@ export function ImageTools() {
         )}
       </div>
 
-      <div className="flex min-h-[30vh] min-w-0 flex-1 flex-col p-3 sm:p-6 lg:min-h-0 lg:overflow-y-auto">
+      <div className="flex max-w-full min-h-[30vh] min-w-0 flex-1 flex-col overflow-x-hidden p-3 sm:p-6 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:touch-pan-y">
         {resultUrl ? (
           <div className="animate-fade-in flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2">

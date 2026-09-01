@@ -51,7 +51,7 @@ export function ChatHistoryDialog({ open, onClose }: ChatHistoryDialogProps) {
   return (
     <div className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label="Chat history">
       <button type="button" className="absolute inset-0 bg-black/70 backdrop-blur-sm" aria-label="Close chat history" onClick={onClose} />
-      <section className="relative flex max-h-[82dvh] w-full flex-col overflow-hidden rounded-t-2xl border border-white/[0.1] bg-[#111116] shadow-2xl sm:max-w-lg sm:rounded-2xl">
+      <section className="relative flex max-h-[82dvh] w-full max-w-full min-w-0 flex-col overflow-hidden rounded-t-2xl border border-white/[0.1] bg-[#111116] shadow-2xl sm:max-w-lg sm:rounded-2xl">
         <div className="flex items-center gap-2 border-b border-white/[0.07] px-4 py-3">
           <div className="min-w-0 flex-1">
             <h2 className="text-[17px] font-semibold text-white">Chat history</h2>

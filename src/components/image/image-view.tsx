@@ -233,7 +233,7 @@ export function ImageView() {
             </button>
           </div>
         </div>
-        <div className="mb-2 flex gap-2 overflow-x-auto pb-1" aria-label="Prompt presets">
+        <div className="touch-pan-x mb-2 flex max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-1" aria-label="Prompt presets">
           {[
             ['Portrait', 'Photorealistic full-body portrait, natural skin texture, realistic lighting, sharp eyes, accurate anatomy'],
             ['Couple', 'Photorealistic adult couple together, natural interaction, both identities clear, realistic skin and anatomy'],

@@ -53,7 +53,7 @@ export function Select({ value, onChange, options, placeholder = 'Select...', se
       </button>
 
       {open && (
-        <div className="absolute z-50 w-full min-w-[12rem] mt-0.5 bg-[#0e0e0e] border border-white/[0.12] rounded-lg shadow-2xl shadow-black/50 animate-scale-in overflow-hidden">
+        <div className="absolute z-50 mt-0.5 w-full min-w-[min(12rem,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] overflow-hidden rounded-lg border border-white/[0.12] bg-[#0e0e0e] shadow-2xl shadow-black/50 animate-scale-in">
           {searchable && (
             <div className="p-1 border-b border-white/[0.06]">
               <input

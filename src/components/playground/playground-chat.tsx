@@ -76,12 +76,22 @@ export function PlaygroundChat() {
   const [error, setError] = useState<string | null>(null)
   const [speakingId, setSpeakingId] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const shouldStickToBottomRef = useRef(true)
   const abortRef = useRef<AbortController | null>(null)
   const audioRef = useRef<{ audio: HTMLAudioElement; url: string } | null>(null)
 
+  const messageCount = messages.length
+  const lastMessage = messages[messageCount - 1]
+  const lastActivityCount = lastMessage?.activity?.length ?? 0
+  const scrollTrigger = `${messageCount}-${Math.floor((lastMessage?.content.length ?? 0) / 200)}-${lastActivityCount}-${isThinking}`
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
-  }, [messages, isThinking])
+    if (!shouldStickToBottomRef.current) return
+    const frame = requestAnimationFrame(() => {
+      const scroller = scrollRef.current
+      if (scroller) scroller.scrollTop = scroller.scrollHeight
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [scrollTrigger])
 
   const stopVoice = () => {
     const current = audioRef.current
@@ -159,6 +169,7 @@ export function PlaygroundChat() {
     }
     setError(null)
     setInput('')
+    shouldStickToBottomRef.current = true
 
     const userMsg = { id: generateId(), role: 'user' as const, content: trimmed }
     const pendingMsg = { id: generateId(), role: 'assistant' as const, content: '', pending: true, activity: [] }
@@ -214,16 +225,29 @@ export function PlaygroundChat() {
         })
       } else {
         // Legacy JSON-patch mode for models without function calling.
-        const response = await callAgent({
+        const requestAgent = (modelId: string, capabilities: typeof agentCaps) => callAgent({
           userMessage: trimmed,
           draft,
           history,
           catalog,
-          model: activeAgentModelId,
-          capabilities: agentCaps,
+          model: modelId,
+          capabilities,
           languageMode,
           signal: controller.signal,
         })
+
+        let response: Awaited<ReturnType<typeof callAgent>>
+        try {
+          response = await requestAgent(activeAgentModelId, agentCaps)
+        } catch (requestError) {
+          const status = typeof requestError === 'object' && requestError !== null && 'status' in requestError
+            ? Number((requestError as { status?: number }).status)
+            : 0
+          const fallback = agentModels.find((candidate) => candidate.id !== activeAgentModelId)
+          const canFallback = fallback && status !== 401 && status !== 402 && status !== 429 && !controller.signal.aborted
+          if (!canFallback) throw requestError
+          response = await requestAgent(fallback.id, fallback.capabilities)
+        }
 
         let patchError: string | undefined
         try {
@@ -265,8 +289,15 @@ export function PlaygroundChat() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-[#0c0c10]">
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
+    <div className="flex h-full max-w-full min-w-0 flex-col overflow-hidden bg-[#0c0c10]">
+      <div
+        ref={scrollRef}
+        className="touch-pan-y max-w-full min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 py-4 sm:px-4"
+        onScroll={(event) => {
+          const element = event.currentTarget
+          shouldStickToBottomRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 120
+        }}
+      >
         {messages.length === 0 ? (
           <div className="flex flex-col gap-3 pt-5">
             <div className="flex items-center gap-3 mb-2">
@@ -304,7 +335,7 @@ export function PlaygroundChat() {
               >
                 <div
                   className={cn(
-                    'max-w-[88%] px-3.5 py-2 rounded-xl text-[13.5px] leading-relaxed whitespace-pre-wrap',
+                    'max-w-[88%] min-w-0 break-words [overflow-wrap:anywhere] px-3.5 py-2 rounded-xl text-[13.5px] leading-relaxed whitespace-pre-wrap',
                     m.role === 'user'
                       ? 'bg-white/[0.09] text-white border border-white/[0.05]'
                       : 'bg-white/[0.04] border border-white/[0.07] text-white/85',
@@ -334,7 +365,7 @@ export function PlaygroundChat() {
                 )}
 
                 {m.activity && m.activity.length > 0 && (
-                  <div className="max-w-[88%] flex flex-col gap-px text-[11.5px] font-mono text-white/45 px-1">
+                  <div className="flex max-w-[88%] min-w-0 flex-col gap-px break-words [overflow-wrap:anywhere] px-1 font-mono text-[11.5px] text-white/45">
                     {m.activity.map((a, i) => (
                       <div key={i} className={cn('flex items-center gap-1.5', !a.ok && 'text-rose-300/85')}>
                         <span className="text-white/30">·</span>
@@ -361,8 +392,8 @@ export function PlaygroundChat() {
         )}
       </div>
 
-      <div className="shrink-0 border-t border-white/[0.06] p-3">
-        <div className="mb-2 flex items-center gap-2 overflow-x-auto pb-0.5" aria-label="Noor language mode">
+      <div className="max-w-full min-w-0 shrink-0 overflow-x-hidden border-t border-white/[0.06] p-3">
+        <div className="touch-pan-x mb-2 flex max-w-full items-center gap-2 overflow-x-auto overscroll-x-contain pb-0.5" aria-label="Noor language mode">
           {(Object.entries(NOUR_LANGUAGE_LABELS) as Array<[NourLanguageMode, string]>).map(([mode, label]) => (
             <button
               key={mode}
@@ -384,8 +415,8 @@ export function PlaygroundChat() {
           ))}
           <span className="shrink-0 text-[11px] text-white/35">Voice · {NOUR_TTS_VOICE}</span>
         </div>
-        {error && <div role="alert" className="mb-2 text-[13px] text-red-300/95">{error}</div>}
-        <div className="flex items-end gap-2">
+        {error && <div role="alert" className="mb-2 break-words [overflow-wrap:anywhere] text-[13px] text-red-300/95">{error}</div>}
+        <div className="flex max-w-full min-w-0 items-end gap-2">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -399,7 +430,7 @@ export function PlaygroundChat() {
             rows={2}
             disabled={isThinking}
             aria-label="Message Noor"
-            className="flex-1 min-h-11 bg-white/[0.03] border border-white/[0.08] rounded-lg px-3 py-2 text-[13.5px] text-white/90 outline-none resize-none placeholder:text-white/30 focus:border-white/[0.2] disabled:opacity-60"
+            className="min-h-11 min-w-0 flex-1 resize-none rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-[16px] text-white/90 outline-none placeholder:text-white/30 focus:border-white/[0.2] disabled:opacity-60"
           />
           {isThinking ? (
             <button

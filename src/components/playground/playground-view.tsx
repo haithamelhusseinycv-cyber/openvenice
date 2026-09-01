@@ -110,14 +110,14 @@ export function PlaygroundView() {
   }
 
   return (
-    <div className="flex h-full">
-      <div className="w-[420px] shrink-0 border-r border-white/[0.06] flex flex-col">
-        <div className="flex items-center justify-between gap-2 px-3 h-11 border-b border-white/[0.06] bg-[#0a0a0a] shrink-0">
+    <div className="flex h-full max-w-full min-w-0 overflow-hidden">
+      <div className="flex w-full max-w-full min-w-0 shrink-0 flex-col overflow-hidden border-r border-white/[0.06] lg:w-[420px]">
+        <div className="flex min-w-0 shrink-0 items-center justify-between gap-2 border-b border-white/[0.06] bg-[#0a0a0a] px-3 h-11">
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-[14px] font-medium text-white/65 shrink-0">Playground</span>
             <span className="text-[11px] px-1.5 py-0.5 rounded bg-white/[0.06] text-white/45 uppercase tracking-wider shrink-0">Agent</span>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0 min-w-0">
+          <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5 overflow-hidden">
             <AgentModelPicker value={currentAgentModel} onChange={setPlaygroundAgentModel} />
             <button
               onClick={handleReset}
@@ -128,12 +128,12 @@ export function PlaygroundView() {
             </button>
           </div>
         </div>
-        <div className="flex-1 min-h-0">
+        <div className="max-w-full min-h-0 min-w-0 flex-1 overflow-hidden">
           <PlaygroundChat />
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="hidden max-w-full min-w-0 flex-1 flex-col overflow-hidden lg:flex">
         <div className="flex items-center gap-2 px-3 h-11 border-b border-white/[0.06] bg-[#0a0a0a] shrink-0">
           <div className="flex items-center gap-2 min-w-0 flex-1">
             {linkedWorkflow ? (

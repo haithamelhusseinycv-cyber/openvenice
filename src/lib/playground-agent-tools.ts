@@ -461,7 +461,9 @@ export async function runAgentTools(opts: RunOptions): Promise<RunResult> {
   let askedUser = false
   let activeModel = opts.model
   let usedFallback = false
-  const fallbackModel = opts.agentModels?.find((m) => m.id === 'zai-org-glm-5-1' && m.capabilities.supportsFunctionCalling)?.id
+  const fallbackModel = opts.agentModels?.find((m) => (
+    m.id !== activeModel && m.id === 'zai-org-glm-5-1' && m.capabilities.supportsFunctionCalling
+  ))?.id || opts.agentModels?.find((m) => m.id !== activeModel && m.capabilities.supportsFunctionCalling)?.id
 
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
     if (opts.signal?.aborted) throw new DOMException('Aborted', 'AbortError')
@@ -488,7 +490,7 @@ export async function runAgentTools(opts: RunOptions): Promise<RunResult> {
         ? Number((error as { status?: number }).status)
         : 0
       const canFallback = !usedFallback && fallbackModel && activeModel !== fallbackModel
-        && status !== 401 && status !== 402 && !opts.signal?.aborted
+        && status !== 401 && status !== 402 && status !== 429 && !opts.signal?.aborted
       if (!canFallback) throw error
       activeModel = fallbackModel
       usedFallback = true

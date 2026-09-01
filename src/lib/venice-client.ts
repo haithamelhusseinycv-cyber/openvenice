@@ -49,7 +49,41 @@ function getApiKey(): string {
 
 function invalidateRejectedKey() {
   useAuthStore.getState().clearApiKey()
-  window.dispatchEvent(new Event('venice-auth-invalid'))
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('venice-auth-invalid'))
+  }
+}
+
+/**
+ * Venice can return 401 when a particular model needs a higher access tier,
+ * even though the bearer key itself is still valid. Never destroy a saved key
+ * based on an inference endpoint alone: confirm it against the key-scoped
+ * rate-limit endpoint first.
+ */
+async function resolveAuthenticatedRequest401(error: VeniceAPIError, key: string): Promise<VeniceAPIError> {
+  try {
+    await validateCandidateEndpoint('/api_keys/rate_limits', key, 6_000)
+    return new VeniceAPIError(
+      'Your API key is valid, but Venice denied access to this model or endpoint. Choose another available model and retry.',
+      403,
+      'MODEL_ACCESS_DENIED',
+      undefined,
+      error.requestId,
+    )
+  } catch (validationError) {
+    if (validationError instanceof VeniceAPIError && validationError.status === 401) {
+      invalidateRejectedKey()
+      return error
+    }
+
+    return new VeniceAPIError(
+      'Venice refused this request, but the key check was temporarily unavailable. Your saved key was kept; retry before reconnecting it.',
+      503,
+      'AUTH_CHECK_UNAVAILABLE',
+      undefined,
+      error.requestId,
+    )
+  }
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -122,7 +156,8 @@ async function veniceFetch(path: string, options: VeniceFetchOptions): Promise<R
   const method = (fetchOptions.method || 'GET').toUpperCase()
   const retryLimit = retries ?? (method === 'GET' || method === 'HEAD' ? MAX_RETRIES : 0)
   const headers = new Headers(fetchOptions.headers)
-  if (!noAuth) headers.set('Authorization', `Bearer ${getApiKey()}`)
+  const requestKey = noAuth ? null : getApiKey().trim()
+  if (requestKey) headers.set('Authorization', `Bearer ${requestKey}`)
   if (fetchOptions.body && typeof fetchOptions.body === 'string') {
     headers.set('Content-Type', 'application/json')
   }
@@ -135,7 +170,9 @@ async function veniceFetch(path: string, options: VeniceFetchOptions): Promise<R
 
       if (!RETRY_STATUSES.has(res.status) || attempt === retryLimit) {
         const error = await parseError(res)
-        if (res.status === 401 && !noAuth) invalidateRejectedKey()
+        if (res.status === 401 && requestKey) {
+          throw await resolveAuthenticatedRequest401(error, requestKey)
+        }
         throw error
       }
 

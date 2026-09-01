@@ -103,12 +103,12 @@ export function App() {
         />
       )}
       <Sidebar mobileOpen={mobileSidebarOpen} onMobileClose={() => setMobileSidebarOpen(false)} />
-      <div className="flex flex-col flex-1 min-w-0">
+      <div className="flex max-w-full flex-1 min-w-0 flex-col overflow-hidden">
         <Header
           onOpenApiKey={() => setApiKeyOpen(true)}
           onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
         />
-        <main className="flex-1 min-h-0 overflow-hidden">
+        <main className="max-w-full min-h-0 min-w-0 flex-1 overflow-hidden">
           <Suspense fallback={<div className="flex h-full items-center justify-center text-[14px] text-white/45" role="status">Loading…</div>}>
             <ErrorBoundary key={safeTab}>
               <ActiveView />

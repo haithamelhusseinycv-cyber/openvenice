@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { formatVeniceError, validateVeniceApiKey, VeniceAPIError, veniceBlob } from './venice-client'
+import { formatVeniceError, validateVeniceApiKey, VeniceAPIError, venice, veniceBlob } from './venice-client'
 import { useAuthStore } from '../stores/auth-store'
 
 function response(status: number, message = `HTTP ${status}`): Response {
@@ -25,6 +25,8 @@ describe('validateVeniceApiKey', () => {
 
   beforeEach(() => {
     vi.stubGlobal('fetch', fetchMock)
+    vi.stubGlobal('sessionStorage', { getItem: vi.fn(), setItem: vi.fn(), removeItem: vi.fn() })
+    vi.stubGlobal('localStorage', { getItem: vi.fn(), setItem: vi.fn(), removeItem: vi.fn() })
     useAuthStore.setState({ apiKey: 'sk-test' })
   })
 
@@ -130,6 +132,53 @@ describe('validateVeniceApiKey', () => {
     fetchMock.mockResolvedValueOnce(response(401, 'Invalid API key'))
 
     await expect(validateVeniceApiKey('sk-invalid')).rejects.toBeInstanceOf(VeniceAPIError)
+  })
+
+  it('keeps a valid saved key when a model request returns 401 for access-tier reasons', async () => {
+    fetchMock
+      .mockResolvedValueOnce(response(401, 'This model requires a higher access tier'))
+      .mockResolvedValueOnce(response(204))
+
+    await expect(venice('/chat/completions', {
+      method: 'POST',
+      body: JSON.stringify({ model: 'restricted-model', messages: [] }),
+    })).rejects.toMatchObject({
+      status: 403,
+      code: 'MODEL_ACCESS_DENIED',
+    })
+
+    expect(useAuthStore.getState().apiKey).toBe('sk-test')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock.mock.calls[1]?.[0]).toContain('/api_keys/rate_limits')
+  })
+
+  it('clears a saved key only when the key-scoped recheck also returns 401', async () => {
+    fetchMock
+      .mockResolvedValueOnce(response(401, 'Authentication failed'))
+      .mockResolvedValueOnce(response(401, 'Invalid API key'))
+
+    await expect(venice('/chat/completions', {
+      method: 'POST',
+      body: JSON.stringify({ model: 'any-model', messages: [] }),
+    })).rejects.toMatchObject({ status: 401 })
+
+    expect(useAuthStore.getState().apiKey).toBeNull()
+  })
+
+  it('keeps the saved key when its recheck is temporarily unavailable', async () => {
+    fetchMock
+      .mockResolvedValueOnce(response(401, 'Authentication failed'))
+      .mockRejectedValueOnce(new TypeError('Network unavailable'))
+
+    await expect(venice('/chat/completions', {
+      method: 'POST',
+      body: JSON.stringify({ model: 'any-model', messages: [] }),
+    })).rejects.toMatchObject({
+      status: 503,
+      code: 'AUTH_CHECK_UNAVAILABLE',
+    })
+
+    expect(useAuthStore.getState().apiKey).toBe('sk-test')
   })
 
   it('shows the string and field details returned by image endpoint validation', async () => {

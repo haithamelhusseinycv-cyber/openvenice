@@ -24,6 +24,12 @@ img, video, canvas, svg {
 
 .touch-pan-y {
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+.touch-pan-x {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
 }
 
 textarea {

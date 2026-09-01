@@ -85,10 +85,10 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory
   }
 
   return (
-    <div className="shrink-0 bg-[#0a0a0c] px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 sm:px-6 sm:pb-5">
-      <div className="w-full max-w-[860px] mx-auto">
+    <div className="max-w-full min-w-0 shrink-0 overflow-x-hidden bg-[#0a0a0c] px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 sm:px-6 sm:pb-5">
+      <div className="mx-auto w-full max-w-[860px] min-w-0">
         {images.length > 0 && (
-          <div className="flex gap-2 mb-2 overflow-x-auto pb-1">
+          <div className="touch-pan-x mb-2 flex max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-1">
             {images.map((img, i) => (
               <div key={i} className="relative group shrink-0">
                 <img src={img} alt={`Attachment ${i + 1}`} className="h-16 w-16 object-cover rounded-lg border border-white/[0.08]" />
@@ -107,7 +107,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory
 
         <div
           className={cn(
-            'relative bg-[#0e0e12] border rounded-2xl overflow-hidden transition-all shadow-lg shadow-black/30',
+            'relative max-w-full min-w-0 bg-[#0e0e12] border rounded-2xl overflow-hidden transition-all shadow-lg shadow-black/30',
             'focus-within:border-white/[0.22] focus-within:shadow-xl focus-within:shadow-black/40',
             dragOver ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)]' : 'border-white/[0.08]',
           )}

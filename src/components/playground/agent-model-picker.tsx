@@ -47,7 +47,7 @@ export function AgentModelPicker({ value, onChange }: Props) {
   const label = isLoading ? 'Loading…' : current?.name || value || 'Pick agent model'
 
   return (
-    <div ref={ref} className="relative w-56 shrink-0">
+    <div ref={ref} className="relative w-full max-w-56 min-w-0">
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -71,7 +71,7 @@ export function AgentModelPicker({ value, onChange }: Props) {
       </button>
 
       {open && (
-        <div className="absolute top-full right-0 mt-1 w-[340px] z-50 bg-[#101015] border border-white/[0.1] rounded-lg shadow-2xl shadow-black/70 animate-scale-in overflow-hidden">
+        <div className="absolute right-0 top-full z-50 mt-1 w-[min(340px,calc(100vw-1.5rem))] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-lg border border-white/[0.1] bg-[#101015] shadow-2xl shadow-black/70 animate-scale-in">
           <div className="px-2 py-2 border-b border-white/[0.06] flex items-center gap-2">
             <input
               autoFocus

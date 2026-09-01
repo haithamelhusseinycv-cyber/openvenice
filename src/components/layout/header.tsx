@@ -56,7 +56,7 @@ export function Header({ onOpenApiKey, onOpenMobileSidebar }: Props) {
   const modelOptions = hasOwnSelector ? [] : (models?.map((m) => ({ value: m.id, label: m.model_spec?.name || m.id })) ?? [])
 
   return (
-    <header className="flex flex-wrap sm:flex-nowrap items-center gap-x-2 gap-y-1 sm:gap-3 min-h-14 h-auto px-2 py-1 sm:py-0 sm:px-3 border-b border-white/[0.05] bg-[#0a0a0c] shrink-0 pt-[max(0.25rem,env(safe-area-inset-top))] sm:pt-[env(safe-area-inset-top)]">
+    <header className="flex max-w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-1 border-b border-white/[0.05] bg-[#0a0a0c] px-2 py-1 pt-[max(0.25rem,env(safe-area-inset-top))] sm:min-h-14 sm:flex-nowrap sm:gap-3 sm:px-3 sm:py-0 sm:pt-[env(safe-area-inset-top)]">
       <button
         onClick={() => onOpenMobileSidebar?.()}
         aria-label="Open menu"
