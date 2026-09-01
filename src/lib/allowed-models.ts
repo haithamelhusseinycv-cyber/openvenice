@@ -1,7 +1,8 @@
 export const ALLOWED_CHAT_MODEL_IDS = [
+  'qwen-3-8-27b',
+  'qwen-3-6-plus',
   'venice-uncensored-1-2',
   'venice-uncensored-role-play',
-  'qwen-3-6-plus',
   'olafangensan-glm-4.7-flash-heretic',
   'olafangensan-glm-4-7-flash-heretic',
 ] as const
@@ -45,7 +46,8 @@ export const ALLOWED_EDIT_MODEL_IDS = [
   'firered-image-edit',
 ] as const
 
-export const DEFAULT_CHAT_MODEL_ID = 'qwen-3-6-plus'
+export const DEFAULT_CHAT_MODEL_ID = 'qwen-3-8-27b'
+export const FALLBACK_CHAT_MODEL_ID = 'qwen-3-6-plus'
 export const DEFAULT_IMAGE_MODEL_ID = 'flux-2-max'
 export const DEFAULT_EDIT_MODEL_ID = 'qwen-edit-uncensored'
 

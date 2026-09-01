@@ -24,6 +24,8 @@ import type { Node, Edge } from '@xyflow/react'
 import type { VeniceNodeData, VeniceNodeType } from '../stores/workflow-store'
 import type { ModelCatalog } from '../hooks/use-model-catalog'
 import type { AgentModel } from '../hooks/use-agent-models'
+import { FALLBACK_AGENT_MODEL } from './playground-agent'
+import { shouldUseModelFallback } from './model-routing'
 
 // ---- Tool schema (OpenAI-compatible) ---------------------------------------
 
@@ -462,7 +464,7 @@ export async function runAgentTools(opts: RunOptions): Promise<RunResult> {
   let activeModel = opts.model
   let usedFallback = false
   const fallbackModel = opts.agentModels?.find((m) => (
-    m.id !== activeModel && m.id === 'zai-org-glm-5-1' && m.capabilities.supportsFunctionCalling
+    m.id !== activeModel && m.id === FALLBACK_AGENT_MODEL && m.capabilities.supportsFunctionCalling
   ))?.id || opts.agentModels?.find((m) => m.id !== activeModel && m.capabilities.supportsFunctionCalling)?.id
 
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
@@ -477,7 +479,12 @@ export async function runAgentTools(opts: RunOptions): Promise<RunResult> {
         max_tokens: 4096,
         tools: TOOLS,
         tool_choice: 'auto',
-        venice_parameters: { include_venice_system_prompt: false },
+        venice_parameters: {
+          include_venice_system_prompt: false,
+          enable_web_search: 'on',
+          enable_web_citations: true,
+          include_search_results_in_stream: false,
+        },
       }),
       signal: opts.signal,
     })
@@ -486,11 +493,8 @@ export async function runAgentTools(opts: RunOptions): Promise<RunResult> {
     try {
       resp = await request(activeModel)
     } catch (error) {
-      const status = typeof error === 'object' && error !== null && 'status' in error
-        ? Number((error as { status?: number }).status)
-        : 0
       const canFallback = !usedFallback && fallbackModel && activeModel !== fallbackModel
-        && status !== 401 && status !== 402 && status !== 429 && !opts.signal?.aborted
+        && shouldUseModelFallback(error, { aborted: opts.signal?.aborted })
       if (!canFallback) throw error
       activeModel = fallbackModel
       usedFallback = true

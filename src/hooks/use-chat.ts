@@ -3,6 +3,11 @@ import { venice } from '../lib/venice-client'
 import { parseSSEStream } from '../lib/stream'
 import { useChatStore } from '../stores/chat-store'
 import { lockChatSystemPrompt } from '../lib/defaults'
+import {
+  DEFAULT_CHAT_MODEL_ID,
+  FALLBACK_CHAT_MODEL_ID,
+} from '../lib/allowed-models'
+import { shouldUseModelFallback } from '../lib/model-routing'
 import type { ChatCompletionRequest, ChatMessage, ContentPart } from '../types/venice'
 
 export function useChat() {
@@ -69,6 +74,25 @@ export function useChat() {
     [appendToLastAssistant, appendReasoningToLastAssistant, setLastAssistantServedModel, veniceParams, temperature, topP, maxTokens],
   )
 
+  const streamWithFallback = useCallback(
+    async (convId: string, model: string, abortController: AbortController) => {
+      try {
+        await streamResponse(convId, model, abortController)
+      } catch (error) {
+        const conversation = useChatStore.getState().conversations.find((item) => item.id === convId)
+        const last = conversation?.messages[conversation.messages.length - 1]
+        const hasOutput = last?.role === 'assistant'
+          && typeof last.content === 'string'
+          && last.content.length > 0
+        const canFallback = model === DEFAULT_CHAT_MODEL_ID
+          && shouldUseModelFallback(error, { aborted: abortController.signal.aborted, hasOutput })
+        if (!canFallback) throw error
+        await streamResponse(convId, FALLBACK_CHAT_MODEL_ID, abortController)
+      }
+    },
+    [streamResponse],
+  )
+
   const send = useCallback(
     async (userMessage: string, model: string, imageAttachments?: string[]) => {
       let convId = useChatStore.getState().activeConversationId
@@ -96,7 +120,7 @@ export function useChat() {
       abortRef.current = abortController
 
       try {
-        await streamResponse(convId, model, abortController)
+        await streamWithFallback(convId, model, abortController)
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') return
         const message = err instanceof Error ? err.message : 'Unknown error'
@@ -106,7 +130,7 @@ export function useChat() {
         abortRef.current = null
       }
     },
-    [addMessage, appendToLastAssistant, createConversation, setStreaming, streamResponse],
+    [addMessage, appendToLastAssistant, createConversation, setStreaming, streamWithFallback],
   )
 
   const regenerate = useCallback(
@@ -128,7 +152,7 @@ export function useChat() {
       abortRef.current = abortController
 
       try {
-        await streamResponse(convId, model, abortController)
+        await streamWithFallback(convId, model, abortController)
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') return
         const message = err instanceof Error ? err.message : 'Unknown error'
@@ -138,7 +162,7 @@ export function useChat() {
         abortRef.current = null
       }
     },
-    [addMessage, appendToLastAssistant, deleteMessage, setStreaming, streamResponse],
+    [addMessage, appendToLastAssistant, deleteMessage, setStreaming, streamWithFallback],
   )
 
   const stop = useCallback(() => {

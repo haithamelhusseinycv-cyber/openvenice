@@ -15,9 +15,9 @@ export interface AgentResponse {
 
 const VALID_OPS = new Set(['add_node', 'remove_node', 'set_params', 'move_node', 'connect', 'disconnect', 'clear'])
 
-// Noor's preferred uncensored reasoning model, plus a conventional tool-capable fallback.
-export const DEFAULT_AGENT_MODEL = 'qwen-3-6-plus'
-export const FALLBACK_AGENT_MODEL = 'zai-org-glm-5-1'
+// Noor's preferred model and its high-context uncensored backup.
+export const DEFAULT_AGENT_MODEL = 'qwen-3-8-27b'
+export const FALLBACK_AGENT_MODEL = 'qwen-3-6-plus'
 
 function nodeCatalog(): string {
   return Object.values(NODE_SCHEMAS)
@@ -194,7 +194,12 @@ async function singleCall(opts: {
     messages: opts.messages,
     temperature: opts.temperature,
     max_tokens: 4096,
-    venice_parameters: { include_venice_system_prompt: false },
+    venice_parameters: {
+      include_venice_system_prompt: false,
+      enable_web_search: 'on',
+      enable_web_citations: true,
+      include_search_results_in_stream: false,
+    },
   }
   if (opts.useResponseFormat) body.response_format = { type: 'json_object' }
   const resp = await venice<ChatCompletionResponse>('/chat/completions', {

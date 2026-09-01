@@ -4,8 +4,9 @@ import { useAuthStore } from '../../stores/auth-store'
 import { useSettingsStore } from '../../stores/settings-store'
 import { useModelCatalog } from '../../hooks/use-model-catalog'
 import { useAgentModels } from '../../hooks/use-agent-models'
-import { callAgent, DEFAULT_AGENT_MODEL } from '../../lib/playground-agent'
+import { callAgent, DEFAULT_AGENT_MODEL, FALLBACK_AGENT_MODEL } from '../../lib/playground-agent'
 import { runAgentTools, type RunStep } from '../../lib/playground-agent-tools'
+import { shouldUseModelFallback } from '../../lib/model-routing'
 import {
   NOUR_AGE,
   NOUR_LANGUAGE_LABELS,
@@ -240,11 +241,10 @@ export function PlaygroundChat() {
         try {
           response = await requestAgent(activeAgentModelId, agentCaps)
         } catch (requestError) {
-          const status = typeof requestError === 'object' && requestError !== null && 'status' in requestError
-            ? Number((requestError as { status?: number }).status)
-            : 0
-          const fallback = agentModels.find((candidate) => candidate.id !== activeAgentModelId)
-          const canFallback = fallback && status !== 401 && status !== 402 && status !== 429 && !controller.signal.aborted
+          const fallback = agentModels.find((candidate) => (
+            candidate.id === FALLBACK_AGENT_MODEL && candidate.id !== activeAgentModelId
+          )) || agentModels.find((candidate) => candidate.id !== activeAgentModelId)
+          const canFallback = fallback && shouldUseModelFallback(requestError, { aborted: controller.signal.aborted })
           if (!canFallback) throw requestError
           response = await requestAgent(fallback.id, fallback.capabilities)
         }

@@ -56,17 +56,17 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'venice-settings',
-      version: 7,
+      version: 8,
       storage: createJSONStorage(() => createSafeStorage()),
       migrate: (persisted) => {
         if (!persisted || typeof persisted !== 'object') return persisted as SettingsState
         const s = persisted as Partial<SettingsState>
-        if (s.selectedModels?.chat === 'venice-uncensored-1-2') {
-          s.selectedModels = { ...s.selectedModels, chat: DEFAULT_CHAT_MODEL_ID }
-        }
+        // Adopt the new preferred Qwen once. Users can still choose the Qwen
+        // 3.6 backup manually after this migration has completed.
+        s.selectedModels = { ...s.selectedModels, chat: DEFAULT_CHAT_MODEL_ID }
         s.selectedModels = sanitizeSelectedModels(s.selectedModels)
         if (!isVisibleTab(s.activeTab)) s.activeTab = 'chat'
-        // Reset stale agent selections once so Noor adopts the new uncensored default.
+        // Reset stale agent selections once so Noor adopts Qwen 3.8 first.
         s.playgroundAgentModel = ''
         if (s.nourLanguageMode !== 'american-egyptian' && s.nourLanguageMode !== 'cairo-street') {
           s.nourLanguageMode = 'american-egyptian'

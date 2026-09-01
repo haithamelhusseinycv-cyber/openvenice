@@ -21,7 +21,8 @@ export interface AgentModel {
  * The ONLY text / agent models allowed
  * anywhere in this OpenVenice build.
  */
-const ALLOWED_AGENT_MODELS = [
+export const ALLOWED_AGENT_MODELS = [
+  'qwen-3-8-27b',
   'qwen-3-6-plus',
   'venice-uncensored',
   'venice-uncensored-1-2',

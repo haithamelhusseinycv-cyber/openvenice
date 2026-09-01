@@ -5,6 +5,7 @@ import { generateId } from '../lib/utils'
 import { createSafeStorage } from '../lib/safe-storage'
 import {
   DEFAULT_CHAT_SYSTEM_PROMPT,
+  DEFAULT_CHAT_SEARCH_PARAMS,
   LOCKED_CHAT_MAX_TOKENS,
   LOCKED_CHAT_TEMPERATURE,
   LOCKED_CHAT_TOP_P,
@@ -64,7 +65,7 @@ export const useChatStore = create<ChatState>()(
       conversations: [],
       activeConversationId: null,
       isStreaming: false,
-      veniceParams: lockChatParams(),
+      veniceParams: lockChatParams(DEFAULT_CHAT_SEARCH_PARAMS),
       systemPrompt: DEFAULT_CHAT_SYSTEM_PROMPT,
       temperature: LOCKED_CHAT_TEMPERATURE,
       topP: LOCKED_CHAT_TOP_P,
@@ -178,7 +179,7 @@ export const useChatStore = create<ChatState>()(
     }),
     {
       name: 'venice-chat',
-      version: 16,
+      version: 17,
       storage: createJSONStorage(() => createSafeStorage()),
       migrate: (persisted) => {
         if (!persisted || typeof persisted !== 'object') return persisted as ChatState
@@ -187,7 +188,12 @@ export const useChatStore = create<ChatState>()(
         // Keep the saved history, but do not reopen a conversation containing
         // an assistant reply produced under the retired image-writer prompt.
         s.activeConversationId = null
-        s.veniceParams = lockChatParams(s.veniceParams)
+        // Enable search and citations once for the new Qwen routing. The
+        // controls remain user-adjustable after this migration.
+        s.veniceParams = lockChatParams({
+          ...s.veniceParams,
+          ...DEFAULT_CHAT_SEARCH_PARAMS,
+        })
         s.systemPrompt = lockChatSystemPrompt(s.systemPrompt)
         s.maxTokens = LOCKED_CHAT_MAX_TOKENS
         s.temperature = LOCKED_CHAT_TEMPERATURE

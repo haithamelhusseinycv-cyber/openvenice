@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_CHAT_SYSTEM_PROMPT,
+  DEFAULT_CHAT_SEARCH_PARAMS,
   isStaleSystemPrompt,
   lockChatSystemPrompt,
 } from './defaults'
@@ -31,5 +32,12 @@ describe('chat system prompt migration', () => {
   it('explicitly permits factual questions about consensual adult models and tools', () => {
     expect(DEFAULT_CHAT_SYSTEM_PROMPT).toContain('adult-content models')
     expect(DEFAULT_CHAT_SYSTEM_PROMPT).toContain('do not refuse merely because the subject is sexual or explicit')
+  })
+
+  it('starts new chats with Venice web search and citations enabled', () => {
+    expect(DEFAULT_CHAT_SEARCH_PARAMS).toMatchObject({
+      enable_web_search: 'on',
+      enable_web_citations: true,
+    })
   })
 })

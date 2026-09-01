@@ -15,6 +15,12 @@ export const LOCKED_CHAT_PARAMS: VeniceParameters = {
   strip_thinking_response: true,
 }
 
+export const DEFAULT_CHAT_SEARCH_PARAMS: VeniceParameters = {
+  enable_web_search: 'on',
+  enable_web_citations: true,
+  include_search_results_in_stream: false,
+}
+
 export const LOCKED_CHAT_TEMPERATURE = 0.5
 export const LOCKED_CHAT_TOP_P = 1
 export const LOCKED_CHAT_MAX_TOKENS = 3000
