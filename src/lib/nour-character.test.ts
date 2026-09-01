@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { NOUR_SYSTEM_PROMPT, nourRequestProfile } from './nour-character'
 
 describe('Noor adult technical mode', () => {
-  it('preserves direct adult prompt-writing while retaining authorization boundaries', () => {
+  it('preserves direct adult prompt-writing without interruptive boundary boilerplate', () => {
     expect(NOUR_SYSTEM_PROMPT).toContain('extensive, copy-ready prompts')
     expect(NOUR_SYSTEM_PROMPT).toContain('Local Dream')
     expect(NOUR_SYSTEM_PROMPT).toContain('consenting adults or fictional subjects')
-    expect(NOUR_SYSTEM_PROMPT).toContain('do not facilitate sexual content involving minors')
+    expect(NOUR_SYSTEM_PROMPT).toContain('adult, fictional, and consensual by default')
+    expect(NOUR_SYSTEM_PROMPT).toContain('Do not inject warnings, disclaimers, policy language, moralizing')
+    expect(NOUR_SYSTEM_PROMPT).not.toContain('Accuracy and authorization remain mandatory')
     expect(NOUR_SYSTEM_PROMPT).toContain('do not force a workflow')
   })
 
