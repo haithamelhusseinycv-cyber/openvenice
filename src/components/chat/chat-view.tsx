@@ -74,7 +74,7 @@ export function ChatView() {
   }
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+    <div className="flex h-full max-w-full min-h-0 min-w-0 flex-col overflow-hidden">
       <div className="flex shrink-0 items-center gap-1.5 border-b border-white/[0.05] bg-[#0a0a0c] px-2 py-1.5 sm:px-4">
         <button type="button" onClick={startNewChat} className="flex min-h-10 items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-white/70 hover:bg-white/[0.06] hover:text-white">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
@@ -92,7 +92,7 @@ export function ChatView() {
       </div>
       <div
         ref={scrollRef}
-        className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y"
+        className="min-h-0 max-w-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain touch-pan-y"
         onScroll={(event) => {
           const element = event.currentTarget
           shouldStickToBottomRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 120
@@ -133,7 +133,7 @@ export function ChatView() {
             <div className="border-b border-white/[0.04]">
               <VeniceParams />
             </div>
-            <div className="mx-auto flex w-full max-w-[960px] min-w-0 flex-col gap-5 px-3 py-4 sm:px-5 sm:py-5">
+            <div className="mx-auto flex w-full max-w-[960px] min-w-0 flex-col gap-5 overflow-x-hidden px-3 py-4 sm:px-5 sm:py-5">
               {conversation.messages.map((msg, i) => (
                 <MessageBubble
                   key={i}

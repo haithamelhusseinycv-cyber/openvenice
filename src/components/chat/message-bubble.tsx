@@ -1,4 +1,4 @@
-import { useState, type ComponentPropsWithoutRef } from 'react'
+import { isValidElement, useState, type ComponentPropsWithoutRef, type ReactNode } from 'react'
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { ChatMessage, ContentPart } from '../../types/venice'
@@ -19,28 +19,62 @@ function safeUrlTransform(url: string, key: string): string {
 }
 
 function CodeBlock({ children, className, ...props }: ComponentPropsWithoutRef<'code'>) {
-  const match = /language-(\w+)/.exec(className || '')
-  const lang = match ? match[1] : ''
-  const codeStr = String(children).replace(/\n$/, '')
-  const [codeCopied, setCodeCopied] = useState(false)
-
   if (!className && !String(children).includes('\n')) {
     return <code className={className} {...props}>{children}</code>
   }
 
+  return <code className={className} {...props}>{children}</code>
+}
+
+function reactNodeText(node: ReactNode): string {
+  if (typeof node === 'string' || typeof node === 'number') return String(node)
+  if (Array.isArray(node)) return node.map(reactNodeText).join('')
+  if (isValidElement<{ children?: ReactNode }>(node)) return reactNodeText(node.props.children)
+  return ''
+}
+
+async function copyText(text: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text)
+    return
+  }
+  const input = document.createElement('textarea')
+  input.value = text
+  input.style.position = 'fixed'
+  input.style.opacity = '0'
+  document.body.appendChild(input)
+  input.select()
+  const copied = document.execCommand('copy')
+  input.remove()
+  if (!copied) throw new Error('Copy failed')
+}
+
+function PromptCodeBox({ children, className }: ComponentPropsWithoutRef<'pre'>) {
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
+  const codeText = reactNodeText(children).replace(/\n$/, '')
+
+  const handleCopyAll = async () => {
+    try {
+      await copyText(codeText)
+      setCopyState('copied')
+    } catch {
+      setCopyState('failed')
+    }
+    window.setTimeout(() => setCopyState('idle'), 1800)
+  }
+
   return (
-    <div className="relative group/code">
-      {lang && (
-        <div className="absolute top-0 left-0 px-3 py-1.5 text-[13px] text-white/15 font-mono uppercase tracking-wider select-none">{lang}</div>
-      )}
+    <div className="prompt-code-box">
       <button
         type="button"
-        onClick={() => { navigator.clipboard.writeText(codeStr); setCodeCopied(true); setTimeout(() => setCodeCopied(false), 1500) }}
-        className="absolute top-1.5 right-1.5 px-2 py-1 text-[13px] font-medium text-white/15 hover:text-white/40 bg-white/[0.03] hover:bg-white/[0.06] rounded-md transition-all opacity-0 group-hover/code:opacity-100"
+        onClick={() => { void handleCopyAll() }}
+        aria-label="Copy everything in this box"
+        className="absolute right-2 top-2 z-10 inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-white/[0.14] bg-[#1b1b20] px-3 py-1.5 text-[12px] font-semibold text-white/85 shadow-lg transition-colors hover:bg-[#25252b] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
       >
-        {codeCopied ? 'Copied' : 'Copy'}
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg>
+        {copyState === 'copied' ? 'Copied' : copyState === 'failed' ? 'Try again' : 'Copy all'}
       </button>
-      <code className={className} {...props}>{children}</code>
+      <pre className={['prompt-code-scroll', className].filter(Boolean).join(' ')}>{children}</pre>
     </div>
   )
 }
@@ -122,7 +156,7 @@ export function MessageBubble({ message, onCopy, onDelete, onRegenerate }: Messa
   }
 
   return (
-    <div className="flex min-w-0 gap-2 sm:gap-3" onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)}>
+    <div className="flex max-w-full min-w-0 gap-2 overflow-x-hidden sm:gap-3" onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)}>
       <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-white/95 to-white/75 shadow-sm sm:h-8 sm:w-8">
         <svg viewBox="0 0 32 32" width="14" height="14" fill="none">
           <g fill="#0a0a0c">
@@ -139,7 +173,7 @@ export function MessageBubble({ message, onCopy, onDelete, onRegenerate }: Messa
           </g>
         </svg>
       </div>
-      <div className="min-w-0 flex-1">
+      <div className="max-w-full min-w-0 flex-1 overflow-x-hidden">
         {/* Reasoning content (thinking) */}
         {message.reasoning_content && (
           <div className="mb-2">
@@ -168,6 +202,7 @@ export function MessageBubble({ message, onCopy, onDelete, onRegenerate }: Messa
               remarkPlugins={[remarkGfm]}
               urlTransform={safeUrlTransform}
               components={{
+                pre: PromptCodeBox,
                 code: CodeBlock,
                 a: ({ href, children, ...props }) => (
                   <a {...props} href={href} target="_blank" rel="noopener noreferrer ugc">

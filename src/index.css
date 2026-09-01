@@ -30,11 +30,15 @@ html {
   color-scheme: dark;
   height: 100%;
   overscroll-behavior: none;
+  overflow-x: hidden;
 }
 html, body, #root { min-height: 100%; }
 button, a, input, textarea, select { -webkit-tap-highlight-color: transparent; }
 body {
   margin: 0;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
   background: var(--color-bg-base);
   color: var(--color-text-primary);
   -webkit-font-smoothing: antialiased;
@@ -138,7 +142,7 @@ input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 4px var(
 }
 
 /* Markdown prose — comfortable reading */
-.prose-venice { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
+.prose-venice { width: 100%; max-width: 100%; min-width: 0; overflow-x: hidden; overflow-wrap: anywhere; word-break: break-word; }
 .prose-venice > *:first-child { margin-top: 0 !important; }
 .prose-venice > *:last-child { margin-bottom: 0 !important; }
 .prose-venice p { margin: 0.6em 0; line-height: 1.7; }
@@ -164,16 +168,35 @@ input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 4px var(
   border-radius: 4px;
   color: rgba(255,255,255,0.88);
 }
-.prose-venice pre {
+.prompt-code-box {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  contain: inline-size;
+}
+.prose-venice pre,
+.prose-venice .prompt-code-scroll {
   background: rgba(255,255,255,0.025);
   border: 1px solid rgba(255,255,255,0.07);
   border-radius: 8px;
   padding: 1em;
-  padding-top: 1.9em;
+  padding-top: 3.4em;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
   margin: 0.8em 0;
 }
-.prose-venice pre code {
+.prose-venice pre code,
+.prose-venice .prompt-code-scroll code {
+  display: block;
+  width: max-content;
+  min-width: 100%;
   background: none;
   padding: 0;
   border-radius: 0;
@@ -181,6 +204,9 @@ input[type="range"]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 4px var(
   line-height: 1.65;
   color: rgba(255,255,255,0.82);
   tab-size: 2;
+  white-space: pre;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 .prose-venice ul, .prose-venice ol {
   padding-left: 1.4em;
