@@ -178,12 +178,15 @@ export const useChatStore = create<ChatState>()(
     }),
     {
       name: 'venice-chat',
-      version: 15,
+      version: 16,
       storage: createJSONStorage(() => createSafeStorage()),
       migrate: (persisted) => {
         if (!persisted || typeof persisted !== 'object') return persisted as ChatState
         const s = persisted as Partial<ChatState>
         if (Array.isArray(s.conversations)) s.conversations = conversationsForStorage(s.conversations)
+        // Keep the saved history, but do not reopen a conversation containing
+        // an assistant reply produced under the retired image-writer prompt.
+        s.activeConversationId = null
         s.veniceParams = lockChatParams(s.veniceParams)
         s.systemPrompt = lockChatSystemPrompt(s.systemPrompt)
         s.maxTokens = LOCKED_CHAT_MAX_TOKENS
