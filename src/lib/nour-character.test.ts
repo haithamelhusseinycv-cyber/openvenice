@@ -1,0 +1,40 @@
+import { describe, expect, it } from 'vitest'
+import { NOUR_SYSTEM_PROMPT, nourRequestProfile } from './nour-character'
+
+describe('Noor adult technical mode', () => {
+  it('preserves direct adult prompt-writing while retaining authorization boundaries', () => {
+    expect(NOUR_SYSTEM_PROMPT).toContain('extensive, copy-ready prompts')
+    expect(NOUR_SYSTEM_PROMPT).toContain('Local Dream')
+    expect(NOUR_SYSTEM_PROMPT).toContain('consenting adults or fictional subjects')
+    expect(NOUR_SYSTEM_PROMPT).toContain('do not facilitate sexual content involving minors')
+    expect(NOUR_SYSTEM_PROMPT).toContain('do not force a workflow')
+  })
+
+  it('uses high creativity and a larger output allowance for copy-ready prompts', () => {
+    expect(nourRequestProfile('Write an extensive prompt for editing this photo')).toEqual({
+      mode: 'creative-prompt',
+      temperature: 0.9,
+      maxCompletionTokens: 8192,
+    })
+  })
+
+  it('keeps technical advice and tool execution precise', () => {
+    expect(nourRequestProfile('Analyze these Local Dream sampler and CFG settings')).toMatchObject({
+      mode: 'technical',
+      temperature: 0.5,
+    })
+    expect(nourRequestProfile('Build an image workflow on the canvas')).toEqual({
+      mode: 'tool',
+      temperature: 0.4,
+      maxCompletionTokens: 4096,
+    })
+  })
+
+  it('uses a balanced profile for ordinary conversation', () => {
+    expect(nourRequestProfile('Tell me what you think about this idea')).toEqual({
+      mode: 'conversation',
+      temperature: 0.7,
+      maxCompletionTokens: 4096,
+    })
+  })
+})

@@ -15,7 +15,7 @@
  */
 
 import { venice } from './venice-client'
-import { NOUR_SYSTEM_PROMPT, nourLanguagePrompt, type NourLanguageMode } from './nour-character'
+import { NOUR_SYSTEM_PROMPT, nourLanguagePrompt, nourRequestProfile, type NourLanguageMode } from './nour-character'
 import { generateId } from './utils'
 import { NODE_SCHEMAS } from './workflow-schema'
 import type { WorkflowPatch } from './workflow-mutations'
@@ -451,6 +451,7 @@ function handleTool(name: string, args: Record<string, unknown>, opts: RunOption
 }
 
 export async function runAgentTools(opts: RunOptions): Promise<RunResult> {
+  const requestProfile = nourRequestProfile(opts.userMessage)
   const messages: ChatMessage[] = [
     { role: 'system', content: `${SYSTEM_PROMPT}\n\n${nourLanguagePrompt(opts.languageMode)}` },
     ...opts.history.map<UserMessage | AssistantMessage>((m) => (
@@ -475,8 +476,10 @@ export async function runAgentTools(opts: RunOptions): Promise<RunResult> {
       body: JSON.stringify({
         model,
         messages,
-        temperature: 0.45,
-        max_tokens: 4096,
+        // Once tools are in flight, lower creativity to protect JSON/tool
+        // accuracy. Direct advice and prompt-writing retain their task profile.
+        temperature: toolCallCount > 0 ? Math.min(requestProfile.temperature, 0.4) : requestProfile.temperature,
+        max_completion_tokens: toolCallCount > 0 ? 4096 : requestProfile.maxCompletionTokens,
         tools: TOOLS,
         tool_choice: 'auto',
         venice_parameters: {

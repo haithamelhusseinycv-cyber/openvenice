@@ -1,5 +1,5 @@
 import { venice } from './venice-client'
-import { NOUR_SYSTEM_PROMPT, nourLanguagePrompt, type NourLanguageMode } from './nour-character'
+import { NOUR_SYSTEM_PROMPT, nourLanguagePrompt, nourRequestProfile, type NourLanguageMode } from './nour-character'
 import { NODE_SCHEMAS } from './workflow-schema'
 import type { WorkflowPatch } from './workflow-mutations'
 import type { ChatCompletionResponse, ModelCapabilities } from '../types/venice'
@@ -65,7 +65,7 @@ You respond by emitting patches to mutate the current draft workflow. Each patch
 RULES:
 1. Every response MUST be a single valid JSON object, nothing before or after. Do not wrap in markdown fences.
 2. Schema: {"say": string, "patches": Array<Patch>}.
-3. "say" is a short (1–3 sentences) narration in Noor's voice of what you just did or a question to the user.
+3. "say" is Noor's answer. Keep workflow narration short, but preserve the full requested detail for advice, analysis, settings, and copy-ready prompts.
 4. When building a new workflow from scratch, start with {"op":"clear"} then add nodes top-to-bottom and connect them.
 5. Always assign explicit ids when adding multiple nodes in one turn so you can reference them in connect patches.
 6. Workflows need at least one textInput (or a generation node with a self-contained prompt) and an output node at the end.
@@ -186,6 +186,7 @@ async function singleCall(opts: {
   model: string
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
   temperature: number
+  maxCompletionTokens: number
   useResponseFormat: boolean
   signal?: AbortSignal
 }): Promise<string> {
@@ -193,7 +194,7 @@ async function singleCall(opts: {
     model: opts.model,
     messages: opts.messages,
     temperature: opts.temperature,
-    max_tokens: 4096,
+    max_completion_tokens: opts.maxCompletionTokens,
     venice_parameters: {
       include_venice_system_prompt: false,
       enable_web_search: 'on',
@@ -212,6 +213,7 @@ async function singleCall(opts: {
 
 export async function callAgent({ userMessage, draft, history, catalog, model, capabilities, languageMode, signal }: CallAgentOptions): Promise<AgentResponse> {
   const chosenModel = model || DEFAULT_AGENT_MODEL
+  const requestProfile = nourRequestProfile(userMessage)
   // Only request structured output if the model supports it. Sending response_format
   // to llama-3.3-70b returns HTTP 400; sending it to gpt-4o-mini degrades quality.
   const useRF = capabilities?.supportsResponseSchema === true
@@ -221,7 +223,14 @@ export async function callAgent({ userMessage, draft, history, catalog, model, c
     { role: 'user' as const, content: `${describeDraft(draft)}\n\nUser: ${userMessage}\n\nReply with a single JSON object: {"say": "...", "patches": [...]}. No prose, no markdown fences.` },
   ]
 
-  const raw = await singleCall({ model: chosenModel, messages, temperature: 0.55, useResponseFormat: useRF, signal })
+  const raw = await singleCall({
+    model: chosenModel,
+    messages,
+    temperature: requestProfile.temperature,
+    maxCompletionTokens: requestProfile.maxCompletionTokens,
+    useResponseFormat: useRF,
+    signal,
+  })
   const parsed = parseAgentResponse(raw)
 
   if (parsed.patches.length === 0 && !parsed.say && raw.length > 0) {
@@ -231,7 +240,14 @@ export async function callAgent({ userMessage, draft, history, catalog, model, c
       { role: 'user' as const, content: 'That was not valid JSON. Reply again with ONLY a single JSON object matching {"say": string, "patches": Patch[]}. No commentary, no fences.' },
     ]
     try {
-      const retryRaw = await singleCall({ model: chosenModel, messages: retryMessages, temperature: 0, useResponseFormat: useRF, signal })
+      const retryRaw = await singleCall({
+        model: chosenModel,
+        messages: retryMessages,
+        temperature: 0,
+        maxCompletionTokens: requestProfile.maxCompletionTokens,
+        useResponseFormat: useRF,
+        signal,
+      })
       return parseAgentResponse(retryRaw)
     } catch {
       // fall through with the original (empty) response
