@@ -39,4 +39,21 @@ describe('chat history actions', () => {
     expect(stored[0].messages[0].content).toBe('Describe this image')
     expect(JSON.stringify(stored)).not.toContain('very-large-payload')
   })
+
+  it('records the model actually reported by the streamed response', () => {
+    useChatStore.setState({
+      conversations: [{
+        ...conversations[0],
+        messages: [{ role: 'assistant', content: '', requested_model: 'requested-model' }],
+      }],
+      activeConversationId: 'one',
+    })
+
+    useChatStore.getState().setLastAssistantServedModel('one', 'served-model')
+
+    expect(useChatStore.getState().conversations[0].messages[0]).toMatchObject({
+      requested_model: 'requested-model',
+      served_model: 'served-model',
+    })
+  })
 })

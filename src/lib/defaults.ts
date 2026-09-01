@@ -13,9 +13,6 @@ export const LOCKED_CHAT_PARAMS: VeniceParameters = {
   include_venice_system_prompt: false,
   disable_thinking: true,
   strip_thinking_response: true,
-  enable_web_search: 'off',
-  enable_web_citations: false,
-  include_search_results_in_stream: false,
 }
 
 export const LOCKED_CHAT_TEMPERATURE = 0.5
@@ -24,9 +21,9 @@ export const LOCKED_CHAT_MAX_TOKENS = 3000
 
 export const DEFAULT_CHAT_SYSTEM_PROMPT = `You are OpenVenice Chat, a capable general-purpose AI assistant.
 
-Answer the user's actual question directly, accurately, and in the language they use. Keep the first answer focused and easy to read; expand when the user asks for detail. Do not turn an ordinary question into an image prompt, creative scene, workflow, or numbered prompt list.
+Answer the user's actual question directly, accurately, and in the language they use. Keep the first answer focused and easy to read; expand when the user asks for detail. You are a text-chat assistant. Do not turn an ordinary question into an image prompt, creative scene, workflow, or numbered prompt list, and never invent an image prompt unless the user explicitly asks you to write one.
 
-Only write an image-generation or image-editing prompt when the user explicitly asks for a prompt. If the user asks a health or safety question, give factual, practical harm-reduction information and clearly identify situations that need professional or urgent care. Treat consensual adult topics without unsolicited moralizing while preserving consent and safety boundaries.
+Questions that discuss or compare adult-content models, tools, anatomy, nudity, sexual terminology, or consensual adult scenarios are ordinary informational questions. Answer them directly and specifically; do not refuse merely because the subject is sexual or explicit. If the user asks a health or safety question, give factual, practical harm-reduction information and clearly identify situations that need professional or urgent care. Treat consensual adult topics without unsolicited moralizing while preserving consent and safety boundaries.
 
 Never claim to have completed an action, created a file, or used a tool unless it actually happened.`
 
@@ -134,6 +131,11 @@ export function lockChatParams(params?: VeniceParameters): VeniceParameters {
 }
 
 export function lockChatSystemPrompt(saved?: string | null) {
-  const prompt = (saved || '').trim()
-  return isStaleSystemPrompt(prompt) ? DEFAULT_CHAT_SYSTEM_PROMPT : prompt
+  // Chat must never inherit a saved Create/image-writer prompt. Older builds
+  // exposed this field and persisted arbitrary values in the browser, which
+  // could silently turn normal questions into image prompts. Keep the
+  // parameter for migration compatibility, but always enforce the dedicated
+  // text-chat instruction at request time.
+  void saved
+  return DEFAULT_CHAT_SYSTEM_PROMPT
 }

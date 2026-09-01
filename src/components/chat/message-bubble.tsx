@@ -185,6 +185,13 @@ export function MessageBubble({ message, onCopy, onDelete, onRegenerate }: Messa
           </span>
         )}
         <div className="mt-0.5">{actions}</div>
+        {(message.served_model || message.requested_model) && (
+          <div className="mt-0.5 break-all text-[10.5px] text-white/25">
+            {message.served_model && message.requested_model && message.served_model !== message.requested_model
+              ? `Requested ${message.requested_model} · Served ${message.served_model}`
+              : `Model: ${message.served_model || message.requested_model}`}
+          </div>
+        )}
       </div>
     </div>
   )

@@ -13,11 +13,11 @@ describe('chat system prompt migration', () => {
     expect(lockChatSystemPrompt(legacy)).toBe(DEFAULT_CHAT_SYSTEM_PROMPT)
   })
 
-  it('keeps a user-defined general chat instruction', () => {
+  it('replaces a saved custom instruction so Chat cannot inherit another workspace prompt', () => {
     const custom = 'Answer directly, use concise bullet points, and ask before making assumptions.'
 
     expect(isStaleSystemPrompt(custom)).toBe(false)
-    expect(lockChatSystemPrompt(custom)).toBe(custom)
+    expect(lockChatSystemPrompt(custom)).toBe(DEFAULT_CHAT_SYSTEM_PROMPT)
   })
 
   it('defaults an empty saved instruction', () => {
@@ -26,5 +26,10 @@ describe('chat system prompt migration', () => {
 
   it('explicitly prevents ordinary questions becoming image prompts', () => {
     expect(DEFAULT_CHAT_SYSTEM_PROMPT).toContain('Do not turn an ordinary question into an image prompt')
+  })
+
+  it('explicitly permits factual questions about consensual adult models and tools', () => {
+    expect(DEFAULT_CHAT_SYSTEM_PROMPT).toContain('adult-content models')
+    expect(DEFAULT_CHAT_SYSTEM_PROMPT).toContain('do not refuse merely because the subject is sexual or explicit')
   })
 })

@@ -86,6 +86,8 @@ export interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
   content: string | ContentPart[]
   reasoning_content?: string
+  requested_model?: string
+  served_model?: string
 }
 
 export interface VeniceParameters {

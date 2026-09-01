@@ -29,6 +29,7 @@ interface ChatState {
   addMessage: (conversationId: string, message: ChatMessage) => void
   appendToLastAssistant: (conversationId: string, token: string) => void
   appendReasoningToLastAssistant: (conversationId: string, token: string) => void
+  setLastAssistantServedModel: (conversationId: string, model: string) => void
   deleteMessage: (conversationId: string, index: number) => void
   setStreaming: (streaming: boolean) => void
   setVeniceParams: (params: Partial<VeniceParameters>) => void
@@ -138,6 +139,19 @@ export const useChatStore = create<ChatState>()(
           }),
         })),
 
+      setLastAssistantServedModel: (conversationId, model) =>
+        set((s) => ({
+          conversations: s.conversations.map((c) => {
+            if (c.id !== conversationId) return c
+            const msgs = [...c.messages]
+            const last = msgs[msgs.length - 1]
+            if (last?.role === 'assistant') {
+              msgs[msgs.length - 1] = { ...last, served_model: model }
+            }
+            return { ...c, messages: msgs }
+          }),
+        })),
+
       deleteMessage: (conversationId, index) =>
         set((s) => ({
           conversations: s.conversations.map((c) => {
@@ -164,7 +178,7 @@ export const useChatStore = create<ChatState>()(
     }),
     {
       name: 'venice-chat',
-      version: 14,
+      version: 15,
       storage: createJSONStorage(() => createSafeStorage()),
       migrate: (persisted) => {
         if (!persisted || typeof persisted !== 'object') return persisted as ChatState

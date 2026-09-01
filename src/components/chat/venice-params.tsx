@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import { useChatStore } from '../../stores/chat-store'
 import { cn } from '../../lib/utils'
-import { DEFAULT_CHAT_SYSTEM_PROMPT } from '../../lib/defaults'
 
 export function VeniceParams() {
-  const { veniceParams, setVeniceParams, systemPrompt, setSystemPrompt, temperature, setTemperature, topP, setTopP, maxTokens, setMaxTokens } = useChatStore()
+  const { veniceParams, setVeniceParams, temperature, setTemperature, topP, setTopP, maxTokens, setMaxTokens } = useChatStore()
   const [showSettings, setShowSettings] = useState(false)
 
   return (
@@ -51,18 +50,8 @@ export function VeniceParams() {
               Close
             </button>
           </div>
-          <div>
-            <div className="mb-1 flex items-center justify-between gap-2">
-              <label className="text-[13px] text-white/35 font-medium uppercase tracking-[0.08em]">System prompt</label>
-              <button type="button" onClick={() => setSystemPrompt(DEFAULT_CHAT_SYSTEM_PROMPT)} className="min-h-8 rounded-md px-2 text-[12px] text-white/45 hover:bg-white/[0.05] hover:text-white/75">Reset default</button>
-            </div>
-            <textarea
-              value={systemPrompt}
-              onChange={(e) => setSystemPrompt(e.target.value)}
-              placeholder="Describe how Chat should answer…"
-              rows={6}
-              className="w-full bg-white/[0.02] border border-white/[0.05] rounded-lg px-3 py-2 text-[15px] text-white/50 outline-none resize-y min-h-[6rem] max-h-[40vh] placeholder:text-white/8 focus:border-white/[0.1] transition-colors"
-            />
+          <div className="rounded-lg border border-emerald-400/10 bg-emerald-400/[0.04] px-3 py-2 text-[13px] leading-relaxed text-white/55">
+            General text-chat mode is locked on. The selected model is called directly; Create prompts cannot override this chat.
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <ParamSlider label="Temperature" value={temperature} onChange={setTemperature} min={0} max={2} step={0.1} />
@@ -70,11 +59,7 @@ export function VeniceParams() {
             <ParamSlider label="Max Tokens" value={maxTokens} onChange={setMaxTokens} min={256} max={32768} step={256} format={(v) => v >= 1000 ? `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}k` : String(v)} />
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
-            <Toggle label="Venice system prompt" active={veniceParams.include_venice_system_prompt !== false} onChange={(v) => setVeniceParams({ include_venice_system_prompt: v })} />
-            <Toggle label="Disable thinking" active={veniceParams.disable_thinking === true} onChange={(v) => setVeniceParams({ disable_thinking: v })} />
-            <Toggle label="Strip thinking" active={veniceParams.strip_thinking_response === true} onChange={(v) => setVeniceParams({ strip_thinking_response: v })} />
-          </div>
+          <div className="text-[12px] text-white/35">Venice system prompt: off · thinking: disabled</div>
         </div>
       )}
     </div>
@@ -133,27 +118,6 @@ function SearchPill({ value, onChange }: { value: string; onChange: (v: SearchMo
           : 'bg-white/[0.03] text-white/35 hover:text-white/55 hover:bg-white/[0.05]',
       )}
     >
-      {label}
-    </button>
-  )
-}
-
-function Toggle({ label, active, onChange }: { label: string; active: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!active)}
-      className="flex items-center gap-2 text-[14px] text-white/45 hover:text-white/70 transition-colors min-h-[36px]"
-    >
-      <div className={cn(
-        'w-8 h-5 rounded-full transition-colors duration-150 relative shrink-0',
-        active ? 'bg-white/80' : 'bg-white/[0.08]',
-      )}>
-        <div className={cn(
-          'absolute top-0.5 w-4 h-4 rounded-full transition-all duration-150',
-          active ? 'left-3.5 bg-black' : 'left-0.5 bg-white/30',
-        )} />
-      </div>
       {label}
     </button>
   )

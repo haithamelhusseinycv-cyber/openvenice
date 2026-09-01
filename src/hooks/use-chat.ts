@@ -11,6 +11,7 @@ export function useChat() {
     addMessage,
     appendToLastAssistant,
     appendReasoningToLastAssistant,
+    setLastAssistantServedModel,
     deleteMessage,
     setStreaming,
     isStreaming,
@@ -53,6 +54,9 @@ export function useChat() {
       })
 
       for await (const chunk of parseSSEStream(stream, { signal: abortController.signal })) {
+        if (chunk.model) {
+          setLastAssistantServedModel(convId, chunk.model)
+        }
         const delta = chunk.choices[0]?.delta
         if (delta?.content) {
           appendToLastAssistant(convId, delta.content)
@@ -62,7 +66,7 @@ export function useChat() {
         }
       }
     },
-    [appendToLastAssistant, appendReasoningToLastAssistant, veniceParams, temperature, topP, maxTokens],
+    [appendToLastAssistant, appendReasoningToLastAssistant, setLastAssistantServedModel, veniceParams, temperature, topP, maxTokens],
   )
 
   const send = useCallback(
@@ -85,7 +89,7 @@ export function useChat() {
       }
 
       addMessage(convId, userMsg)
-      addMessage(convId, { role: 'assistant', content: '' })
+      addMessage(convId, { role: 'assistant', content: '', requested_model: model })
       setStreaming(true)
 
       const abortController = new AbortController()
@@ -117,7 +121,7 @@ export function useChat() {
         deleteMessage(convId, lastAssistantIdx)
       }
 
-      addMessage(convId, { role: 'assistant', content: '' })
+      addMessage(convId, { role: 'assistant', content: '', requested_model: model })
       setStreaming(true)
 
       const abortController = new AbortController()
