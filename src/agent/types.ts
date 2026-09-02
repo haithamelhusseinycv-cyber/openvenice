@@ -1,3 +1,5 @@
+import type { AgentArtifactStore } from './artifact-store'
+
 export type ToolRisk = 'read' | 'write' | 'destructive'
 
 export type ToolPermission =
@@ -12,6 +14,7 @@ export interface AgentToolContext {
   signal?: AbortSignal
   conversationId?: string
   jobId?: string
+  artifacts?: AgentArtifactStore
 }
 
 export interface AgentToolResult<T = unknown> {
