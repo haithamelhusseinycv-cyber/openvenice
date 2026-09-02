@@ -4,6 +4,7 @@ import { parseSSEStream } from '../lib/stream'
 import { useChatStore } from '../stores/chat-store'
 import { useProviderStore } from '../stores/provider-store'
 import { useAgentStatusStore } from '../stores/agent-status-store'
+import { useVoiceStore } from '../stores/voice-store'
 import { lockChatSystemPrompt } from '../lib/defaults'
 import { getDefaultAgentRegistry } from '../agent/runtime'
 import { runQwenAgent } from '../agent/qwen-tool-loop'
@@ -123,15 +124,17 @@ export function useChat() {
       let convId = useChatStore.getState().activeConversationId
       if (!convId) convId = createConversation(model)
 
+      const voiceLocale = useVoiceStore.getState().consumePendingInputLocale()
+      const voiceMetadata = voiceLocale ? { voice_locale: voiceLocale } : {}
       let userMsg: ChatMessage
       if (imageAttachments && imageAttachments.length > 0) {
         const parts: ContentPart[] = [
           { type: 'text', text: userMessage },
           ...imageAttachments.map((url) => ({ type: 'image_url' as const, image_url: { url } })),
         ]
-        userMsg = { role: 'user', content: parts }
+        userMsg = { role: 'user', content: parts, ...voiceMetadata } as ChatMessage
       } else {
-        userMsg = { role: 'user', content: userMessage }
+        userMsg = { role: 'user', content: userMessage, ...voiceMetadata } as ChatMessage
       }
 
       useAgentStatusStore.getState().clearConversation(convId)
