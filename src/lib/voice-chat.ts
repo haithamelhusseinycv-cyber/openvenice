@@ -167,7 +167,7 @@ function normalizeSpeechText(text: string) {
   return text
     .replace(/```[\s\S]*?```/g, ' code block omitted ')
     .replace(/`([^`]+)`/g, '$1')
-    .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
     .replace(/https?:\/\/\S+/g, '')
     .replace(/[*_>#~-]+/g, ' ')
     .replace(/\s+/g, ' ')
