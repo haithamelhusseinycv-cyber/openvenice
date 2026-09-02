@@ -64,7 +64,20 @@ export function useAgentModels() {
         return {
           id: m.id,
           name: m.model_spec?.name || m.id,
-          capabilities: caps,
+
+          /*
+           * Noor is a conversation-first surface. The legacy function-call
+           * runner is a workflow editor, so routing every function-capable
+           * model through it can turn an ordinary question into a slow
+           * "0 edits" result. Keep the model's other capabilities, but use
+           * Noor's direct structured-response path for normal conversation
+           * and workflow mutations alike. That path still emits and applies
+           * workflow patches when the user actually asks for them.
+           */
+          capabilities: {
+            ...caps,
+            supportsFunctionCalling: false,
+          },
           traits,
           contextTokens:
             m.model_spec?.availableContextTokens,
