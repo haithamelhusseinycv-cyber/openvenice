@@ -50,12 +50,13 @@ function getRank(model: VeniceModel, bucket: VeniceType | null) {
   return byId === -1 ? 9999 : byId
 }
 
-export function useModels(type?: string) {
+export function useModels(type?: string, enabled = true) {
   const bucket = getBucket(type)
 
   return useQuery({
     queryKey: ['models', type],
     queryFn: () => venice<ModelsResponse>(`/models${type ? `?type=${type}` : ''}`),
+    enabled,
     staleTime: 0,
     gcTime: 0,
     refetchOnMount: 'always',
