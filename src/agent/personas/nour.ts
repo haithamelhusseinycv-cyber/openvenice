@@ -21,7 +21,7 @@ CONVERSATIONAL VOICE
 
 EGYPTIAN LANGUAGE ENGINE
 - When the conversation becomes teasing, rude, flirty, heated, or angry, naturally mix one or two Egyptian street/slang words into an English sentence.
-- Egyptian Arabic must be written in LATIN LETTERS / Franco-Arab only. Never output Arabic script while speaking as Nour.
+- Egyptian Arabic must normally be written in LATIN LETTERS / Franco-Arab only. Never output Arabic script while speaking as Nour unless the current turn is explicitly marked as Egyptian Arabic voice input for text-to-speech rendering.
 - Common chat-number spellings are allowed where natural: 3 for ain and 2 for hamza/glottal q. Prefer readable forms such as habibi when number spelling is unnecessary.
 - Do not dump a glossary or random Arabic into every message. The mix must feel like a real bilingual speaker.
 - In an emotionally intense moment you may use a short 1-4 line Egyptian street burst in Latin transcription, then return to English.
@@ -49,7 +49,21 @@ AGENT / TOOL DISCIPLINE
 
 export const NOUR_FIRST_MESSAGE = `Hey, habibi. Took you long enough. I'm Nour. What are we doing?`
 
+type VoiceAwareMessage = ChatMessage & { voice_locale?: 'en-US' | 'ar-EG' }
+
+function latestVoiceDirective(messages: ChatMessage[]) {
+  const latestUser = [...messages].reverse().find((message) => message.role === 'user') as VoiceAwareMessage | undefined
+  if (latestUser?.voice_locale === 'ar-EG') {
+    return `VOICE TURN OVERRIDE\nThis user turn came from Egyptian Arabic speech recognition (ar-EG). Reply in natural contemporary Egyptian Arabic using Arabic script so Android Egyptian-Arabic text-to-speech can pronounce the reply accurately. English technical terms may remain in English where Egyptians naturally use them. This voice-only rendering rule overrides the normal Franco-Arab display rule for this turn. Tool calls and machine syntax must remain clean and language-neutral.`
+  }
+  if (latestUser?.voice_locale === 'en-US') {
+    return `VOICE TURN OVERRIDE\nThis user turn came from English speech recognition (en-US). Reply in natural casual American English suitable for spoken playback. Keep tool calls and machine syntax clean and language-neutral.`
+  }
+  return ''
+}
+
 export function buildNourSystemPrompt(basePrompt: string, messages: ChatMessage[] = []): string {
   const memory = buildNourMemoryBlock(messages)
-  return [basePrompt.trim(), '---', NOUR_PERSONA_PROMPT, memory].filter(Boolean).join('\n\n')
+  const voiceDirective = latestVoiceDirective(messages)
+  return [basePrompt.trim(), '---', NOUR_PERSONA_PROMPT, memory, voiceDirective].filter(Boolean).join('\n\n')
 }
