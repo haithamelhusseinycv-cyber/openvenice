@@ -1,5 +1,3 @@
-import type { ChatCompletionRequest } from '../types/venice'
-
 export interface QwenClientConfig {
   baseUrl: string
   apiKey?: string
@@ -29,7 +27,7 @@ async function errorMessage(response: Response) {
  */
 export async function qwenChatStream(
   config: QwenClientConfig,
-  body: ChatCompletionRequest,
+  body: unknown,
   signal?: AbortSignal,
 ): Promise<ReadableStream<Uint8Array>> {
   const baseUrl = normalizeBaseUrl(config.baseUrl)
