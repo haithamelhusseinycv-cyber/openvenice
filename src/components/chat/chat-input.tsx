@@ -16,7 +16,7 @@ interface ChatInputProps {
   onOpenHistory: () => void
 }
 
-const EMPTY_TOOL_ACTIVITIES = Object.freeze([]) as ReturnType<typeof useAgentStatusStore.getState>['activitiesByConversation'][string]
+const EMPTY_TOOL_ACTIVITIES: ReturnType<typeof useAgentStatusStore.getState>['activitiesByConversation'][string] = []
 
 export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory }: ChatInputProps) {
   const [value, setValue] = useState('')
