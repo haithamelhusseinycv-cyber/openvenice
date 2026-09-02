@@ -11,6 +11,13 @@ import { runQwenAgent } from '../agent/qwen-tool-loop'
 import { buildNourSystemPrompt } from '../agent/personas/nour'
 import type { ChatCompletionRequest, ChatMessage, ContentPart } from '../types/venice'
 
+type VoiceAwareChatMessage = ChatMessage & { voice_locale?: 'en-US' | 'ar-EG' }
+
+function providerSafeMessage(message: ChatMessage): ChatMessage {
+  const { voice_locale: _voiceLocale, ...clean } = message as VoiceAwareChatMessage
+  return clean as ChatMessage
+}
+
 export function useChat() {
   const abortRef = useRef<AbortController | null>(null)
   const {
@@ -34,12 +41,15 @@ export function useChat() {
       const conv = useChatStore.getState().conversations.find((c) => c.id === convId)
       if (!conv) return
 
-      const messages = conv.messages.filter((m) => {
+      // Keep local voice-origin metadata available to Nour's prompt builder,
+      // but never forward non-standard message fields to OpenAI-compatible APIs.
+      const contextualMessages = conv.messages.filter((m) => {
         if (typeof m.content === 'string') return m.content !== ''
         return true
       })
       const baseSystemPrompt = lockChatSystemPrompt(useChatStore.getState().systemPrompt)
-      const safeSystemPrompt = buildNourSystemPrompt(baseSystemPrompt, messages)
+      const safeSystemPrompt = buildNourSystemPrompt(baseSystemPrompt, contextualMessages)
+      const messages = contextualMessages.map(providerSafeMessage)
       if (safeSystemPrompt) {
         messages.unshift({ role: 'system', content: safeSystemPrompt })
       }
