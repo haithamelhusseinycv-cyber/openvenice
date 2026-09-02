@@ -88,13 +88,18 @@ jobs:
         run: |
           manifest='android/app/src/main/AndroidManifest.xml'
           grep -q 'ai.openvenice.permission.FACEFUSION_AGENT' "$manifest"
+          grep -q 'android.permission.RECORD_AUDIO' "$manifest"
+          grep -q 'android.speech.RecognitionService' "$manifest"
+          grep -q 'android.intent.action.TTS_SERVICE' "$manifest"
           grep -q 'com.pv.androidfacefusion' "$manifest"
           grep -q '${applicationId}.fileprovider' "$manifest"
           grep -q 'network_security_config' "$manifest"
           test -f android/app/src/main/java/ai/openvenice/app/FaceFusionAgentPlugin.java
           test -f android/app/src/main/java/ai/openvenice/app/MediaActionsPlugin.java
+          test -f android/app/src/main/java/ai/openvenice/app/VoiceChatPlugin.java
           grep -q 'registerPlugin(FaceFusionAgentPlugin.class)' android/app/src/main/java/ai/openvenice/app/MainActivity.java
           grep -q 'registerPlugin(MediaActionsPlugin.class)' android/app/src/main/java/ai/openvenice/app/MainActivity.java
+          grep -q 'registerPlugin(VoiceChatPlugin.class)' android/app/src/main/java/ai/openvenice/app/MainActivity.java
 
       - name: Build debug APK
         working-directory: android

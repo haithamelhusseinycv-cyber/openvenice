@@ -13,7 +13,7 @@ if not root.exists():
 main_java.mkdir(parents=True, exist_ok=True)
 res_xml.mkdir(parents=True, exist_ok=True)
 
-for source in ('FaceFusionAgentPlugin.java', 'MediaActionsPlugin.java'):
+for source in ('FaceFusionAgentPlugin.java', 'MediaActionsPlugin.java', 'VoiceChatPlugin.java'):
     (main_java / source).write_text(
         (custom / source).read_text(encoding='utf-8'),
         encoding='utf-8',
@@ -22,7 +22,7 @@ for source in ('FaceFusionAgentPlugin.java', 'MediaActionsPlugin.java'):
 # Explicit plugin registration keeps the native surface deterministic and makes
 # it easy to verify in CI. Loopback mixed content is needed only because Local
 # Dream exposes its generation service over localhost HTTP.
-(main_java / 'MainActivity.java').write_text('''package ai.openvenice.app;\n\nimport android.os.Bundle;\nimport android.webkit.WebSettings;\n\nimport com.getcapacitor.BridgeActivity;\n\npublic class MainActivity extends BridgeActivity {\n    @Override\n    public void onCreate(Bundle savedInstanceState) {\n        registerPlugin(FaceFusionAgentPlugin.class);\n        registerPlugin(MediaActionsPlugin.class);\n        super.onCreate(savedInstanceState);\n        if (getBridge() != null && getBridge().getWebView() != null) {\n            getBridge().getWebView().getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);\n        }\n    }\n}\n''', encoding='utf-8')
+(main_java / 'MainActivity.java').write_text('''package ai.openvenice.app;\n\nimport android.os.Bundle;\nimport android.webkit.WebSettings;\n\nimport com.getcapacitor.BridgeActivity;\n\npublic class MainActivity extends BridgeActivity {\n    @Override\n    public void onCreate(Bundle savedInstanceState) {\n        registerPlugin(FaceFusionAgentPlugin.class);\n        registerPlugin(MediaActionsPlugin.class);\n        registerPlugin(VoiceChatPlugin.class);\n        super.onCreate(savedInstanceState);\n        if (getBridge() != null && getBridge().getWebView() != null) {\n            getBridge().getWebView().getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);\n        }\n    }\n}\n''', encoding='utf-8')
 
 # FileProvider stays limited to app-private cache/files. It is used for temporary
 # agent inputs and Android share intents; generated files are never exposed as
@@ -35,6 +35,7 @@ text = manifest.read_text(encoding='utf-8')
 
 permissions = [
     '    <uses-permission android:name="ai.openvenice.permission.FACEFUSION_AGENT" />\n',
+    '    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n',
     '    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />\n',
 ]
 for permission in permissions:
@@ -46,8 +47,8 @@ for permission in permissions:
             raise RuntimeError('Could not locate AndroidManifest application element')
         text = text[:index] + permission + '\n' + text[index:]
 
-queries = '''    <queries>\n        <package android:name="com.pv.androidfacefusion" />\n    </queries>\n\n'''
-if '<package android:name="com.pv.androidfacefusion"' not in text:
+queries = '''    <queries>\n        <package android:name="com.pv.androidfacefusion" />\n        <intent>\n            <action android:name="android.speech.RecognitionService" />\n        </intent>\n        <intent>\n            <action android:name="android.intent.action.TTS_SERVICE" />\n        </intent>\n    </queries>\n\n'''
+if '<action android:name="android.speech.RecognitionService"' not in text:
     marker = '<application'
     index = text.find(marker)
     if index < 0:

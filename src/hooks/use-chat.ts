@@ -4,11 +4,20 @@ import { parseSSEStream } from '../lib/stream'
 import { useChatStore } from '../stores/chat-store'
 import { useProviderStore } from '../stores/provider-store'
 import { useAgentStatusStore } from '../stores/agent-status-store'
+import { useVoiceStore } from '../stores/voice-store'
 import { lockChatSystemPrompt } from '../lib/defaults'
 import { getDefaultAgentRegistry } from '../agent/runtime'
 import { runQwenAgent } from '../agent/qwen-tool-loop'
 import { buildNourSystemPrompt } from '../agent/personas/nour'
 import type { ChatCompletionRequest, ChatMessage, ContentPart } from '../types/venice'
+
+type VoiceAwareChatMessage = ChatMessage & { voice_locale?: 'en-US' | 'ar-EG' }
+
+function providerSafeMessage(message: ChatMessage): ChatMessage {
+  const clean = { ...(message as VoiceAwareChatMessage) }
+  delete clean.voice_locale
+  return clean as ChatMessage
+}
 
 export function useChat() {
   const abortRef = useRef<AbortController | null>(null)
@@ -33,12 +42,15 @@ export function useChat() {
       const conv = useChatStore.getState().conversations.find((c) => c.id === convId)
       if (!conv) return
 
-      const messages = conv.messages.filter((m) => {
+      // Keep local voice-origin metadata available to Nour's prompt builder,
+      // but never forward non-standard message fields to OpenAI-compatible APIs.
+      const contextualMessages = conv.messages.filter((m) => {
         if (typeof m.content === 'string') return m.content !== ''
         return true
       })
       const baseSystemPrompt = lockChatSystemPrompt(useChatStore.getState().systemPrompt)
-      const safeSystemPrompt = buildNourSystemPrompt(baseSystemPrompt, messages)
+      const safeSystemPrompt = buildNourSystemPrompt(baseSystemPrompt, contextualMessages)
+      const messages = contextualMessages.map(providerSafeMessage)
       if (safeSystemPrompt) {
         messages.unshift({ role: 'system', content: safeSystemPrompt })
       }
@@ -123,15 +135,17 @@ export function useChat() {
       let convId = useChatStore.getState().activeConversationId
       if (!convId) convId = createConversation(model)
 
+      const voiceLocale = useVoiceStore.getState().consumePendingInputLocale()
+      const voiceMetadata = voiceLocale ? { voice_locale: voiceLocale } : {}
       let userMsg: ChatMessage
       if (imageAttachments && imageAttachments.length > 0) {
         const parts: ContentPart[] = [
           { type: 'text', text: userMessage },
           ...imageAttachments.map((url) => ({ type: 'image_url' as const, image_url: { url } })),
         ]
-        userMsg = { role: 'user', content: parts }
+        userMsg = { role: 'user', content: parts, ...voiceMetadata } as ChatMessage
       } else {
-        userMsg = { role: 'user', content: userMessage }
+        userMsg = { role: 'user', content: userMessage, ...voiceMetadata } as ChatMessage
       }
 
       useAgentStatusStore.getState().clearConversation(convId)
