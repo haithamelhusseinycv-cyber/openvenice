@@ -41,10 +41,11 @@ const noModelSelector = new Set(['video', 'workflows', 'playground'])
 
 interface Props {
   onOpenApiKey: () => void
+  onOpenDiagnostics: () => void
   onOpenMobileSidebar?: () => void
 }
 
-export function Header({ onOpenApiKey, onOpenMobileSidebar }: Props) {
+export function Header({ onOpenApiKey, onOpenDiagnostics, onOpenMobileSidebar }: Props) {
   const { activeTab, selectedModels, setSelectedModel, toggleSidebar } = useSettingsStore()
   const imageSubTab = useImageWorkspace((s) => s.imageSubTab)
   const apiKey = useAuthStore((s) => s.apiKey)
@@ -96,6 +97,15 @@ export function Header({ onOpenApiKey, onOpenMobileSidebar }: Props) {
       <div className="order-5 min-w-0 flex-1 sm:order-none sm:flex-none">
         <BillingBar />
       </div>
+
+      <button
+        onClick={onOpenDiagnostics}
+        aria-label="Device diagnostics"
+        title="Device diagnostics"
+        className="order-3 shrink-0 flex min-h-11 min-w-11 items-center justify-center rounded-md border border-white/[0.1] px-2 text-white/60 transition-colors hover:border-white/[0.22] hover:text-white sm:order-none"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14h4l2-7 4 12 2-5h4" /><path d="M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z" /></svg>
+      </button>
 
       <button
         onClick={onOpenApiKey}
