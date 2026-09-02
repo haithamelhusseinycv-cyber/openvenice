@@ -9,8 +9,6 @@ import { cn } from '../../lib/utils'
 const SAFE_URL_PROTOCOLS = /^(https?:|mailto:|#|\/|\.)/i
 function safeUrlTransform(url: string, key: string): string {
   if (!url) return ''
-  // react-markdown's default already handles most protocol filtering; we layer
-  // an explicit allow-list on top because we render untrusted model output.
   const cleaned = defaultUrlTransform(url)
   if (!cleaned) return ''
   if (key === 'src' && cleaned.startsWith('data:image/')) return cleaned
@@ -79,7 +77,6 @@ function PromptCodeBox({ children, className }: ComponentPropsWithoutRef<'pre'>)
   )
 }
 
-// Extract text and images from multimodal content
 function extractContent(content: string | ContentPart[]): { text: string; images: string[] } {
   if (typeof content === 'string') return { text: content, images: [] }
   let text = ''
@@ -105,6 +102,7 @@ export function MessageBubble({ message, onCopy, onDelete, onRegenerate }: Messa
   const [reasoningOpen, setReasoningOpen] = useState(false)
   const isUser = message.role === 'user'
   const { text: content, images } = extractContent(message.content)
+  const artifacts = message.artifacts || []
 
   const handleCopy = () => {
     navigator.clipboard.writeText(content)
@@ -174,7 +172,6 @@ export function MessageBubble({ message, onCopy, onDelete, onRegenerate }: Messa
         </svg>
       </div>
       <div className="max-w-full min-w-0 flex-1 overflow-x-hidden">
-        {/* Reasoning content (thinking) */}
         {message.reasoning_content && (
           <div className="mb-2">
             <button
@@ -212,13 +209,33 @@ export function MessageBubble({ message, onCopy, onDelete, onRegenerate }: Messa
               }}
             >{content}</ReactMarkdown>
           </div>
-        ) : (
+        ) : artifacts.length === 0 ? (
           <span className="inline-flex gap-1.5 py-1.5">
             <span className="w-1 h-1 rounded-full bg-white/25 animate-pulse-dot" />
             <span className="w-1 h-1 rounded-full bg-white/25 animate-pulse-dot" style={{ animationDelay: '0.2s' }} />
             <span className="w-1 h-1 rounded-full bg-white/25 animate-pulse-dot" style={{ animationDelay: '0.4s' }} />
           </span>
+        ) : null}
+
+        {artifacts.length > 0 && (
+          <div className="mt-3 flex max-w-full flex-col gap-2">
+            {artifacts.map((artifact) => (
+              <figure key={artifact.id} className="max-w-full overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.02]">
+                <img
+                  src={artifact.url}
+                  alt={artifact.sourceTool === 'localdream.upscale' ? 'Upscaled Local Dream result' : 'Local Dream result'}
+                  className="block h-auto max-h-[70vh] w-full max-w-full object-contain"
+                />
+                <figcaption className="flex flex-wrap items-center gap-x-2 gap-y-0.5 border-t border-white/[0.06] px-2.5 py-2 text-[11px] text-white/35">
+                  <span>{artifact.sourceTool || 'Agent image tool'}</span>
+                  {artifact.width && artifact.height ? <span>{artifact.width}×{artifact.height}</span> : null}
+                  {artifact.format ? <span>{artifact.format.toUpperCase()}</span> : null}
+                </figcaption>
+              </figure>
+            ))}
+          </div>
         )}
+
         <div className="mt-0.5">{actions}</div>
         {(message.served_model || message.requested_model) && (
           <div className="mt-0.5 break-all text-[10.5px] text-white/25">
