@@ -22,7 +22,8 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      # Keep the same debug signing identity so Android can update v2/v3 in place.
+      # Keep the same debug signing identity so Android can update the previous
+      # Complete Models builds in place and OpenVenice can share signature IPC.
       - name: Restore stable debug signing key
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
@@ -45,6 +46,14 @@ jobs:
         run: |
           python3 android-face-fusion-custom/apply_custom.py
           python3 android-face-fusion-custom/fix_downloads_v31.py
+          python3 android-face-fusion-custom/apply_agent_bridge.py
+
+      - name: Verify agent bridge manifest
+        shell: bash
+        run: |
+          grep -q 'ai.openvenice.permission.FACEFUSION_AGENT' android-face-fusion/app/src/main/AndroidManifest.xml
+          grep -q 'AgentBridgeService' android-face-fusion/app/src/main/AndroidManifest.xml
+          test -f android-face-fusion/app/src/main/java/com/pv/androidfacefusion/AgentBridgeService.java
 
       - name: Build debug APK
         working-directory: android-face-fusion
