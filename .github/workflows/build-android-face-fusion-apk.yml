@@ -64,14 +64,14 @@ jobs:
           python3 android-face-fusion-custom/apply_custom.py
           python3 android-face-fusion-custom/fix_downloads_v31.py
           python3 android-face-fusion-custom/apply_agent_bridge.py
-          python3 android-openvenice-custom/pin_debug_signing.py android-face-fusion/app/build.gradle
+          python3 android-openvenice-custom/pin_debug_signing.py android-face-fusion/app/build.gradle.kts
 
       - name: Verify agent bridge manifest
         shell: bash
         run: |
           grep -q 'ai.openvenice.permission.FACEFUSION_AGENT' android-face-fusion/app/src/main/AndroidManifest.xml
           grep -q 'AgentBridgeService' android-face-fusion/app/src/main/AndroidManifest.xml
-          grep -q 'openVeniceStableDebug' android-face-fusion/app/build.gradle
+          grep -q 'openVeniceStableDebug' android-face-fusion/app/build.gradle.kts
           test -f android-face-fusion/app/src/main/java/com/pv/androidfacefusion/AgentBridgeService.java
 
       - name: Build debug APK
