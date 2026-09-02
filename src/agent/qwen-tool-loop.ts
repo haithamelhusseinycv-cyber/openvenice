@@ -2,6 +2,8 @@ import { parseSSEStream } from '../lib/stream'
 import { qwenChatStream, type QwenClientConfig } from '../lib/qwen-client'
 import { createOpenAIToolBindings, parseToolArguments, serializeToolResult, type OpenAIToolCall } from './openai-tools'
 import { AgentToolRegistry } from './tool-registry'
+import { AgentArtifactStore, type AgentArtifact } from './artifact-store'
+import type { AgentToolResult } from './types'
 
 interface QwenAgentRunOptions {
   config: QwenClientConfig
@@ -18,6 +20,7 @@ interface QwenAgentRunOptions {
   onReasoning?: (text: string) => void
   onToolStart?: (toolId: string) => void
   onToolFinish?: (toolId: string, ok: boolean) => void
+  onArtifact?: (artifact: AgentArtifact) => void
 }
 
 interface PendingCall {
@@ -41,8 +44,53 @@ function appendToolCall(map: Map<number, PendingCall>, raw: unknown) {
   map.set(index, current)
 }
 
-function failedToolResult(message: string) {
+function failedToolResult(message: string): AgentToolResult {
   return { ok: false, error: message }
+}
+
+function mimeTypeForFormat(format?: string) {
+  if (format === 'jpeg' || format === 'jpg') return 'image/jpeg'
+  if (format === 'png') return 'image/png'
+  if (format === 'raw') return 'application/octet-stream'
+  return undefined
+}
+
+/**
+ * Tool payloads can contain multi-megabyte base64 images. Keep the bytes in a
+ * private in-memory artifact store and give Qwen a compact artifact:// handle.
+ * This lets a later tool in the same agent run consume the image without
+ * pushing the full payload back through the model context.
+ */
+function externalizeImagePayload(
+  result: AgentToolResult,
+  artifacts: AgentArtifactStore,
+  sourceTool: string,
+  onArtifact?: (artifact: AgentArtifact) => void,
+): AgentToolResult {
+  if (!result.data || typeof result.data !== 'object' || Array.isArray(result.data)) return result
+  const data = result.data as Record<string, unknown>
+  const image = data.image
+  if (typeof image !== 'string' || image.length <= 4096) return result
+
+  const format = typeof data.format === 'string' ? data.format : undefined
+  const artifact = artifacts.put(image, {
+    sourceTool,
+    format,
+    mimeType: mimeTypeForFormat(format),
+    width: typeof data.width === 'number' ? data.width : undefined,
+    height: typeof data.height === 'number' ? data.height : undefined,
+  })
+  onArtifact?.(artifact)
+
+  return {
+    ...result,
+    data: {
+      ...data,
+      image: artifact.ref,
+      artifact_ref: artifact.ref,
+      base64_length: image.length,
+    },
+  }
 }
 
 /**
@@ -54,6 +102,7 @@ export async function runQwenAgent(options: QwenAgentRunOptions) {
   const bindings = createOpenAIToolBindings(options.registry)
   const messages = [...options.messages]
   const maxRounds = Math.max(1, options.maxToolRounds ?? 4)
+  const artifacts = new AgentArtifactStore()
 
   for (let round = 0; round < maxRounds; round++) {
     const stream = await qwenChatStream(
@@ -92,7 +141,13 @@ export async function runQwenAgent(options: QwenAgentRunOptions) {
       }
     }
 
-    if (pending.size === 0) return { completed: true, toolRounds: round }
+    if (pending.size === 0) {
+      return {
+        completed: true,
+        toolRounds: round,
+        artifacts: artifacts.list().map(({ id, ref, metadata }) => ({ id, ref, metadata })),
+      }
+    }
 
     const toolCalls: OpenAIToolCall[] = Array.from(pending.entries())
       .sort(([a], [b]) => a - b)
@@ -110,14 +165,18 @@ export async function runQwenAgent(options: QwenAgentRunOptions) {
 
     for (const call of toolCalls) {
       const toolId = bindings.functionToToolId.get(call.function.name)
-      let result
+      let result: AgentToolResult
       if (!toolId) {
         result = failedToolResult(`Unknown tool function: ${call.function.name}`)
       } else {
         options.onToolStart?.(toolId)
         try {
           const input = parseToolArguments(call.function.arguments)
-          result = await options.registry.execute(toolId, input, { signal: options.signal })
+          const executed = await options.registry.execute(toolId, input, {
+            signal: options.signal,
+            artifacts,
+          })
+          result = externalizeImagePayload(executed, artifacts, toolId, options.onArtifact)
         } catch (error) {
           result = failedToolResult(error instanceof Error ? error.message : String(error))
         }

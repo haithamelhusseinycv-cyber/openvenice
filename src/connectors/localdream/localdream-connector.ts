@@ -81,11 +81,51 @@ export type LocalDreamGenerationEvent =
     }
   | { type: 'error'; message: string }
 
+export interface LocalDreamUpscaleRequest {
+  image: string
+  width: number
+  height: number
+  upscalerPath: string
+  useOpenCl?: boolean
+}
+
+export interface LocalDreamUpscaleResult {
+  image: string
+  format: 'jpeg'
+  width: number
+  height: number
+  duration_ms?: number
+}
+
 export interface LocalDreamConnectorOptions {
   host?: string
   controlPort?: number
   generationPort?: number
   transport?: ConnectorHttpTransport
+}
+
+function decodeBase64(value: string) {
+  const payload = value.startsWith('data:') ? value.slice(value.indexOf(',') + 1) : value
+  const binary = atob(payload)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return bytes
+}
+
+function encodeBase64(bytes: Uint8Array) {
+  const chunkSize = 0x8000
+  let binary = ''
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    const chunk = bytes.subarray(offset, Math.min(offset + chunkSize, bytes.length))
+    for (let i = 0; i < chunk.length; i++) binary += String.fromCharCode(chunk[i])
+  }
+  return btoa(binary)
+}
+
+function parsePositiveInt(value: string | undefined, fallback: number) {
+  if (!value) return fallback
+  const parsed = Number.parseInt(value, 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
 }
 
 export class LocalDreamConnector {
@@ -174,6 +214,44 @@ export class LocalDreamConnector {
       }
       yield payload
       if (payload.type === 'complete' || payload.type === 'error') return
+    }
+  }
+
+  /**
+   * Local Dream's native /upscale endpoint consumes raw RGB bytes and always
+   * returns a JPEG at 4x the original dimensions. The upscaler path comes from
+   * the host's /models catalog.
+   */
+  async upscale(request: LocalDreamUpscaleRequest, signal?: AbortSignal): Promise<LocalDreamUpscaleResult> {
+    if (!request.image) throw new Error('Local Dream upscale requires an image payload')
+    if (!request.upscalerPath) throw new Error('Local Dream upscale requires an upscaler path')
+    if (request.width <= 0 || request.height <= 0) throw new Error('Local Dream upscale requires valid image dimensions')
+
+    const rawRgb = decodeBase64(request.image)
+    const expectedBytes = request.width * request.height * 3
+    if (rawRgb.length !== expectedBytes) {
+      throw new Error(`Local Dream upscale expects raw RGB (${expectedBytes} bytes), received ${rawRgb.length} bytes`)
+    }
+
+    const response = await this.transport.requestBinary(this.generationUrl('/upscale'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'X-Image-Width': String(request.width),
+        'X-Image-Height': String(request.height),
+        'X-Upscaler-Path': request.upscalerPath,
+        ...(request.useOpenCl !== undefined ? { 'X-Use-OpenCL': request.useOpenCl ? 'true' : 'false' } : {}),
+      },
+      body: rawRgb,
+      signal,
+    })
+
+    return {
+      image: encodeBase64(response.data),
+      format: 'jpeg',
+      width: parsePositiveInt(response.headers['x-output-width'], request.width * 4),
+      height: parsePositiveInt(response.headers['x-output-height'], request.height * 4),
+      duration_ms: response.headers['x-duration-ms'] ? Number.parseInt(response.headers['x-duration-ms'], 10) : undefined,
     }
   }
 }
