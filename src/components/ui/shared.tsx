@@ -4,10 +4,10 @@ import { Spinner } from './spinner'
 export function Label({ children, htmlFor, hint }: { children: React.ReactNode; htmlFor?: string; hint?: string }) {
   return (
     <div className="flex items-baseline justify-between mb-1.5 gap-2">
-      <label htmlFor={htmlFor} className="block text-[13px] font-semibold text-white/70 uppercase tracking-[0.06em]">
+      <label htmlFor={htmlFor} className="block text-[13px] font-semibold text-[#c6beb5] uppercase tracking-[0.06em]">
         {children}
       </label>
-      {hint && <span className="text-[12px] text-white/45">{hint}</span>}
+      {hint && <span className="text-[12px] text-[#8d8580]">{hint}</span>}
     </div>
   )
 }
@@ -32,7 +32,7 @@ export function TextArea({ value, onChange, placeholder, rows = 3, ariaLabel, ma
       maxLength={maxLength}
       autoFocus={autoFocus}
       className={cn(
-        'w-full bg-[#0d0d11] border border-white/[0.08] rounded-lg px-3 py-2.5 text-[16px] text-white outline-none focus:border-white/[0.28] transition-colors resize-y placeholder:text-white/35 leading-relaxed max-h-[28vh] overflow-y-auto',
+        'w-full bg-[#121217] border border-white/[0.09] rounded-xl px-3 py-2.5 text-[16px] text-[#f4efe8] outline-none focus:border-[#9b5cff]/60 focus:shadow-[0_0_0_3px_rgba(155,92,255,0.08)] transition-all resize-y placeholder:text-white/30 leading-relaxed max-h-[28vh] overflow-y-auto',
         className,
       )}
     />
@@ -56,15 +56,15 @@ export function PrimaryButton({ onClick, disabled, loading, children, ariaLabel,
       aria-label={ariaLabel}
       aria-busy={loading || undefined}
       className={cn(
-        'w-full rounded-lg font-medium transition-all duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2',
+        'w-full rounded-xl font-semibold transition-all duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2',
         sizing,
         !disabled && !loading
-          ? 'bg-white text-black hover:bg-white/90 active:scale-[0.99] shadow-sm'
-          : 'bg-white/[0.06] text-white/35 cursor-not-allowed',
+          ? 'bg-[linear-gradient(135deg,#8f46ff_0%,#b447e8_48%,#d64cb0_100%)] text-white hover:brightness-110 active:scale-[0.99] shadow-[0_10px_30px_rgba(143,70,255,0.24)]'
+          : 'bg-white/[0.06] text-white/30 cursor-not-allowed',
       )}
     >
       {loading ? (
-        <span className="flex items-center justify-center gap-2"><Spinner className="text-white/45" /> Working…</span>
+        <span className="flex items-center justify-center gap-2"><Spinner className="text-white/70" /> Working…</span>
       ) : children}
     </button>
   )
@@ -78,7 +78,7 @@ export function GhostButton({ onClick, children, disabled, ariaLabel }: { onClic
       disabled={disabled}
       aria-label={ariaLabel}
       className={cn(
-        'px-3 py-2 text-[14px] font-medium rounded-lg border border-white/[0.14] text-white/80 hover:text-white hover:border-white/[0.28] hover:bg-white/[0.03] transition-colors disabled:opacity-30 disabled:cursor-not-allowed min-h-11 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2',
+        'px-3 py-2 text-[14px] font-medium rounded-xl border border-white/[0.12] bg-white/[0.02] text-white/75 hover:text-white hover:border-[#9b5cff]/40 hover:bg-[#9b5cff]/[0.06] transition-colors disabled:opacity-30 disabled:cursor-not-allowed min-h-11 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2',
       )}
     >
       {children}
@@ -102,10 +102,10 @@ export function PillGroup({ options, value, onChange, ariaLabel }: {
           aria-checked={o.value === value}
           onClick={() => onChange(o.value)}
           className={cn(
-            'text-[14px] font-medium px-3 py-2 rounded-md border transition-all duration-100 min-h-11 focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--color-accent)]',
+            'text-[14px] font-medium px-3 py-2 rounded-lg border transition-all duration-150 min-h-11 focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--color-accent)]',
             o.value === value
-              ? 'border-white/25 bg-white/[0.12] text-white'
-              : 'border-white/[0.08] text-white/65 hover:text-white hover:border-white/[0.18]',
+              ? 'border-[#b36cff]/45 bg-[#9b5cff]/[0.14] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
+              : 'border-white/[0.08] bg-white/[0.015] text-white/60 hover:text-white hover:border-[#9b5cff]/30 hover:bg-[#9b5cff]/[0.05]',
           )}
         >
           {o.label}
@@ -117,7 +117,7 @@ export function PillGroup({ options, value, onChange, ariaLabel }: {
 
 export function ErrorText({ children }: { children: React.ReactNode }) {
   return (
-    <div role="alert" className="flex items-start gap-2 text-[14px] text-red-200 bg-red-500/[0.08] border border-red-400/30 rounded-lg px-3 py-2">
+    <div role="alert" className="flex items-start gap-2 text-[14px] text-red-200 bg-red-500/[0.08] border border-red-400/30 rounded-xl px-3 py-2">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="shrink-0 mt-px">
         <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
       </svg>
@@ -127,7 +127,7 @@ export function ErrorText({ children }: { children: React.ReactNode }) {
 }
 
 export function EmptyState({ children }: { children: React.ReactNode }) {
-  return <div className="flex items-center justify-center flex-1 text-white/45 text-[15px]">{children}</div>
+  return <div className="flex items-center justify-center flex-1 text-[#8d8580] text-[15px]">{children}</div>
 }
 
 export function ExamplePrompts({ items, onPick, title = 'Try one of these' }: {
@@ -137,17 +137,17 @@ export function ExamplePrompts({ items, onPick, title = 'Try one of these' }: {
 }) {
   return (
     <div className="w-full max-w-md flex flex-col gap-2.5">
-      <div className="text-[12px] uppercase tracking-[0.08em] text-white/50 font-semibold">{title}</div>
+      <div className="text-[12px] uppercase tracking-[0.08em] text-[#978f88] font-semibold">{title}</div>
       <div className="flex flex-col gap-2">
         {items.map((text) => (
           <button
             key={text}
             type="button"
             onClick={() => onPick(text)}
-            className="group text-left px-3.5 py-3 rounded-xl border border-white/[0.08] bg-white/[0.015] hover:border-white/[0.16] hover:bg-white/[0.04] transition-all text-[15px] text-white/80 hover:text-white min-h-11 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2"
+            className="group text-left px-3.5 py-3 rounded-xl border border-white/[0.08] bg-white/[0.02] hover:border-[#9b5cff]/35 hover:bg-[#9b5cff]/[0.05] transition-all text-[15px] text-white/75 hover:text-white min-h-11 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2"
           >
             <span className="flex items-start gap-2">
-              <span className="text-white/35 group-hover:text-[var(--color-accent)] transition-colors mt-px">→</span>
+              <span className="text-[#b487ef] group-hover:text-[#d7b8ff] transition-colors mt-px">→</span>
               <span className="leading-relaxed">{text}</span>
             </span>
           </button>
@@ -159,7 +159,7 @@ export function ExamplePrompts({ items, onPick, title = 'Try one of these' }: {
 
 export function Card({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn('bg-[#111114] border border-white/[0.06] rounded-xl', className)}>
+    <div className={cn('bg-[#15151a] border border-white/[0.07] rounded-2xl shadow-[0_18px_50px_rgba(0,0,0,0.16)]', className)}>
       {children}
     </div>
   )
@@ -168,7 +168,7 @@ export function Card({ children, className }: { children: React.ReactNode; class
 export function SectionHeading({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between mb-2.5">
-      <h3 className="text-[12px] uppercase tracking-[0.08em] text-white/50 font-semibold">{children}</h3>
+      <h3 className="text-[12px] uppercase tracking-[0.08em] text-[#978f88] font-semibold">{children}</h3>
       {action}
     </div>
   )
@@ -182,7 +182,7 @@ const TONE: Record<string, string> = {
   pink: 'bg-pink-400/15 text-pink-300 border-pink-400/20',
   slate: 'bg-white/[0.05] text-white/60 border-white/10',
   rose: 'bg-rose-400/15 text-rose-300 border-rose-400/20',
-  teal: 'bg-[var(--color-accent-soft)] text-[var(--color-accent)] border-[var(--color-accent)]/30',
+  teal: 'bg-[var(--color-accent-soft)] text-[#cba6ff] border-[#9b5cff]/30',
 }
 
 export function Badge({ children, tone = 'slate' }: { children: React.ReactNode; tone?: keyof typeof TONE }) {
