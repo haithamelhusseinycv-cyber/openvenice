@@ -77,11 +77,14 @@ jobs:
 
       - name: Generate Capacitor Android project
         shell: bash
+        env:
+          OPENVENICE_DEBUG_KEYSTORE: /home/runner/.android/debug.keystore
         run: |
           rm -rf android
           npx cap add android
           npx cap sync android
           python3 android-openvenice-custom/apply_android_agent.py
+          python3 android-openvenice-custom/pin_debug_signing.py android/app/build.gradle
 
       - name: Verify Android agent shell
         shell: bash
@@ -94,6 +97,7 @@ jobs:
           grep -q 'com.pv.androidfacefusion' "$manifest"
           grep -q '${applicationId}.fileprovider' "$manifest"
           grep -q 'network_security_config' "$manifest"
+          grep -q 'openVeniceStableDebug' android/app/build.gradle
           test -f android/app/src/main/java/ai/openvenice/app/FaceFusionAgentPlugin.java
           test -f android/app/src/main/java/ai/openvenice/app/MediaActionsPlugin.java
           test -f android/app/src/main/java/ai/openvenice/app/VoiceChatPlugin.java
@@ -104,17 +108,27 @@ jobs:
       - name: Build debug APK
         working-directory: android
         shell: bash
+        env:
+          OPENVENICE_DEBUG_KEYSTORE: /home/runner/.android/debug.keystore
         run: |
           chmod +x ./gradlew
           ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Verify APK
+      - name: Verify APK and signing identity
         shell: bash
         run: |
           apk='android/app/build/outputs/apk/debug/app-debug.apk'
+          apksigner="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner"
           test -f "$apk"
           ls -lh "$apk"
-          "$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner" verify --print-certs "$apk"
+          "$apksigner" verify --print-certs "$apk"
+
+          expected=$(keytool -list -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey | awk '/SHA256:/{print $2; exit}' | tr -d ':' | tr '[:upper:]' '[:lower:]')
+          actual=$("$apksigner" verify --print-certs "$apk" | awk '/certificate SHA-256 digest:/{print $NF; exit}' | tr '[:upper:]' '[:lower:]')
+          echo "Expected signer: $expected"
+          echo "APK signer:      $actual"
+          test -n "$expected"
+          test "$expected" = "$actual"
 
       - name: Upload OpenVenice Android APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
