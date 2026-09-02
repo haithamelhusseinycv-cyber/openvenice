@@ -3,6 +3,7 @@ import { venice } from '../lib/venice-client'
 import { parseSSEStream } from '../lib/stream'
 import { useChatStore } from '../stores/chat-store'
 import { useProviderStore } from '../stores/provider-store'
+import { useAgentStatusStore } from '../stores/agent-status-store'
 import { lockChatSystemPrompt } from '../lib/defaults'
 import { getDefaultAgentRegistry } from '../agent/runtime'
 import { runQwenAgent } from '../agent/qwen-tool-loop'
@@ -56,6 +57,8 @@ export function useChat() {
           onModel: (servedModel) => setLastAssistantServedModel(convId, servedModel),
           onContent: (text) => appendToLastAssistant(convId, text),
           onReasoning: (text) => appendReasoningToLastAssistant(convId, text),
+          onToolStart: (toolId) => useAgentStatusStore.getState().startTool(convId, toolId),
+          onToolFinish: (toolId, ok) => useAgentStatusStore.getState().finishTool(convId, toolId, ok),
           onArtifact: (artifact) => {
             const mimeType = typeof artifact.metadata.mimeType === 'string'
               ? artifact.metadata.mimeType
@@ -131,6 +134,7 @@ export function useChat() {
         userMsg = { role: 'user', content: userMessage }
       }
 
+      useAgentStatusStore.getState().clearConversation(convId)
       addMessage(convId, userMsg)
       addMessage(convId, { role: 'assistant', content: '', requested_model: model })
       setStreaming(true)
@@ -166,6 +170,7 @@ export function useChat() {
         deleteMessage(convId, lastAssistantIdx)
       }
 
+      useAgentStatusStore.getState().clearConversation(convId)
       addMessage(convId, { role: 'assistant', content: '', requested_model: model })
       setStreaming(true)
 
@@ -188,6 +193,8 @@ export function useChat() {
 
   const stop = useCallback(() => {
     abortRef.current?.abort()
+    const convId = useChatStore.getState().activeConversationId
+    if (convId) useAgentStatusStore.getState().clearConversation(convId)
     setStreaming(false)
   }, [setStreaming])
 
