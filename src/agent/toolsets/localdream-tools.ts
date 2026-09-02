@@ -11,6 +11,17 @@ const objectSchema = (properties: Record<string, unknown>, required: string[] = 
   additionalProperties: false,
 })
 
+function base64Payload(value: string) {
+  if (!value.startsWith('data:')) return value
+  const comma = value.indexOf(',')
+  return comma >= 0 ? value.slice(comma + 1) : value
+}
+
+function resolveImagePayload(value: string | undefined, context: Parameters<AgentTool['execute']>[1]) {
+  if (!value) return value
+  return base64Payload(context.artifacts?.resolveData(value) ?? value)
+}
+
 export function createLocalDreamTools(connector = new LocalDreamConnector()): AgentTool[] {
   return [
     {
@@ -61,7 +72,7 @@ export function createLocalDreamTools(connector = new LocalDreamConnector()): Ag
     {
       id: 'localdream.generate',
       name: 'Generate or edit with Local Dream',
-      description: 'Run Local Dream text-to-image, img2img, or inpaint. Include image for img2img; include image and mask for inpaint. When a 4x upscale will follow, set output_format to raw so the returned artifact can be passed directly to localdream.upscale.',
+      description: 'Run Local Dream text-to-image, img2img, or inpaint. image and mask may be artifact:// handles for user attachments or prior agent outputs. Include image for img2img; image and mask for inpaint. When a 4x upscale will follow, set output_format to raw so the returned artifact can be passed directly to localdream.upscale.',
       risk: 'write',
       permissions: ['network', 'local-app-control', 'local-files'],
       inputSchema: objectSchema(
@@ -76,16 +87,22 @@ export function createLocalDreamTools(connector = new LocalDreamConnector()): Ag
           height: { type: 'integer', minimum: 8 },
           aspect_ratio: { type: 'string' },
           denoise_strength: { type: 'number', minimum: 0, maximum: 1 },
-          image: { type: 'string', description: 'Base64-encoded input image payload.' },
-          mask: { type: 'string', description: 'Base64-encoded mask payload.' },
+          image: { type: 'string', description: 'Base64 image payload or artifact:// handle.' },
+          mask: { type: 'string', description: 'Base64 mask payload or artifact:// handle.' },
           output_format: { enum: ['raw', 'jpeg', 'png'] },
         },
         ['prompt'],
       ),
       execute: async (input, context) => {
+        const value = input as LocalDreamGenerateRequest
+        const request: LocalDreamGenerateRequest = {
+          ...value,
+          image: resolveImagePayload(value.image, context),
+          mask: resolveImagePayload(value.mask, context),
+        }
         const events = []
         let completed: unknown
-        for await (const event of connector.generate(input as LocalDreamGenerateRequest, context.signal)) {
+        for await (const event of connector.generate(request, context.signal)) {
           if (event.type === 'progress') {
             events.push({ step: event.step, total_steps: event.total_steps })
           } else if (event.type === 'error') {
