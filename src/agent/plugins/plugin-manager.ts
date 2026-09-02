@@ -17,8 +17,11 @@ function cloneSnapshot(state: PluginRuntimeState): AgentPluginSnapshot {
 
 export class AgentPluginManager {
   private readonly plugins = new Map<string, PluginRuntimeState>()
+  private readonly registry: AgentToolRegistry
 
-  constructor(private readonly registry: AgentToolRegistry) {}
+  constructor(registry: AgentToolRegistry) {
+    this.registry = registry
+  }
 
   register(definition: AgentPluginDefinition) {
     const id = definition.manifest.id.trim()
