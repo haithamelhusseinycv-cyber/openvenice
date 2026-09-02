@@ -79,8 +79,8 @@ export function Header({ onOpenApiKey, onOpenDiagnostics, onOpenMobileSidebar }:
       </button>
 
       <div className="order-2 flex flex-col min-w-0 shrink-0">
-        <span className="text-[15px] font-semibold text-white leading-none">{tabLabels[activeTab]}</span>
-        <span className="text-[11px] text-white/50 mt-0.5 leading-none truncate hidden sm:block">{tabSubtitles[activeTab]}</span>
+        <span className="text-[15px] font-semibold text-[#f4efe8] leading-none">{tabLabels[activeTab]}</span>
+        <span className="text-[11px] text-[#938b85] mt-0.5 leading-none truncate hidden sm:block">{tabSubtitles[activeTab]}</span>
       </div>
 
       {!hasOwnSelector && (
@@ -112,9 +112,9 @@ export function Header({ onOpenApiKey, onOpenDiagnostics, onOpenMobileSidebar }:
         aria-label={apiKey ? 'API key connected, manage' : 'Connect API key'}
         className="order-3 ml-auto sm:order-none sm:ml-0 shrink-0 flex items-center gap-2 text-[13px] px-2.5 py-2 rounded-md border border-white/[0.12] hover:border-white/[0.25] min-h-11 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2"
       >
-        <StatusDot tone={apiKey ? 'teal' : 'slate'} pulsing={!apiKey} />
-        <span className={apiKey ? 'text-white font-medium hidden sm:inline' : 'text-white/80'}>
-          {apiKey ? 'Key' : 'Key'}
+        <StatusDot tone={apiKey ? 'emerald' : 'slate'} pulsing={!apiKey} />
+        <span className={apiKey ? 'text-[#f4efe8] font-medium hidden sm:inline' : 'text-white/80'}>
+          {apiKey ? 'Ready' : 'Key'}
         </span>
       </button>
 
