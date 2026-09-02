@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { cn } from '../../lib/utils'
 import { formatBytes, prepareImage, type ImagePreparationStage } from '../../lib/image-input'
+import { useChatStore } from '../../stores/chat-store'
+import { agentToolLabel, useAgentStatusStore } from '../../stores/agent-status-store'
 import { TaskProgress } from '../ui/task-progress'
 
 interface ChatInputProps {
@@ -22,6 +24,10 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const preparationAbortRef = useRef<AbortController | null>(null)
+  const activeConversationId = useChatStore((state) => state.activeConversationId)
+  const toolActivities = useAgentStatusStore((state) =>
+    activeConversationId ? state.activitiesByConversation[activeConversationId] || [] : [],
+  )
 
   useEffect(() => { textareaRef.current?.focus() }, [])
   useEffect(() => () => preparationAbortRef.current?.abort(), [])
@@ -87,6 +93,35 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory
   return (
     <div className="max-w-full min-w-0 shrink-0 overflow-x-hidden bg-[#0a0a0c] px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 sm:px-6 sm:pb-5">
       <div className="mx-auto w-full max-w-[860px] min-w-0">
+        {toolActivities.length > 0 && (
+          <div className="mb-1.5 flex max-w-full gap-1.5 overflow-x-auto overscroll-x-contain px-1 pb-0.5" aria-live="polite">
+            {toolActivities.slice(-4).map((activity) => (
+              <div
+                key={activity.id}
+                className={cn(
+                  'inline-flex min-h-7 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-medium',
+                  activity.state === 'running' && 'border-white/[0.12] bg-white/[0.05] text-white/70',
+                  activity.state === 'success' && 'border-emerald-400/15 bg-emerald-400/[0.06] text-emerald-100/65',
+                  activity.state === 'error' && 'border-rose-400/15 bg-rose-400/[0.06] text-rose-100/70',
+                )}
+              >
+                <span
+                  className={cn(
+                    'h-1.5 w-1.5 rounded-full',
+                    activity.state === 'running' && 'bg-white/55 animate-pulse',
+                    activity.state === 'success' && 'bg-emerald-300/65',
+                    activity.state === 'error' && 'bg-rose-300/70',
+                  )}
+                />
+                <span>{agentToolLabel(activity.toolId)}</span>
+                <span className="text-white/30">
+                  {activity.state === 'running' ? 'running' : activity.state === 'success' ? 'done' : 'failed'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
         {images.length > 0 && (
           <div className="touch-pan-x mb-2 flex max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-1">
             {images.map((img, i) => (
@@ -135,7 +170,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory
                 }
               }
             }}
-            placeholder={disabled ? 'Connect an API key to start…' : isPreparing ? 'Preparing image…' : dragOver ? 'Drop image to attach' : 'Ask anything — Enter to send, Shift+Enter for newline'}
+            placeholder={disabled ? 'Connect an API key to start…' : isPreparing ? 'Preparing image…' : dragOver ? 'Drop image to attach' : 'Ask Nour anything — Enter to send, Shift+Enter for newline'}
             rows={2}
             enterKeyHint="send"
             aria-label="Message input"
