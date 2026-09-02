@@ -1,8 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
 import { cn } from '../../lib/utils'
 import { formatBytes, prepareImage, type ImagePreparationStage } from '../../lib/image-input'
+import { cancelVoiceListening, listenForVoice, speakVoice, stopVoiceSpeaking, voiceLocaleLabel, voiceLocaleShortLabel } from '../../lib/voice-chat'
 import { useChatStore } from '../../stores/chat-store'
 import { agentToolLabel, useAgentStatusStore } from '../../stores/agent-status-store'
+import { useVoiceStore } from '../../stores/voice-store'
+import { toast } from '../../stores/toast-store'
 import { TaskProgress } from '../ui/task-progress'
 
 interface ChatInputProps {
@@ -21,16 +24,61 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory
   const [preparationStatus, setPreparationStatus] = useState('')
   const [preparationPercent, setPreparationPercent] = useState(0)
   const [attachmentError, setAttachmentError] = useState<string | null>(null)
+  const [voiceError, setVoiceError] = useState<string | null>(null)
+  const [isListening, setIsListening] = useState(false)
+  const [isSpeaking, setIsSpeaking] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const preparationAbortRef = useRef<AbortController | null>(null)
+  const pendingVoiceReplyLocaleRef = useRef<'en-US' | 'ar-EG' | null>(null)
+  const previousStreamingRef = useRef(isStreaming)
   const activeConversationId = useChatStore((state) => state.activeConversationId)
+  const latestAssistantText = useChatStore((state) => {
+    const id = state.activeConversationId
+    if (!id) return ''
+    const conversation = state.conversations.find((item) => item.id === id)
+    if (!conversation) return ''
+    for (let index = conversation.messages.length - 1; index >= 0; index -= 1) {
+      const message = conversation.messages[index]
+      if (message.role !== 'assistant') continue
+      if (typeof message.content === 'string') return message.content
+      return message.content.filter((part) => part.type === 'text').map((part) => part.text || '').join(' ')
+    }
+    return ''
+  })
   const toolActivities = useAgentStatusStore((state) =>
     activeConversationId ? state.activitiesByConversation[activeConversationId] || [] : [],
   )
+  const voiceLocale = useVoiceStore((state) => state.locale)
+  const speakReplies = useVoiceStore((state) => state.speakReplies)
+  const autoSendVoice = useVoiceStore((state) => state.autoSend)
+  const toggleVoiceLocale = useVoiceStore((state) => state.toggleLocale)
+  const setSpeakReplies = useVoiceStore((state) => state.setSpeakReplies)
+  const markNextInputVoice = useVoiceStore((state) => state.markNextInputVoice)
 
   useEffect(() => { textareaRef.current?.focus() }, [])
-  useEffect(() => () => preparationAbortRef.current?.abort(), [])
+  useEffect(() => () => {
+    preparationAbortRef.current?.abort()
+    void cancelVoiceListening()
+    void stopVoiceSpeaking()
+  }, [])
+
+  useEffect(() => {
+    const wasStreaming = previousStreamingRef.current
+    previousStreamingRef.current = isStreaming
+    if (!wasStreaming || isStreaming) return
+
+    const replyLocale = pendingVoiceReplyLocaleRef.current
+    pendingVoiceReplyLocaleRef.current = null
+    if (!replyLocale || !speakReplies || !latestAssistantText.trim()) return
+
+    setIsSpeaking(true)
+    void speakVoice(latestAssistantText, replyLocale)
+      .catch((error) => {
+        toast.fromError(error, replyLocale === 'ar-EG' ? 'تعذر تشغيل الرد الصوتي' : 'Could not play voice reply')
+      })
+      .finally(() => setIsSpeaking(false))
+  }, [isStreaming, latestAssistantText, speakReplies])
 
   const handleSubmit = () => {
     const trimmed = value.trim()
@@ -38,6 +86,51 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory
     onSend(trimmed, images.length > 0 ? images : undefined)
     setValue('')
     setImages([])
+  }
+
+  const handleVoice = async () => {
+    if (disabled || isPreparing || isStreaming) return
+    setVoiceError(null)
+
+    if (isListening) {
+      await cancelVoiceListening()
+      setIsListening(false)
+      return
+    }
+
+    if (isSpeaking) {
+      await stopVoiceSpeaking()
+      setIsSpeaking(false)
+    }
+
+    setIsListening(true)
+    try {
+      const result = await listenForVoice(voiceLocale)
+      if (result.cancelled || !result.text.trim()) return
+
+      if (autoSendVoice) {
+        markNextInputVoice(voiceLocale)
+        pendingVoiceReplyLocaleRef.current = voiceLocale
+        onSend(result.text.trim())
+      } else {
+        setValue((current) => current.trim() ? `${current.trim()} ${result.text.trim()}` : result.text.trim())
+        textareaRef.current?.focus()
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Voice recognition failed'
+      setVoiceError(message)
+    } finally {
+      setIsListening(false)
+    }
+  }
+
+  const toggleSpokenReplies = async () => {
+    const next = !speakReplies
+    setSpeakReplies(next)
+    if (!next) {
+      await stopVoiceSpeaking()
+      setIsSpeaking(false)
+    }
   }
 
   const handleImageUpload = async (files: FileList | File[] | null) => {
@@ -93,6 +186,13 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory
   return (
     <div className="max-w-full min-w-0 shrink-0 overflow-x-hidden bg-[#0a0a0c] px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 sm:px-6 sm:pb-5">
       <div className="mx-auto w-full max-w-[860px] min-w-0">
+        {(isListening || isSpeaking) && (
+          <div className="mb-1.5 flex items-center gap-2 px-1 text-[11px] font-medium text-white/55" aria-live="polite">
+            <span className={cn('h-1.5 w-1.5 rounded-full', isListening ? 'bg-rose-300 animate-pulse' : 'bg-emerald-300 animate-pulse')} />
+            <span>{isListening ? `Listening · ${voiceLocaleLabel(voiceLocale)}` : `Nour speaking · ${voiceLocaleLabel(pendingVoiceReplyLocaleRef.current || voiceLocale)}`}</span>
+          </div>
+        )}
+
         {toolActivities.length > 0 && (
           <div className="mb-1.5 flex max-w-full gap-1.5 overflow-x-auto overscroll-x-contain px-1 pb-0.5" aria-live="polite">
             {toolActivities.slice(-4).map((activity) => (
@@ -149,7 +249,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory
           onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(true) }}
           onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(false) }}
           onDrop={(e) => { e.preventDefault(); e.stopPropagation(); setDragOver(false); void handleImageUpload(e.dataTransfer.files) }}
-          aria-busy={isPreparing || undefined}
+          aria-busy={isPreparing || isListening || undefined}
         >
           <textarea
             ref={textareaRef}
@@ -164,29 +264,27 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory
               for (const item of items) {
                 if (item.type.startsWith('image/')) {
                   const file = item.getAsFile()
-                  if (file) {
-                    void handleImageUpload([file])
-                  }
+                  if (file) void handleImageUpload([file])
                 }
               }
             }}
-            placeholder={disabled ? 'Connect an API key to start…' : isPreparing ? 'Preparing image…' : dragOver ? 'Drop image to attach' : 'Ask Nour anything — Enter to send, Shift+Enter for newline'}
+            placeholder={disabled ? 'Connect an API key to start…' : isListening ? (voiceLocale === 'ar-EG' ? 'اتكلم…' : 'Listening…') : isPreparing ? 'Preparing image…' : dragOver ? 'Drop image to attach' : 'Ask Nour anything — type or use the mic'}
             rows={2}
             enterKeyHint="send"
             aria-label="Message input"
             className="min-h-[72px] max-h-32 w-full resize-none overflow-y-auto bg-transparent px-4 pb-1 pt-3 text-[16px] leading-relaxed text-white outline-none placeholder:text-white/30 sm:px-5 sm:pt-4"
             disabled={disabled}
           />
-          <div className="flex items-center justify-between px-3 pb-2.5">
-            <div className="flex items-center gap-1">
+          <div className="flex items-center justify-between gap-1 px-2.5 pb-2.5 sm:px-3">
+            <div className="flex min-w-0 items-center gap-0.5 overflow-x-auto">
               <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { void handleImageUpload(e.target.files) }} />
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
-                disabled={disabled || isPreparing || images.length >= 4}
+                disabled={disabled || isPreparing || images.length >= 4 || isListening}
                 aria-label="Attach image"
-                className="flex items-center gap-1.5 px-2 py-1.5 text-white/50 hover:text-white text-[13px] transition-colors rounded-lg hover:bg-white/[0.05] disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
-                title="Attach image (or drag/paste)"
+                className="flex h-10 w-10 shrink-0 items-center justify-center text-white/50 hover:text-white transition-colors rounded-lg hover:bg-white/[0.05] disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
+                title="Attach image"
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
@@ -194,10 +292,45 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory
               </button>
               <button
                 type="button"
-                onClick={onOpenHistory}
-                className="min-h-10 rounded-lg px-2 text-[12px] font-medium text-white/55 hover:bg-white/[0.05] hover:text-white"
+                onClick={() => { void handleVoice() }}
+                disabled={disabled || isPreparing || isStreaming}
+                aria-label={isListening ? 'Stop listening' : `Voice command in ${voiceLocaleLabel(voiceLocale)}`}
+                aria-pressed={isListening}
+                className={cn(
+                  'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] disabled:opacity-40',
+                  isListening ? 'border-rose-400/30 bg-rose-500/15 text-rose-100' : 'border-transparent text-white/55 hover:bg-white/[0.05] hover:text-white',
+                )}
+                title={isListening ? 'Stop listening' : `Speak to Nour · ${voiceLocaleLabel(voiceLocale)}`}
               >
-                History
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10a7 7 0 0014 0M12 17v5M8 22h8" /></svg>
+              </button>
+              <button
+                type="button"
+                onClick={toggleVoiceLocale}
+                disabled={isListening || isStreaming}
+                aria-label={`Voice language: ${voiceLocaleLabel(voiceLocale)}. Tap to switch.`}
+                className="min-h-10 shrink-0 rounded-lg px-2 text-[12px] font-semibold text-white/60 hover:bg-white/[0.05] hover:text-white disabled:opacity-40"
+                title="Switch voice language between English and Egyptian Arabic"
+              >
+                {voiceLocaleShortLabel(voiceLocale)}
+              </button>
+              <button
+                type="button"
+                onClick={() => { void toggleSpokenReplies() }}
+                aria-pressed={speakReplies}
+                aria-label={speakReplies ? 'Spoken voice replies on' : 'Spoken voice replies off'}
+                className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors', speakReplies ? 'text-emerald-100/70 hover:bg-emerald-400/[0.08]' : 'text-white/30 hover:bg-white/[0.05]')}
+                title={speakReplies ? 'Nour will speak replies to voice commands' : 'Voice reply playback is off'}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5z" /><path d="M15 9a4 4 0 010 6M18 6a8 8 0 010 12" /></svg>
+              </button>
+              <button
+                type="button"
+                onClick={onOpenHistory}
+                className="min-h-10 shrink-0 rounded-lg px-2 text-[12px] font-medium text-white/50 hover:bg-white/[0.05] hover:text-white"
+              >
+                <span className="hidden sm:inline">History</span>
+                <span className="sm:hidden" aria-label="History">History</span>
               </button>
             </div>
             {isStreaming ? (
@@ -205,7 +338,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory
                 type="button"
                 onClick={onStop}
                 aria-label="Stop generating"
-                className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-white/85 bg-white/[0.08] hover:bg-white/[0.14] border border-white/[0.12] rounded-lg transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
+                className="flex min-h-10 shrink-0 items-center gap-1.5 px-3 text-[13px] font-medium text-white/85 bg-white/[0.08] hover:bg-white/[0.14] border border-white/[0.12] rounded-lg transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
               >
                 <svg width="9" height="9" viewBox="0 0 8 8" fill="currentColor"><rect width="8" height="8" rx="1" /></svg>
                 Stop
@@ -214,11 +347,11 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={!value.trim() || disabled || isPreparing}
+                disabled={!value.trim() || disabled || isPreparing || isListening}
                 aria-label="Send message"
                 className={cn(
-                  'w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2',
-                  value.trim() && !disabled && !isPreparing
+                  'w-10 h-10 shrink-0 flex items-center justify-center rounded-xl transition-all duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2',
+                  value.trim() && !disabled && !isPreparing && !isListening
                     ? 'bg-white text-black hover:bg-white/95 active:scale-95 shadow-sm'
                     : 'bg-white/[0.06] text-white/25',
                 )}
@@ -243,6 +376,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory
           </div>
         )}
         {attachmentError && <div role="alert" className="mt-1.5 px-1 text-[12px] text-red-300/90">{attachmentError}</div>}
+        {voiceError && <div role="alert" className="mt-1.5 px-1 text-[12px] text-rose-200/90">{voiceError}</div>}
       </div>
     </div>
   )
