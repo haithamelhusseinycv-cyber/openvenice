@@ -6,6 +6,7 @@ import { useProviderStore } from '../stores/provider-store'
 import { lockChatSystemPrompt } from '../lib/defaults'
 import { getDefaultAgentRegistry } from '../agent/runtime'
 import { runQwenAgent } from '../agent/qwen-tool-loop'
+import { buildNourSystemPrompt } from '../agent/personas/nour'
 import type { ChatCompletionRequest, ChatMessage, ContentPart } from '../types/venice'
 
 export function useChat() {
@@ -35,7 +36,8 @@ export function useChat() {
         if (typeof m.content === 'string') return m.content !== ''
         return true
       })
-      const safeSystemPrompt = lockChatSystemPrompt(useChatStore.getState().systemPrompt)
+      const baseSystemPrompt = lockChatSystemPrompt(useChatStore.getState().systemPrompt)
+      const safeSystemPrompt = buildNourSystemPrompt(baseSystemPrompt)
       if (safeSystemPrompt) {
         messages.unshift({ role: 'system', content: safeSystemPrompt })
       }
