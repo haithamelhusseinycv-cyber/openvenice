@@ -1,13 +1,10 @@
 import { useCallback, useRef } from 'react'
 import { venice } from '../lib/venice-client'
+import { qwenChatStream } from '../lib/qwen-client'
 import { parseSSEStream } from '../lib/stream'
 import { useChatStore } from '../stores/chat-store'
+import { useProviderStore } from '../stores/provider-store'
 import { lockChatSystemPrompt } from '../lib/defaults'
-import {
-  DEFAULT_CHAT_MODEL_ID,
-  FALLBACK_CHAT_MODEL_ID,
-} from '../lib/allowed-models'
-import { shouldUseModelFallback } from '../lib/model-routing'
 import type { ChatCompletionRequest, ChatMessage, ContentPart } from '../types/venice'
 
 export function useChat() {
@@ -41,56 +38,47 @@ export function useChat() {
         messages.unshift({ role: 'system', content: safeSystemPrompt })
       }
 
-      const body: ChatCompletionRequest = {
+      const provider = useProviderStore.getState()
+      const commonBody: ChatCompletionRequest = {
         model,
         messages,
         stream: true,
         temperature,
         top_p: topP,
         max_tokens: maxTokens,
-        venice_parameters: veniceParams,
       }
 
-      const stream = await venice<ReadableStream<Uint8Array>>('/chat/completions', {
-        method: 'POST',
-        body: JSON.stringify(body),
-        stream: true,
-        signal: abortController.signal,
-      })
+      const stream = provider.chatProvider === 'qwen'
+        ? await qwenChatStream(
+            { baseUrl: provider.qwenBaseUrl, apiKey: provider.qwenApiKey },
+            commonBody,
+            abortController.signal,
+          )
+        : await venice<ReadableStream<Uint8Array>>('/chat/completions', {
+            method: 'POST',
+            body: JSON.stringify({ ...commonBody, venice_parameters: veniceParams }),
+            stream: true,
+            signal: abortController.signal,
+          })
 
       for await (const chunk of parseSSEStream(stream, { signal: abortController.signal })) {
         if (chunk.model) {
           setLastAssistantServedModel(convId, chunk.model)
         }
-        const delta = chunk.choices[0]?.delta
+        const delta = chunk.choices[0]?.delta as (typeof chunk.choices)[number]['delta'] & {
+          reasoning?: string
+          reasoning_text?: string
+        }
         if (delta?.content) {
           appendToLastAssistant(convId, delta.content)
         }
-        if (delta?.reasoning_content) {
-          appendReasoningToLastAssistant(convId, delta.reasoning_content)
+        const reasoning = delta?.reasoning_content || delta?.reasoning || delta?.reasoning_text
+        if (reasoning) {
+          appendReasoningToLastAssistant(convId, reasoning)
         }
       }
     },
     [appendToLastAssistant, appendReasoningToLastAssistant, setLastAssistantServedModel, veniceParams, temperature, topP, maxTokens],
-  )
-
-  const streamWithFallback = useCallback(
-    async (convId: string, model: string, abortController: AbortController) => {
-      try {
-        await streamResponse(convId, model, abortController)
-      } catch (error) {
-        const conversation = useChatStore.getState().conversations.find((item) => item.id === convId)
-        const last = conversation?.messages[conversation.messages.length - 1]
-        const hasOutput = last?.role === 'assistant'
-          && typeof last.content === 'string'
-          && last.content.length > 0
-        const canFallback = model === DEFAULT_CHAT_MODEL_ID
-          && shouldUseModelFallback(error, { aborted: abortController.signal.aborted, hasOutput })
-        if (!canFallback) throw error
-        await streamResponse(convId, FALLBACK_CHAT_MODEL_ID, abortController)
-      }
-    },
-    [streamResponse],
   )
 
   const send = useCallback(
@@ -100,7 +88,6 @@ export function useChat() {
         convId = createConversation(model)
       }
 
-      // Build user message — plain text or multimodal with images
       let userMsg: ChatMessage
       if (imageAttachments && imageAttachments.length > 0) {
         const parts: ContentPart[] = [
@@ -120,7 +107,9 @@ export function useChat() {
       abortRef.current = abortController
 
       try {
-        await streamWithFallback(convId, model, abortController)
+        // Provider/model routing is explicit. Do not silently fall back to a
+        // different provider or model when the selected route fails.
+        await streamResponse(convId, model, abortController)
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') return
         const message = err instanceof Error ? err.message : 'Unknown error'
@@ -130,7 +119,7 @@ export function useChat() {
         abortRef.current = null
       }
     },
-    [addMessage, appendToLastAssistant, createConversation, setStreaming, streamWithFallback],
+    [addMessage, appendToLastAssistant, createConversation, setStreaming, streamResponse],
   )
 
   const regenerate = useCallback(
@@ -152,7 +141,7 @@ export function useChat() {
       abortRef.current = abortController
 
       try {
-        await streamWithFallback(convId, model, abortController)
+        await streamResponse(convId, model, abortController)
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') return
         const message = err instanceof Error ? err.message : 'Unknown error'
@@ -162,7 +151,7 @@ export function useChat() {
         abortRef.current = null
       }
     },
-    [addMessage, appendToLastAssistant, deleteMessage, setStreaming, streamWithFallback],
+    [addMessage, appendToLastAssistant, deleteMessage, setStreaming, streamResponse],
   )
 
   const stop = useCallback(() => {
