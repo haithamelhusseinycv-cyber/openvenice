@@ -16,6 +16,8 @@ interface ChatInputProps {
   onOpenHistory: () => void
 }
 
+const EMPTY_TOOL_ACTIVITIES = Object.freeze([]) as ReturnType<typeof useAgentStatusStore.getState>['activitiesByConversation'][string]
+
 export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory }: ChatInputProps) {
   const [value, setValue] = useState('')
   const [images, setImages] = useState<string[]>([])
@@ -47,7 +49,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory
     return ''
   })
   const toolActivities = useAgentStatusStore((state) =>
-    activeConversationId ? state.activitiesByConversation[activeConversationId] || [] : [],
+    activeConversationId ? state.activitiesByConversation[activeConversationId] || EMPTY_TOOL_ACTIVITIES : EMPTY_TOOL_ACTIVITIES,
   )
   const voiceLocale = useVoiceStore((state) => state.locale)
   const speakReplies = useVoiceStore((state) => state.speakReplies)
