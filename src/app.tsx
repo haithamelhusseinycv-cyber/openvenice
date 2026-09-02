@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState, useEffect } from 'react'
 import { useSettingsStore, type Tab } from './stores/settings-store'
-import { useChatStore } from './stores/chat-store'
+import { usePlaygroundStore } from './stores/playground-store'
 import { useAuthStore } from './stores/auth-store'
 import { Sidebar } from './components/layout/sidebar'
 import { Header } from './components/layout/header'
@@ -10,17 +10,15 @@ import { ErrorBoundary } from './components/ui/error-boundary'
 import { Toaster } from './components/ui/toaster'
 import { isVisibleTab } from './lib/allowed-models'
 
-const ChatView = lazy(() => import('./components/chat/chat-view').then((module) => ({ default: module.ChatView })))
 const ImagePage = lazy(() => import('./components/image/image-page').then((module) => ({ default: module.ImagePage })))
 const PlaygroundView = lazy(() => import('./components/playground/playground-view').then((module) => ({ default: module.PlaygroundView })))
 
 const views = {
-  chat: ChatView,
-  image: ImagePage,
   playground: PlaygroundView,
+  image: ImagePage,
 } as const
 
-const TAB_ORDER: Tab[] = ['chat', 'image', 'playground']
+const TAB_ORDER: Tab[] = ['playground', 'image']
 
 export function App() {
   const needsUnlock = useAuthStore((s) => s.hasEncrypted && !s.apiKey)
@@ -29,11 +27,11 @@ export function App() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const activeTab = useSettingsStore((s) => s.activeTab)
   const setActiveTab = useSettingsStore((s) => s.setActiveTab)
-  const safeTab = isVisibleTab(activeTab) ? activeTab : 'chat'
+  const safeTab = isVisibleTab(activeTab) ? activeTab : 'playground'
   const ActiveView = views[safeTab]
 
   useEffect(() => {
-    if (!isVisibleTab(activeTab)) setActiveTab('chat')
+    if (!isVisibleTab(activeTab)) setActiveTab('playground')
   }, [activeTab, setActiveTab])
 
   useEffect(() => {
@@ -66,8 +64,8 @@ export function App() {
         setApiKeyOpen(false)
         return
       }
-      if (safeTab !== 'chat') {
-        setActiveTab('chat')
+      if (safeTab !== 'playground') {
+        setActiveTab('playground')
       }
     }
     window.addEventListener('popstate', onPop)
@@ -81,9 +79,9 @@ export function App() {
 
       if (e.key === 'n') {
         e.preventDefault()
-        setActiveTab('chat')
+        setActiveTab('playground')
         setMobileSidebarOpen(false)
-        useChatStore.getState().setActiveConversation(null)
+        usePlaygroundStore.getState().clearConversation()
         return
       }
 
@@ -122,8 +120,8 @@ export function App() {
             </ErrorBoundary>
           </Suspense>
         </main>
-        <nav aria-label="Mobile navigation" className="lg:hidden shrink-0 grid grid-cols-3 border-t border-white/[0.08] bg-[#0d0d11] pb-[env(safe-area-inset-bottom)]">
-          {([['chat', 'Chat'], ['image', 'Create'], ['playground', 'Noor']] as const).map(([id, label]) => (
+        <nav aria-label="Mobile navigation" className="lg:hidden shrink-0 grid grid-cols-2 border-t border-white/[0.08] bg-[#0d0d11] pb-[env(safe-area-inset-bottom)]">
+          {([['playground', 'Noor'], ['image', 'Create']] as const).map(([id, label]) => (
             <button key={id} type="button" onClick={() => setActiveTab(id)} aria-current={safeTab === id ? 'page' : undefined} className={`min-h-14 px-2 text-[13px] font-medium ${safeTab === id ? 'text-[var(--color-accent)] bg-white/[0.04]' : 'text-white/55'}`}>
               {label}
             </button>
