@@ -5,6 +5,7 @@ import { useAuthStore } from './stores/auth-store'
 import { Sidebar } from './components/layout/sidebar'
 import { Header } from './components/layout/header'
 import { ApiKeyDialog } from './components/layout/api-key-dialog'
+import { DeviceDiagnosticsDialog } from './components/chat/device-diagnostics-dialog'
 import { ErrorBoundary } from './components/ui/error-boundary'
 import { Toaster } from './components/ui/toaster'
 import { isVisibleTab } from './lib/allowed-models'
@@ -24,6 +25,7 @@ const TAB_ORDER: Tab[] = ['chat', 'image', 'playground']
 export function App() {
   const needsUnlock = useAuthStore((s) => s.hasEncrypted && !s.apiKey)
   const [apiKeyOpen, setApiKeyOpen] = useState(needsUnlock)
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const activeTab = useSettingsStore((s) => s.activeTab)
   const setActiveTab = useSettingsStore((s) => s.setActiveTab)
@@ -52,6 +54,10 @@ export function App() {
       window.dispatchEvent(ev)
       stay()
       if (ev.defaultPrevented) return
+      if (diagnosticsOpen) {
+        setDiagnosticsOpen(false)
+        return
+      }
       if (mobileSidebarOpen) {
         setMobileSidebarOpen(false)
         return
@@ -66,7 +72,7 @@ export function App() {
     }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
-  }, [mobileSidebarOpen, apiKeyOpen, safeTab, setActiveTab])
+  }, [diagnosticsOpen, mobileSidebarOpen, apiKeyOpen, safeTab, setActiveTab])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -106,6 +112,7 @@ export function App() {
       <div className="flex max-w-full flex-1 min-w-0 flex-col overflow-hidden">
         <Header
           onOpenApiKey={() => setApiKeyOpen(true)}
+          onOpenDiagnostics={() => setDiagnosticsOpen(true)}
           onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
         />
         <main className="max-w-full min-h-0 min-w-0 flex-1 overflow-hidden">
@@ -124,6 +131,7 @@ export function App() {
         </nav>
       </div>
       <ApiKeyDialog open={apiKeyOpen} onClose={() => setApiKeyOpen(false)} />
+      <DeviceDiagnosticsDialog open={diagnosticsOpen} onClose={() => setDiagnosticsOpen(false)} />
       <Toaster />
     </div>
   )
