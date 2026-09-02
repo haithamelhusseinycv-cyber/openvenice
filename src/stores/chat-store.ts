@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { ChatMessage, Conversation, VeniceParameters } from '../types/venice'
+import type { ChatArtifact, ChatMessage, Conversation, VeniceParameters } from '../types/venice'
 import { generateId } from '../lib/utils'
 import { createSafeStorage } from '../lib/safe-storage'
 import {
@@ -30,6 +30,7 @@ interface ChatState {
   addMessage: (conversationId: string, message: ChatMessage) => void
   appendToLastAssistant: (conversationId: string, token: string) => void
   appendReasoningToLastAssistant: (conversationId: string, token: string) => void
+  addArtifactToLastAssistant: (conversationId: string, artifact: ChatArtifact) => void
   setLastAssistantServedModel: (conversationId: string, model: string) => void
   deleteMessage: (conversationId: string, index: number) => void
   setStreaming: (streaming: boolean) => void
@@ -41,21 +42,26 @@ interface ChatState {
   getActiveConversation: () => Conversation | undefined
 }
 
+function messageForStorage(message: ChatMessage): ChatMessage {
+  const sanitized: ChatMessage = { ...message }
+  delete sanitized.artifacts
+  if (typeof sanitized.content === 'string') return sanitized
+
+  const text = sanitized.content
+    .filter((part) => part.type === 'text' && typeof part.text === 'string')
+    .map((part) => part.text)
+    .join('\n')
+    .trim()
+  return {
+    ...sanitized,
+    content: text || '[Image attachment omitted from saved history]',
+  }
+}
+
 export function conversationsForStorage(conversations: Conversation[]): Conversation[] {
   return conversations.slice(0, 50).map((conversation) => ({
     ...conversation,
-    messages: conversation.messages.map((message) => {
-      if (typeof message.content === 'string') return message
-      const text = message.content
-        .filter((part) => part.type === 'text' && typeof part.text === 'string')
-        .map((part) => part.text)
-        .join('\n')
-        .trim()
-      return {
-        ...message,
-        content: text || '[Image attachment omitted from saved history]',
-      }
-    }),
+    messages: conversation.messages.map(messageForStorage),
   }))
 }
 
@@ -140,6 +146,22 @@ export const useChatStore = create<ChatState>()(
           }),
         })),
 
+      addArtifactToLastAssistant: (conversationId, artifact) =>
+        set((s) => ({
+          conversations: s.conversations.map((c) => {
+            if (c.id !== conversationId) return c
+            const msgs = [...c.messages]
+            const last = msgs[msgs.length - 1]
+            if (last?.role === 'assistant') {
+              const existing = last.artifacts || []
+              if (!existing.some((item) => item.id === artifact.id)) {
+                msgs[msgs.length - 1] = { ...last, artifacts: [...existing, artifact] }
+              }
+            }
+            return { ...c, messages: msgs }
+          }),
+        })),
+
       setLastAssistantServedModel: (conversationId, model) =>
         set((s) => ({
           conversations: s.conversations.map((c) => {
@@ -179,17 +201,13 @@ export const useChatStore = create<ChatState>()(
     }),
     {
       name: 'venice-chat',
-      version: 17,
+      version: 18,
       storage: createJSONStorage(() => createSafeStorage()),
       migrate: (persisted) => {
         if (!persisted || typeof persisted !== 'object') return persisted as ChatState
         const s = persisted as Partial<ChatState>
         if (Array.isArray(s.conversations)) s.conversations = conversationsForStorage(s.conversations)
-        // Keep the saved history, but do not reopen a conversation containing
-        // an assistant reply produced under the retired image-writer prompt.
         s.activeConversationId = null
-        // Enable search and citations once for the new Qwen routing. The
-        // controls remain user-adjustable after this migration.
         s.veniceParams = lockChatParams({
           ...s.veniceParams,
           ...DEFAULT_CHAT_SEARCH_PARAMS,

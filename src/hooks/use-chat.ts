@@ -14,6 +14,7 @@ export function useChat() {
     addMessage,
     appendToLastAssistant,
     appendReasoningToLastAssistant,
+    addArtifactToLastAssistant,
     setLastAssistantServedModel,
     deleteMessage,
     setStreaming,
@@ -53,6 +54,30 @@ export function useChat() {
           onModel: (servedModel) => setLastAssistantServedModel(convId, servedModel),
           onContent: (text) => appendToLastAssistant(convId, text),
           onReasoning: (text) => appendReasoningToLastAssistant(convId, text),
+          onArtifact: (artifact) => {
+            const mimeType = typeof artifact.metadata.mimeType === 'string'
+              ? artifact.metadata.mimeType
+              : undefined
+            const format = typeof artifact.metadata.format === 'string'
+              ? artifact.metadata.format
+              : undefined
+            // Raw RGB is an internal pipeline artifact for chaining into
+            // Local Dream upscale; it cannot be rendered directly in chat.
+            if (!mimeType?.startsWith('image/') || format === 'raw') return
+            const url = artifact.data.startsWith('data:')
+              ? artifact.data
+              : `data:${mimeType};base64,${artifact.data}`
+            addArtifactToLastAssistant(convId, {
+              id: artifact.id,
+              kind: 'image',
+              url,
+              mimeType,
+              format,
+              width: typeof artifact.metadata.width === 'number' ? artifact.metadata.width : undefined,
+              height: typeof artifact.metadata.height === 'number' ? artifact.metadata.height : undefined,
+              sourceTool: typeof artifact.metadata.sourceTool === 'string' ? artifact.metadata.sourceTool : undefined,
+            })
+          },
         })
         return
       }
@@ -85,7 +110,7 @@ export function useChat() {
         if (reasoning) appendReasoningToLastAssistant(convId, reasoning)
       }
     },
-    [appendToLastAssistant, appendReasoningToLastAssistant, setLastAssistantServedModel, veniceParams, temperature, topP, maxTokens],
+    [addArtifactToLastAssistant, appendToLastAssistant, appendReasoningToLastAssistant, setLastAssistantServedModel, veniceParams, temperature, topP, maxTokens],
   )
 
   const send = useCallback(
