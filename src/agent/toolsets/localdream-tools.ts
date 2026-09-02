@@ -1,5 +1,8 @@
 import type { AgentTool } from '../types'
-import { LocalDreamConnector, type LocalDreamGenerateRequest } from '../../connectors/localdream/localdream-connector'
+import {
+  LocalDreamConnector,
+  type LocalDreamGenerateRequest,
+} from '../../connectors/localdream/localdream-connector'
 
 const objectSchema = (properties: Record<string, unknown>, required: string[] = []) => ({
   type: 'object',
@@ -22,7 +25,7 @@ export function createLocalDreamTools(connector = new LocalDreamConnector()): Ag
     {
       id: 'localdream.list_models',
       name: 'List Local Dream models',
-      description: 'List downloaded Local Dream generation models, defaults, supported resolutions, and upscalers.',
+      description: 'List downloaded Local Dream generation models, defaults, supported resolutions, and installed upscalers.',
       risk: 'read',
       permissions: ['network', 'local-app-control'],
       inputSchema: objectSchema({}),
@@ -58,7 +61,7 @@ export function createLocalDreamTools(connector = new LocalDreamConnector()): Ag
     {
       id: 'localdream.generate',
       name: 'Generate or edit with Local Dream',
-      description: 'Run Local Dream text-to-image, img2img, or inpaint. Include image for img2img; include image and mask for inpaint.',
+      description: 'Run Local Dream text-to-image, img2img, or inpaint. Include image for img2img; include image and mask for inpaint. When a 4x upscale will follow, set output_format to raw so the returned artifact can be passed directly to localdream.upscale.',
       risk: 'write',
       permissions: ['network', 'local-app-control', 'local-files'],
       inputSchema: objectSchema(
@@ -93,6 +96,63 @@ export function createLocalDreamTools(connector = new LocalDreamConnector()): Ag
         }
         if (!completed) return { ok: false, error: 'Local Dream ended without a completed image' }
         return { ok: true, data: completed, metadata: { progress: events } }
+      },
+    },
+    {
+      id: 'localdream.upscale',
+      name: 'Upscale with Local Dream',
+      description: 'Upscale a raw RGB Local Dream image by 4x using one of the installed Local Dream upscalers. Call localdream.list_models to discover upscaler IDs. The image may be an artifact:// reference returned from a previous raw Local Dream generation.',
+      risk: 'write',
+      permissions: ['network', 'local-app-control', 'local-files'],
+      inputSchema: objectSchema(
+        {
+          image: { type: 'string', description: 'Raw RGB base64 image or artifact:// reference from Local Dream generation.' },
+          width: { type: 'integer', minimum: 1 },
+          height: { type: 'integer', minimum: 1 },
+          upscaler_id: { type: 'string', description: 'Installed upscaler ID from localdream.list_models.' },
+          use_opencl: { type: 'boolean', description: 'Optional OpenCL acceleration for MNN upscalers.' },
+        },
+        ['image', 'width', 'height', 'upscaler_id'],
+      ),
+      execute: async (input, context) => {
+        const value = input as {
+          image: string
+          width: number
+          height: number
+          upscaler_id: string
+          use_opencl?: boolean
+        }
+
+        const artifact = context.artifacts?.get(value.image)
+        if (artifact?.metadata.format && artifact.metadata.format !== 'raw') {
+          return {
+            ok: false,
+            error: `Local Dream upscale requires a raw RGB artifact; received ${artifact.metadata.format}`,
+          }
+        }
+
+        const catalog = await connector.listModels(context.signal)
+        const upscaler = catalog.upscalers.find((item) => item.id === value.upscaler_id)
+        if (!upscaler) {
+          return {
+            ok: false,
+            error: `Unknown Local Dream upscaler: ${value.upscaler_id}`,
+            metadata: { available_upscalers: catalog.upscalers.map((item) => item.id) },
+          }
+        }
+
+        const image = context.artifacts?.resolveData(value.image) ?? value.image
+        const result = await connector.upscale(
+          {
+            image,
+            width: value.width,
+            height: value.height,
+            upscalerPath: upscaler.path,
+            useOpenCl: value.use_opencl,
+          },
+          context.signal,
+        )
+        return { ok: true, data: result }
       },
     },
     {
