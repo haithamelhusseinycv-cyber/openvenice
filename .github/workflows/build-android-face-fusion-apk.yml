@@ -16,6 +16,9 @@ jobs:
     timeout-minutes: 45
 
     steps:
+      - name: Checkout OpenVenice customization source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
       - name: Set up Java 21
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
         with:
@@ -29,12 +32,6 @@ jobs:
         with:
           path: ~/.android/debug.keystore
           key: android-face-fusion-debug-keystore-v2
-
-      - name: Clone build customizations
-        shell: bash
-        run: |
-          git clone --depth 1 --branch master https://github.com/haithamelhusseinycv-cyber/openvenice.git build-host
-          cp -R build-host/android-face-fusion-custom ./android-face-fusion-custom
 
       - name: Clone Android Face Fusion
         shell: bash
