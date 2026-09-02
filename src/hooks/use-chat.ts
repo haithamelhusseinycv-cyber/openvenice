@@ -1,10 +1,11 @@
 import { useCallback, useRef } from 'react'
 import { venice } from '../lib/venice-client'
-import { qwenChatStream } from '../lib/qwen-client'
 import { parseSSEStream } from '../lib/stream'
 import { useChatStore } from '../stores/chat-store'
 import { useProviderStore } from '../stores/provider-store'
 import { lockChatSystemPrompt } from '../lib/defaults'
+import { getDefaultAgentRegistry } from '../agent/runtime'
+import { runQwenAgent } from '../agent/qwen-tool-loop'
 import type { ChatCompletionRequest, ChatMessage, ContentPart } from '../types/venice'
 
 export function useChat() {
@@ -39,43 +40,49 @@ export function useChat() {
       }
 
       const provider = useProviderStore.getState()
-      const commonBody: ChatCompletionRequest = {
+      if (provider.chatProvider === 'qwen') {
+        await runQwenAgent({
+          config: { baseUrl: provider.qwenBaseUrl, apiKey: provider.qwenApiKey },
+          model,
+          messages,
+          temperature,
+          topP,
+          maxTokens,
+          registry: getDefaultAgentRegistry(),
+          signal: abortController.signal,
+          onModel: (servedModel) => setLastAssistantServedModel(convId, servedModel),
+          onContent: (text) => appendToLastAssistant(convId, text),
+          onReasoning: (text) => appendReasoningToLastAssistant(convId, text),
+        })
+        return
+      }
+
+      const body: ChatCompletionRequest = {
         model,
         messages,
         stream: true,
         temperature,
         top_p: topP,
         max_tokens: maxTokens,
+        venice_parameters: veniceParams,
       }
 
-      const stream = provider.chatProvider === 'qwen'
-        ? await qwenChatStream(
-            { baseUrl: provider.qwenBaseUrl, apiKey: provider.qwenApiKey },
-            commonBody,
-            abortController.signal,
-          )
-        : await venice<ReadableStream<Uint8Array>>('/chat/completions', {
-            method: 'POST',
-            body: JSON.stringify({ ...commonBody, venice_parameters: veniceParams }),
-            stream: true,
-            signal: abortController.signal,
-          })
+      const stream = await venice<ReadableStream<Uint8Array>>('/chat/completions', {
+        method: 'POST',
+        body: JSON.stringify(body),
+        stream: true,
+        signal: abortController.signal,
+      })
 
       for await (const chunk of parseSSEStream(stream, { signal: abortController.signal })) {
-        if (chunk.model) {
-          setLastAssistantServedModel(convId, chunk.model)
-        }
+        if (chunk.model) setLastAssistantServedModel(convId, chunk.model)
         const delta = chunk.choices[0]?.delta as (typeof chunk.choices)[number]['delta'] & {
           reasoning?: string
           reasoning_text?: string
         }
-        if (delta?.content) {
-          appendToLastAssistant(convId, delta.content)
-        }
+        if (delta?.content) appendToLastAssistant(convId, delta.content)
         const reasoning = delta?.reasoning_content || delta?.reasoning || delta?.reasoning_text
-        if (reasoning) {
-          appendReasoningToLastAssistant(convId, reasoning)
-        }
+        if (reasoning) appendReasoningToLastAssistant(convId, reasoning)
       }
     },
     [appendToLastAssistant, appendReasoningToLastAssistant, setLastAssistantServedModel, veniceParams, temperature, topP, maxTokens],
@@ -84,9 +91,7 @@ export function useChat() {
   const send = useCallback(
     async (userMessage: string, model: string, imageAttachments?: string[]) => {
       let convId = useChatStore.getState().activeConversationId
-      if (!convId) {
-        convId = createConversation(model)
-      }
+      if (!convId) convId = createConversation(model)
 
       let userMsg: ChatMessage
       if (imageAttachments && imageAttachments.length > 0) {
