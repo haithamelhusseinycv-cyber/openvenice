@@ -5,7 +5,7 @@ import type { ChatArtifact, ChatMessage, ContentPart } from '../../types/venice'
 import { cn } from '../../lib/utils'
 import { shareText } from '../../lib/native-media'
 import { toast } from '../../stores/toast-store'
-import { ArtifactActions } from './artifact-actions'
+import { ArtifactActions, type ImageRetryMode } from './artifact-actions'
 
 const SAFE_URL_PROTOCOLS = /^(https?:|mailto:|#|\/|\.)/i
 function safeUrlTransform(url: string, key: string): string {
@@ -91,6 +91,7 @@ interface MessageBubbleProps {
   onCopy: () => void
   onDelete: () => void
   onRegenerate?: () => void
+  onArtifactRetry?: (artifact: ChatArtifact, mode: ImageRetryMode) => void
   onArtifactEdit?: (artifact: ChatArtifact) => void
   onArtifactLocalDream?: (artifact: ChatArtifact) => void
   onArtifactFaceFusion?: (artifact: ChatArtifact) => void
@@ -102,6 +103,7 @@ export function MessageBubble({
   onCopy,
   onDelete,
   onRegenerate,
+  onArtifactRetry,
   onArtifactEdit,
   onArtifactLocalDream,
   onArtifactFaceFusion,
@@ -261,7 +263,7 @@ export function MessageBubble({
                 </figcaption>
                 <ArtifactActions
                   artifact={artifact}
-                  onRetry={onRegenerate}
+                  onRetry={onArtifactRetry ? (mode) => onArtifactRetry(artifact, mode) : onRegenerate ? () => onRegenerate() : undefined}
                   onEdit={onArtifactEdit ? () => onArtifactEdit(artifact) : undefined}
                   onSendLocalDream={onArtifactLocalDream ? () => onArtifactLocalDream(artifact) : undefined}
                   onSendFaceFusion={onArtifactFaceFusion ? () => onArtifactFaceFusion(artifact) : undefined}
