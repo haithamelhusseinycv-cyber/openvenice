@@ -64,7 +64,10 @@ const EDIT_MODEL_FAMILY_PREFIXES = [
   'firered-image-edit',
 ] as const
 
-export const VISIBLE_TABS = ['chat', 'image', 'playground'] as const
+// Noor is the only conversational surface. Create remains available as the
+// dedicated image workspace; the legacy Chat view stays in source for now but
+// is intentionally not exposed through app navigation.
+export const VISIBLE_TABS = ['playground', 'image'] as const
 export type VisibleTab = (typeof VISIBLE_TABS)[number]
 
 export function isAllowedChatModel(id?: string) {
