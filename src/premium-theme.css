@@ -1,0 +1,270 @@
+:root {
+  --color-bg-base: #0b0b0e;
+  --color-bg-raised: #131318;
+  --color-bg-overlay: #19191f;
+  --color-bg-input: #101014;
+  --color-border-faint: rgba(255, 255, 255, 0.055);
+  --color-border-soft: rgba(255, 255, 255, 0.095);
+  --color-border-strong: rgba(255, 255, 255, 0.18);
+  --color-text-primary: #f4efe8;
+  --color-text-secondary: #b8b0a7;
+  --color-text-tertiary: #817a75;
+  --color-text-quaternary: #5d5857;
+  --color-accent: #9b5cff;
+  --color-accent-soft: rgba(155, 92, 255, 0.18);
+  --noor-accent-2: #d64cb0;
+  --noor-accent-3: #b447e8;
+  --noor-warm: #f4efe8;
+  --noor-surface: #15151a;
+  --noor-surface-2: #1b1b21;
+  --noor-success: #6ee7a8;
+  --noor-gradient: linear-gradient(135deg, #8f46ff 0%, #b447e8 48%, #d64cb0 100%);
+  --noor-gradient-soft: linear-gradient(135deg, rgba(143, 70, 255, 0.22), rgba(214, 76, 176, 0.16));
+}
+
+html,
+body,
+#root {
+  background: #0b0b0e;
+}
+
+body {
+  background-image:
+    radial-gradient(circle at 78% 0%, rgba(155, 92, 255, 0.085), transparent 28rem),
+    radial-gradient(circle at 10% 92%, rgba(214, 76, 176, 0.055), transparent 25rem);
+  color: var(--noor-warm);
+}
+
+::selection {
+  background: rgba(155, 92, 255, 0.33);
+  color: #fff;
+}
+
+/* Premium shell */
+header {
+  background: rgba(11, 11, 14, 0.96) !important;
+  border-color: rgba(255, 255, 255, 0.07) !important;
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(18px);
+}
+
+aside[aria-label="Primary navigation"] {
+  background:
+    linear-gradient(180deg, rgba(155, 92, 255, 0.045), transparent 16rem),
+    #0f0f13 !important;
+  border-color: rgba(255, 255, 255, 0.07) !important;
+}
+
+aside[aria-label="Primary navigation"] button[aria-current="page"] {
+  background: var(--noor-gradient-soft) !important;
+  border: 1px solid rgba(180, 71, 232, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 10px 30px rgba(87, 34, 147, 0.08);
+}
+
+aside[aria-label="Primary navigation"] button[aria-current="page"] > span:first-of-type {
+  background: var(--noor-gradient) !important;
+  width: 3px !important;
+  box-shadow: 0 0 14px rgba(180, 71, 232, 0.8);
+}
+
+nav[aria-label="Mobile navigation"] {
+  background: rgba(13, 13, 17, 0.97) !important;
+  border-color: rgba(255, 255, 255, 0.075) !important;
+  box-shadow: 0 -12px 28px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(18px);
+}
+
+nav[aria-label="Mobile navigation"] button {
+  position: relative;
+  background: transparent !important;
+  color: rgba(244, 239, 232, 0.5) !important;
+}
+
+nav[aria-label="Mobile navigation"] button[aria-current="page"] {
+  color: #f4efe8 !important;
+  text-shadow: 0 0 18px rgba(155, 92, 255, 0.28);
+}
+
+nav[aria-label="Mobile navigation"] button[aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  left: 30%;
+  right: 30%;
+  bottom: 5px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--noor-gradient);
+  box-shadow: 0 0 14px rgba(180, 71, 232, 0.48);
+}
+
+/* Header controls */
+header div.relative > button,
+header button[aria-label="Device diagnostics"],
+header button[aria-label*="API key"] {
+  background: rgba(255, 255, 255, 0.025) !important;
+  border-color: rgba(255, 255, 255, 0.11) !important;
+  border-radius: 12px !important;
+}
+
+header div.relative > button:focus-visible,
+header div.relative > button:hover,
+header button[aria-label="Device diagnostics"]:hover,
+header button[aria-label*="API key"]:hover {
+  border-color: rgba(155, 92, 255, 0.48) !important;
+  box-shadow: 0 0 0 1px rgba(155, 92, 255, 0.1), 0 8px 28px rgba(86, 30, 139, 0.1);
+}
+
+header div.relative > div.absolute {
+  background: #15151a !important;
+  border-color: rgba(155, 92, 255, 0.24) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(155, 92, 255, 0.05);
+}
+
+header div.relative > div.absolute input {
+  background: rgba(255, 255, 255, 0.035) !important;
+  border: 1px solid rgba(155, 92, 255, 0.26);
+  border-radius: 10px;
+}
+
+header div.relative > div.absolute button:hover,
+header div.relative > div.absolute button[class*="bg-white"] {
+  background: rgba(155, 92, 255, 0.14) !important;
+}
+
+a[aria-label="Add Venice credits"] {
+  background: var(--noor-gradient) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 24px rgba(143, 70, 255, 0.2);
+}
+
+a[aria-label="Add Venice credits"]:active {
+  transform: scale(0.98);
+}
+
+/* Noor surface */
+[aria-label="Noor language mode"] {
+  padding: 2px 0 3px;
+}
+
+[aria-label="Noor language mode"] button {
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.025) !important;
+  border-color: rgba(255, 255, 255, 0.09) !important;
+  color: rgba(244, 239, 232, 0.55) !important;
+}
+
+[aria-label="Noor language mode"] button[aria-pressed="true"] {
+  background: var(--noor-gradient) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+  box-shadow: 0 10px 30px rgba(143, 70, 255, 0.23), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+[aria-label="Noor voice commands"] button {
+  background: #15151a !important;
+  border-color: rgba(255, 255, 255, 0.09) !important;
+  border-radius: 14px !important;
+}
+
+[aria-label="Noor voice commands"] button:hover {
+  border-color: rgba(155, 92, 255, 0.42) !important;
+  background: rgba(155, 92, 255, 0.07) !important;
+}
+
+button[aria-label*="Auto-read"],
+button[aria-label*="auto-read"] {
+  border-color: rgba(155, 92, 255, 0.25) !important;
+}
+
+textarea[aria-label="Message Noor"] {
+  background: linear-gradient(180deg, #15151a, #121216) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  border-radius: 16px !important;
+  color: #f4efe8 !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+textarea[aria-label="Message Noor"]:focus {
+  border-color: rgba(155, 92, 255, 0.58) !important;
+  box-shadow: 0 0 0 3px rgba(155, 92, 255, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+textarea[aria-label="Message Noor"] + button:not(:disabled) {
+  background: var(--noor-gradient) !important;
+  color: #fff !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  box-shadow: 0 10px 28px rgba(143, 70, 255, 0.25);
+}
+
+button[aria-label="Play Noor voice"],
+button[aria-label="Stop Noor voice"] {
+  color: rgba(210, 176, 255, 0.9) !important;
+}
+
+button[aria-label="Play Noor voice"]:hover,
+button[aria-label="Stop Noor voice"]:hover {
+  background: rgba(155, 92, 255, 0.08) !important;
+  color: #efdfff !important;
+}
+
+/* Inputs, cards and generation controls */
+textarea:not([aria-label="Message Noor"]),
+input[type="text"],
+input[type="password"],
+input[type="search"] {
+  background-color: #121217 !important;
+  border-color: rgba(255, 255, 255, 0.095) !important;
+}
+
+textarea:not([aria-label="Message Noor"]):focus,
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="search"]:focus {
+  border-color: rgba(155, 92, 255, 0.58) !important;
+  box-shadow: 0 0 0 3px rgba(155, 92, 255, 0.08);
+}
+
+input[type="range"] {
+  background: linear-gradient(90deg, rgba(155, 92, 255, 0.34), rgba(214, 76, 176, 0.17)) !important;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  background: #f4efe8 !important;
+  box-shadow: 0 0 0 4px rgba(155, 92, 255, 0.08), 0 4px 18px rgba(0, 0, 0, 0.48) !important;
+}
+
+input[type="range"]::-moz-range-thumb {
+  background: #f4efe8 !important;
+  box-shadow: 0 0 0 4px rgba(155, 92, 255, 0.08), 0 4px 18px rgba(0, 0, 0, 0.48) !important;
+}
+
+/* Dialogs */
+[role="dialog"] {
+  border-color: rgba(155, 92, 255, 0.16) !important;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.6), 0 0 70px rgba(116, 47, 192, 0.055);
+}
+
+/* Markdown and status details */
+.prose-venice blockquote {
+  border-left-color: #9b5cff !important;
+}
+
+.prose-venice a {
+  color: #c79cff !important;
+  text-decoration-color: rgba(199, 156, 255, 0.38) !important;
+}
+
+/* Scrollbar follows the quieter premium palette */
+::-webkit-scrollbar-thumb {
+  background: rgba(185, 151, 232, 0.16) !important;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+* {
+  scrollbar-color: rgba(185, 151, 232, 0.16) transparent;
+}
