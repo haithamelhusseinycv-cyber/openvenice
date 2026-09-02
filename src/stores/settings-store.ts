@@ -36,8 +36,8 @@ interface SettingsState {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      activeTab: 'chat',
-      setActiveTab: (tab) => set({ activeTab: isVisibleTab(tab) ? tab : 'chat' }),
+      activeTab: 'playground',
+      setActiveTab: (tab) => set({ activeTab: isVisibleTab(tab) ? tab : 'playground' }),
       sidebarOpen: true,
       setSidebarOpen: (open: boolean) => set({ sidebarOpen: open }),
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
@@ -51,30 +51,29 @@ export const useSettingsStore = create<SettingsState>()(
         })),
       playgroundAgentModel: '',
       setPlaygroundAgentModel: (modelId) => set({ playgroundAgentModel: modelId }),
-      nourLanguageMode: 'american-egyptian',
+      nourLanguageMode: 'cairo-street',
       setNourLanguageMode: (mode) => set({ nourLanguageMode: mode }),
     }),
     {
       name: 'venice-settings',
-      version: 8,
+      version: 9,
       storage: createJSONStorage(() => createSafeStorage()),
       migrate: (persisted) => {
         if (!persisted || typeof persisted !== 'object') return persisted as SettingsState
         const s = persisted as Partial<SettingsState>
-        // Adopt the new preferred Qwen once. Users can still choose the Qwen
-        // 3.6 backup manually after this migration has completed.
         s.selectedModels = { ...s.selectedModels, chat: DEFAULT_CHAT_MODEL_ID }
         s.selectedModels = sanitizeSelectedModels(s.selectedModels)
-        if (!isVisibleTab(s.activeTab)) s.activeTab = 'chat'
-        // Reset stale agent selections once so Noor adopts Qwen 3.8 first.
+        // Noor is now the primary conversational surface. Move existing users
+        // off the retired Chat tab while preserving Create when it was active.
+        s.activeTab = s.activeTab === 'image' ? 'image' : 'playground'
+        // Reset stale agent selections once so Noor adopts the preferred model.
         s.playgroundAgentModel = ''
-        if (s.nourLanguageMode !== 'american-egyptian' && s.nourLanguageMode !== 'cairo-street') {
-          s.nourLanguageMode = 'american-egyptian'
-        }
+        // Cairo Street is the preferred Noor mode for this build.
+        s.nourLanguageMode = 'cairo-street'
         return s as SettingsState
       },
       partialize: (state) => ({
-        activeTab: isVisibleTab(state.activeTab) ? state.activeTab : 'chat',
+        activeTab: isVisibleTab(state.activeTab) ? state.activeTab : 'playground',
         sidebarOpen: state.sidebarOpen,
         selectedModels: sanitizeSelectedModels(state.selectedModels),
         playgroundAgentModel: state.playgroundAgentModel,
