@@ -52,7 +52,11 @@ export interface FaceFusionBridgeTransport {
 }
 
 export class FaceFusionConnector {
-  constructor(private readonly bridge: FaceFusionBridgeTransport) {}
+  private readonly bridge: FaceFusionBridgeTransport
+
+  constructor(bridge: FaceFusionBridgeTransport) {
+    this.bridge = bridge
+  }
 
   isAvailable() {
     return this.bridge.isAvailable()
