@@ -82,12 +82,24 @@ export interface ContentPart {
   input_audio?: { data: string; format: string }
 }
 
+export interface ChatArtifact {
+  id: string
+  kind: 'image'
+  url: string
+  mimeType: string
+  format?: string
+  width?: number
+  height?: number
+  sourceTool?: string
+}
+
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
   content: string | ContentPart[]
   reasoning_content?: string
   requested_model?: string
   served_model?: string
+  artifacts?: ChatArtifact[]
 }
 
 export interface VeniceParameters {
