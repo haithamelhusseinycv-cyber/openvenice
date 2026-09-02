@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { usePlaygroundStore, type PlaygroundActivity } from '../../stores/playground-store'
 import { useAuthStore } from '../../stores/auth-store'
 import { useSettingsStore } from '../../stores/settings-store'
+import { useVoiceStore } from '../../stores/voice-store'
 import { useModelCatalog } from '../../hooks/use-model-catalog'
 import { useAgentModels } from '../../hooks/use-agent-models'
 import { callAgent, DEFAULT_AGENT_MODEL, FALLBACK_AGENT_MODEL } from '../../lib/playground-agent'
@@ -73,6 +74,8 @@ export function PlaygroundChat() {
   const agentModelId = useSettingsStore((s) => s.playgroundAgentModel) || DEFAULT_AGENT_MODEL
   const languageMode = useSettingsStore((s) => s.nourLanguageMode)
   const setLanguageMode = useSettingsStore((s) => s.setNourLanguageMode)
+  const speakReplies = useVoiceStore((s) => s.speakReplies)
+  const setSpeakReplies = useVoiceStore((s) => s.setSpeakReplies)
   const { catalog } = useModelCatalog()
   const { models: agentModels, isLoading: agentModelsLoading } = useAgentModels()
   const activeAgentModel = agentModels.find((m) => m.id === agentModelId) || agentModels[0]
@@ -176,8 +179,10 @@ export function PlaygroundChat() {
       return
     }
     const effectiveLanguageMode = options.languageMode ?? languageMode
+    const shouldAutoSpeak = options.autoSpeak ?? speakReplies
     setError(null)
     setInput('')
+    stopVoice()
     shouldStickToBottomRef.current = true
 
     const userMsg = { id: generateId(), role: 'user' as const, content: trimmed }
@@ -292,7 +297,7 @@ export function PlaygroundChat() {
       abortRef.current = null
     }
 
-    if (options.autoSpeak && spokenReply.trim() && !controller.signal.aborted) {
+    if (shouldAutoSpeak && spokenReply.trim() && !controller.signal.aborted) {
       await speak(pendingMsg.id, spokenReply, effectiveLanguageMode)
     }
   }
@@ -313,7 +318,7 @@ export function PlaygroundChat() {
       if (result.cancelled || !result.text.trim()) return
       const mode = languageModeForVoice(locale)
       setLanguageMode(mode)
-      await send(result.text, { languageMode: mode, autoSpeak: true })
+      await send(result.text, { languageMode: mode })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Voice recognition failed')
     } finally {
@@ -350,7 +355,7 @@ export function PlaygroundChat() {
               </div>
             </div>
             <div className="text-[15px] text-white/85 font-semibold mb-1">Tell me what you want done.</div>
-            <div className="text-[13px] text-white/45 mb-4">Chat naturally or use the English / Egyptian microphone buttons below. Noor can answer by voice and execute supported agent commands.</div>
+            <div className="text-[13px] text-white/45 mb-4">Chat naturally or use the English / Egyptian microphone buttons below. Noor can read every reply aloud and execute supported agent commands.</div>
             <div className="flex flex-col gap-2">
               {STARTER_PROMPTS.map((p) => (
                 <button
@@ -452,6 +457,23 @@ export function PlaygroundChat() {
           ))}
           <span className="shrink-0 text-[11px] text-white/35">Voice · {NOUR_TTS_VOICE}</span>
         </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            if (speakReplies) stopVoice()
+            setSpeakReplies(!speakReplies)
+          }}
+          aria-pressed={speakReplies}
+          className={cn(
+            'mb-2 min-h-11 w-full rounded-xl border px-3 text-[12px] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]',
+            speakReplies
+              ? 'border-fuchsia-300/35 bg-fuchsia-400/10 text-white'
+              : 'border-white/[0.09] bg-white/[0.03] text-white/55 hover:text-white/85',
+          )}
+        >
+          {speakReplies ? '🔊 Auto-read replies on' : '🔇 Auto-read replies off'}
+        </button>
 
         <div className="mb-2 grid grid-cols-2 gap-2" aria-label="Noor voice commands">
           <button
