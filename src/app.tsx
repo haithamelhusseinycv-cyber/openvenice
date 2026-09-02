@@ -22,6 +22,7 @@ const TAB_ORDER: Tab[] = ['playground', 'image']
 
 export function App() {
   const needsUnlock = useAuthStore((s) => s.hasEncrypted && !s.apiKey)
+  const hydrateFromDevice = useAuthStore((s) => s.hydrateFromDevice)
   const [apiKeyOpen, setApiKeyOpen] = useState(needsUnlock)
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
@@ -29,6 +30,12 @@ export function App() {
   const setActiveTab = useSettingsStore((s) => s.setActiveTab)
   const safeTab = isVisibleTab(activeTab) ? activeTab : 'playground'
   const ActiveView = views[safeTab]
+
+  useEffect(() => {
+    void hydrateFromDevice().then((restored) => {
+      if (restored) setApiKeyOpen(false)
+    })
+  }, [hydrateFromDevice])
 
   useEffect(() => {
     if (!isVisibleTab(activeTab)) setActiveTab('playground')

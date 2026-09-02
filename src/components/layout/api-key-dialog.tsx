@@ -6,16 +6,51 @@ import { formatVeniceError, validateVeniceApiKey } from '../../lib/venice-client
 
 const MIN_PASSPHRASE = 8
 
+function EyeIcon({ open }: { open: boolean }) {
+  return open ? (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  ) : (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m3 3 18 18" />
+      <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+      <path d="M9.9 4.2A10.4 10.4 0 0 1 12 4c6.5 0 10 8 10 8a17.3 17.3 0 0 1-2.1 3.2" />
+      <path d="M6.6 6.6C3.7 8.5 2 12 2 12s3.5 8 10 8a9.7 9.7 0 0 0 4.1-.9" />
+    </svg>
+  )
+}
+
+function isAndroidApp() {
+  if (typeof window === 'undefined') return false
+  const runtime = (window as unknown as { Capacitor?: { getPlatform?: () => string; isNativePlatform?: () => boolean } }).Capacitor
+  if (!runtime) return false
+  if (runtime.isNativePlatform && !runtime.isNativePlatform()) return false
+  return runtime.getPlatform?.() === 'android'
+}
+
 export function ApiKeyDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { apiKey, hasEncrypted, setApiKey, unlock, clearApiKey } = useAuthStore()
+  const { apiKey, hasEncrypted, deviceRemembered, setApiKey, unlock, clearApiKey } = useAuthStore()
   const [value, setValue] = useState('')
   const [passphrase, setPassphrase] = useState('')
   const [remember, setRemember] = useState(false)
+  const [keepSignedIn, setKeepSignedIn] = useState(deviceRemembered)
+  const [showKey, setShowKey] = useState(false)
+  const [showPassphrase, setShowPassphrase] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [forceConnect, setForceConnect] = useState(false)
   const dialogRef = useRef<HTMLDivElement>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
+  const android = isAndroidApp()
+
+  useEffect(() => {
+    if (!open) return
+    setKeepSignedIn(deviceRemembered)
+    setShowKey(false)
+    setShowPassphrase(false)
+  }, [open, deviceRemembered])
 
   // Trap keyboard focus inside the modal and restore it to the opener.
   useEffect(() => {
@@ -63,8 +98,17 @@ export function ApiKeyDialog({ open, onClose }: { open: boolean; onClose: () => 
     setError(null)
     try {
       await validateVeniceApiKey(value.trim())
-      await setApiKey(value.trim(), remember ? { passphrase } : undefined)
-      toast.success(remember ? 'Key saved (encrypted)' : 'Key set for this session')
+      await setApiKey(
+        value.trim(),
+        keepSignedIn ? { device: true } : remember ? { passphrase } : undefined,
+      )
+      toast.success(
+        keepSignedIn
+          ? 'Key saved securely on this device'
+          : remember
+            ? 'Key saved (encrypted)'
+            : 'Key set for this session',
+      )
       onClose()
     } catch (e) {
       setError(formatVeniceError(e))
@@ -102,7 +146,9 @@ export function ApiKeyDialog({ open, onClose }: { open: boolean; onClose: () => 
             <p className="text-[13px] text-white/50">
               {isUnlockMode
                 ? 'Enter your passphrase to decrypt your saved key.'
-                : 'Stored in this tab only by default. Encrypt to keep across sessions.'}
+                : android
+                  ? 'You can keep the key securely on this phone and sign in automatically.'
+                  : 'Stored in this tab only by default. Encrypt to keep across sessions.'}
             </p>
           </div>
         </div>
@@ -110,32 +156,57 @@ export function ApiKeyDialog({ open, onClose }: { open: boolean; onClose: () => 
         {isUnlockMode ? (
           <div>
             <label htmlFor="apikey-passphrase" className="sr-only">Passphrase</label>
-            <input
-              id="apikey-passphrase"
-              type="password"
-              value={passphrase}
-              onChange={(e) => setPassphrase(e.target.value)}
-              placeholder="Passphrase"
-              className="w-full bg-[#0a0a0a] border border-white/[0.1] rounded-lg px-3.5 py-2.5 text-[16px] text-white outline-none focus:border-white/[0.25] transition-colors placeholder:text-white/25"
-              autoFocus
-              autoComplete="current-password"
-              onKeyDown={(e) => { if (e.key === 'Enter') handleUnlock() }}
-            />
+            <div className="relative">
+              <input
+                id="apikey-passphrase"
+                name="openvenice-passphrase"
+                type={showPassphrase ? 'text' : 'password'}
+                value={passphrase}
+                onChange={(e) => setPassphrase(e.target.value)}
+                placeholder="Passphrase"
+                className="w-full bg-[#0a0a0a] border border-white/[0.1] rounded-lg px-3.5 py-2.5 pr-12 text-[16px] text-white outline-none focus:border-white/[0.25] transition-colors placeholder:text-white/25"
+                autoFocus
+                autoComplete="current-password"
+                onKeyDown={(e) => { if (e.key === 'Enter') handleUnlock() }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassphrase((current) => !current)}
+                aria-label={showPassphrase ? 'Hide passphrase' : 'Show passphrase'}
+                aria-pressed={showPassphrase}
+                className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-white/45 hover:text-white/85"
+              >
+                <EyeIcon open={showPassphrase} />
+              </button>
+            </div>
+            <p className="mt-2 text-[12px] text-white/35">Your password manager may also offer to save or autofill this passphrase.</p>
           </div>
         ) : (
           <>
             <label htmlFor="apikey-input" className="sr-only">Venice API key</label>
-            <input
-              id="apikey-input"
-              type="password"
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              placeholder="sk-..."
-              className="w-full bg-[#0a0a0a] border border-white/[0.1] rounded-lg px-3.5 py-2.5 text-[16px] text-white outline-none focus:border-white/[0.25] transition-colors font-mono placeholder:text-white/25"
-              autoFocus
-              autoComplete="off"
-              onKeyDown={(e) => { if (e.key === 'Enter' && !remember) handleConnect() }}
-            />
+            <div className="relative">
+              <input
+                id="apikey-input"
+                name="openvenice-api-key"
+                type={showKey ? 'text' : 'password'}
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder="sk-..."
+                className="w-full bg-[#0a0a0a] border border-white/[0.1] rounded-lg px-3.5 py-2.5 pr-12 text-[16px] text-white outline-none focus:border-white/[0.25] transition-colors font-mono placeholder:text-white/25"
+                autoFocus
+                autoComplete="current-password"
+                onKeyDown={(e) => { if (e.key === 'Enter' && !remember) handleConnect() }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowKey((current) => !current)}
+                aria-label={showKey ? 'Hide API key' : 'Show API key'}
+                aria-pressed={showKey}
+                className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-white/45 hover:text-white/85"
+              >
+                <EyeIcon open={showKey} />
+              </button>
+            </div>
             <p className="text-[13px] text-white/40 mt-2">
               Get a key at{' '}
               <a
@@ -149,34 +220,67 @@ export function ApiKeyDialog({ open, onClose }: { open: boolean; onClose: () => 
               .
             </p>
 
-            <label className="flex items-center gap-2 mt-4 text-[14px] text-white/65 cursor-pointer select-none">
+            {android && (
+              <label className="flex items-start gap-2 mt-4 text-[14px] text-white/75 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={keepSignedIn}
+                  onChange={(e) => {
+                    setKeepSignedIn(e.target.checked)
+                    if (e.target.checked) setRemember(false)
+                  }}
+                  className="mt-0.5 accent-white"
+                />
+                <span>
+                  <span className="block">Keep me signed in on this device</span>
+                  <span className="mt-0.5 block text-[11.5px] leading-relaxed text-white/35">Saved with Android Keystore and restored automatically when OpenVenice starts.</span>
+                </span>
+              </label>
+            )}
+
+            <label className="flex items-center gap-2 mt-3 text-[13px] text-white/50 cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={remember}
-                onChange={(e) => setRemember(e.target.checked)}
+                onChange={(e) => {
+                  setRemember(e.target.checked)
+                  if (e.target.checked) setKeepSignedIn(false)
+                }}
                 className="accent-white"
               />
-              Remember across sessions (encrypted with passphrase)
+              Use a passphrase-protected saved key instead
             </label>
 
             {remember && (
               <div className="mt-2">
                 <label htmlFor="apikey-new-passphrase" className="sr-only">Encryption passphrase</label>
-                <input
-                  id="apikey-new-passphrase"
-                  type="password"
-                  value={passphrase}
-                  onChange={(e) => setPassphrase(e.target.value)}
-                  placeholder={`Passphrase (min ${MIN_PASSPHRASE} chars)`}
-                  className="w-full bg-[#0a0a0a] border border-white/[0.1] rounded-lg px-3.5 py-2.5 text-[16px] text-white outline-none focus:border-white/[0.25] transition-colors placeholder:text-white/25"
-                  autoComplete="new-password"
-                  onKeyDown={(e) => { if (e.key === 'Enter' && !passphraseTooShort) handleConnect() }}
-                />
+                <div className="relative">
+                  <input
+                    id="apikey-new-passphrase"
+                    name="openvenice-new-passphrase"
+                    type={showPassphrase ? 'text' : 'password'}
+                    value={passphrase}
+                    onChange={(e) => setPassphrase(e.target.value)}
+                    placeholder={`Passphrase (min ${MIN_PASSPHRASE} chars)`}
+                    className="w-full bg-[#0a0a0a] border border-white/[0.1] rounded-lg px-3.5 py-2.5 pr-12 text-[16px] text-white outline-none focus:border-white/[0.25] transition-colors placeholder:text-white/25"
+                    autoComplete="new-password"
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !passphraseTooShort) handleConnect() }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassphrase((current) => !current)}
+                    aria-label={showPassphrase ? 'Hide passphrase' : 'Show passphrase'}
+                    aria-pressed={showPassphrase}
+                    className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-white/45 hover:text-white/85"
+                  >
+                    <EyeIcon open={showPassphrase} />
+                  </button>
+                </div>
                 {passphraseTooShort && (
                   <p className="text-[12px] text-yellow-300/85 mt-1">Use at least {MIN_PASSPHRASE} characters.</p>
                 )}
                 <p className="text-[12px] text-white/40 mt-1">
-                  Encrypted with AES-GCM via PBKDF2 (250k iterations). We never see your passphrase or key.
+                  Encrypted with AES-GCM via PBKDF2 (250k iterations). Your browser/password manager can offer to remember the passphrase.
                 </p>
               </div>
             )}
@@ -195,9 +299,9 @@ export function ApiKeyDialog({ open, onClose }: { open: boolean; onClose: () => 
         {error && <p role="alert" className="text-[13px] text-red-300 mt-3">{error}</p>}
 
         <div className="flex flex-wrap gap-2 mt-6 justify-end">
-          {(apiKey || hasEncrypted) && (
+          {(apiKey || hasEncrypted || deviceRemembered) && (
             <button
-              onClick={() => { clearApiKey(); setValue(''); setPassphrase(''); setRemember(false); toast.info('API key cleared') }}
+              onClick={() => { clearApiKey(); setValue(''); setPassphrase(''); setRemember(false); setKeepSignedIn(false); toast.info('API key cleared') }}
               className="px-3 py-1.5 text-[14px] text-white/55 hover:text-red-300 transition-colors"
             >
               Disconnect

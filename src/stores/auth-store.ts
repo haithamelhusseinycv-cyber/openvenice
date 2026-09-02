@@ -2,6 +2,7 @@ import { create } from 'zustand'
 
 const SESSION_KEY = 'venice-auth'
 const ENCRYPTED_KEY = 'venice-auth-enc'
+const DEVICE_MARKER_KEY = 'venice-auth-device'
 const PBKDF2_ITERATIONS = 250_000
 
 interface EncryptedBlob {
@@ -10,12 +11,27 @@ interface EncryptedBlob {
   ct: string
 }
 
+interface RememberOptions {
+  passphrase?: string
+  device?: boolean
+}
+
 interface AuthState {
   apiKey: string | null
   hasEncrypted: boolean
-  setApiKey: (key: string, remember?: { passphrase: string }) => Promise<void>
+  deviceRemembered: boolean
+  setApiKey: (key: string, remember?: RememberOptions) => Promise<void>
   unlock: (passphrase: string) => Promise<boolean>
+  hydrateFromDevice: () => Promise<boolean>
   clearApiKey: () => void
+}
+
+interface CapacitorRuntime {
+  getPlatform?: () => string
+  isNativePlatform?: () => boolean
+  isPluginAvailable?: (name: string) => boolean
+  nativePromise?: (pluginName: string, methodName: string, options: Record<string, unknown>) => Promise<unknown>
+  Plugins?: Record<string, Record<string, (options?: Record<string, unknown>) => Promise<unknown>>>
 }
 
 const b64encode = (buf: ArrayBuffer): string =>
@@ -67,6 +83,53 @@ async function decrypt(blob: EncryptedBlob, passphrase: string): Promise<string>
   return new TextDecoder().decode(pt)
 }
 
+function nativeRuntime(): CapacitorRuntime | undefined {
+  if (typeof window === 'undefined') return undefined
+  return (window as unknown as { Capacitor?: CapacitorRuntime }).Capacitor
+}
+
+function isNativeAndroid() {
+  const runtime = nativeRuntime()
+  if (!runtime) return false
+  if (typeof runtime.isNativePlatform === 'function' && !runtime.isNativePlatform()) return false
+  return runtime.getPlatform?.() === 'android'
+}
+
+async function invokeVault<T>(method: string, options: Record<string, unknown> = {}): Promise<T> {
+  const runtime = nativeRuntime()
+  if (!runtime || !isNativeAndroid()) throw new Error('Secure device storage is only available in the Android app')
+  if (runtime.isPluginAvailable && !runtime.isPluginAvailable('AuthVault')) {
+    throw new Error('Secure device storage is unavailable in this build')
+  }
+  if (typeof runtime.nativePromise === 'function') {
+    return await runtime.nativePromise('AuthVault', method, options) as T
+  }
+  const plugin = runtime.Plugins?.AuthVault
+  const fn = plugin?.[method]
+  if (!fn) throw new Error(`AuthVault method is unavailable: ${method}`)
+  return await fn(options) as T
+}
+
+async function saveDeviceKey(key: string) {
+  await invokeVault<{ saved: boolean }>('save', { value: key })
+  try { localStorage.setItem(DEVICE_MARKER_KEY, '1') } catch { /* ignore marker failures */ }
+}
+
+async function loadDeviceKey(): Promise<string | null> {
+  if (!isNativeAndroid()) return null
+  try {
+    const result = await invokeVault<{ found?: boolean; value?: string }>('load')
+    return result.found && result.value ? result.value : null
+  } catch {
+    return null
+  }
+}
+
+async function clearDeviceKey() {
+  if (isNativeAndroid()) await invokeVault('clear').catch(() => undefined)
+  try { localStorage.removeItem(DEVICE_MARKER_KEY) } catch { /* ignore marker failures */ }
+}
+
 const initialKey = (() => {
   try {
     const session = sessionStorage.getItem(SESSION_KEY)
@@ -97,19 +160,40 @@ const initialHasEncrypted = (() => {
   }
 })()
 
+const initialDeviceRemembered = (() => {
+  try {
+    return localStorage.getItem(DEVICE_MARKER_KEY) === '1'
+  } catch {
+    return false
+  }
+})()
+
 export const useAuthStore = create<AuthState>()((set) => ({
   apiKey: initialKey,
   hasEncrypted: initialHasEncrypted,
+  deviceRemembered: initialDeviceRemembered,
 
   setApiKey: async (key, remember) => {
     sessionStorage.setItem(SESSION_KEY, key)
-    if (remember) {
+
+    if (remember?.device) {
+      await saveDeviceKey(key)
+      localStorage.removeItem(ENCRYPTED_KEY)
+      set({ apiKey: key, hasEncrypted: false, deviceRemembered: true })
+      return
+    }
+
+    if (remember?.passphrase) {
       const blob = await encrypt(key, remember.passphrase)
       localStorage.setItem(ENCRYPTED_KEY, JSON.stringify(blob))
-      set({ apiKey: key, hasEncrypted: true })
-    } else {
-      set({ apiKey: key })
+      await clearDeviceKey()
+      set({ apiKey: key, hasEncrypted: true, deviceRemembered: false })
+      return
     }
+
+    localStorage.removeItem(ENCRYPTED_KEY)
+    await clearDeviceKey()
+    set({ apiKey: key, hasEncrypted: false, deviceRemembered: false })
   },
 
   unlock: async (passphrase) => {
@@ -125,9 +209,25 @@ export const useAuthStore = create<AuthState>()((set) => ({
     }
   },
 
+  hydrateFromDevice: async () => {
+    if (sessionStorage.getItem(SESSION_KEY)) return true
+    const key = await loadDeviceKey()
+    if (!key) {
+      if (initialDeviceRemembered) {
+        try { localStorage.removeItem(DEVICE_MARKER_KEY) } catch { /* ignore */ }
+        set({ deviceRemembered: false })
+      }
+      return false
+    }
+    sessionStorage.setItem(SESSION_KEY, key)
+    set({ apiKey: key, deviceRemembered: true })
+    return true
+  },
+
   clearApiKey: () => {
     sessionStorage.removeItem(SESSION_KEY)
     localStorage.removeItem(ENCRYPTED_KEY)
-    set({ apiKey: null, hasEncrypted: false })
+    void clearDeviceKey()
+    set({ apiKey: null, hasEncrypted: false, deviceRemembered: false })
   },
 }))
