@@ -139,9 +139,10 @@ function externalizeImagePayload(
  * Runs Qwen with the registered tools and continues the conversation after
  * function calls. Tool calls are executed sequentially so stateful Android
  * operations (for example model selection before generation) remain ordered.
+ * Tool bindings are rebuilt each round so enabling/disabling a known plugin is
+ * reflected immediately in the next Qwen planning round.
  */
 export async function runQwenAgent(options: QwenAgentRunOptions) {
-  const bindings = createOpenAIToolBindings(options.registry)
   const messages = [...options.messages]
   const maxRounds = Math.max(1, options.maxToolRounds ?? 4)
   const artifacts = new AgentArtifactStore()
@@ -155,6 +156,7 @@ export async function runQwenAgent(options: QwenAgentRunOptions) {
   }
 
   for (let round = 0; round < maxRounds; round++) {
+    const bindings = createOpenAIToolBindings(options.registry)
     const stream = await qwenChatStream(
       options.config,
       {
