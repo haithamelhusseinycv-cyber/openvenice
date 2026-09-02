@@ -12,12 +12,40 @@ import { VeniceParams } from './venice-params'
 import { VeniceLogo } from '../ui/logo'
 import { ChatHistoryDialog } from './chat-history-dialog'
 import { toast } from '../../stores/toast-store'
+import type { ChatArtifact, ChatMessage } from '../../types/venice'
 
 const STARTER_PROMPTS = [
   'Explain a difficult topic in simple language.',
   'Help me write a clear professional message.',
   'Compare two options and recommend the better one.',
 ]
+
+function restoreMessage(conversationId: string, index: number, message: ChatMessage) {
+  useChatStore.setState((state) => ({
+    conversations: state.conversations.map((item) => {
+      if (item.id !== conversationId) return item
+      const at = Math.max(0, Math.min(index, item.messages.length))
+      return {
+        ...item,
+        messages: [...item.messages.slice(0, at), message, ...item.messages.slice(at)],
+      }
+    }),
+  }))
+}
+
+function setMessageArtifacts(conversationId: string, index: number, artifacts: ChatArtifact[]) {
+  useChatStore.setState((state) => ({
+    conversations: state.conversations.map((item) => {
+      if (item.id !== conversationId) return item
+      return {
+        ...item,
+        messages: item.messages.map((message, messageIndex) =>
+          messageIndex === index ? { ...message, artifacts } : message,
+        ),
+      }
+    }),
+  }))
+}
 
 export function ChatView() {
   const deleteMessage = useChatStore((s) => s.deleteMessage)
@@ -81,6 +109,40 @@ export function ChatView() {
     })
   }
 
+  const deleteOneMessage = (index: number, message: ChatMessage) => {
+    if (!conversation) return
+    const conversationId = conversation.id
+    deleteMessage(conversationId, index)
+    toast.error('Message deleted', undefined, {
+      label: 'Undo',
+      onClick: () => restoreMessage(conversationId, index, message),
+    })
+  }
+
+  const discardArtifact = (messageIndex: number, artifact: ChatArtifact) => {
+    if (!conversation) return
+    const previous = conversation.messages[messageIndex]?.artifacts || []
+    const next = previous.filter((item) => item.id !== artifact.id)
+    setMessageArtifacts(conversation.id, messageIndex, next)
+    toast.error('Image discarded', artifact.sourceTool || 'Generated image', {
+      label: 'Undo',
+      onClick: () => setMessageArtifacts(conversation.id, messageIndex, previous),
+    })
+  }
+
+  const sendArtifactRequest = (artifact: ChatArtifact, instruction: string) => {
+    if (!providerReady) {
+      toast.info('Connect the agent first', 'Configure the selected chat provider before continuing.')
+      return
+    }
+    if (isStreaming) {
+      toast.info('Agent is busy', 'Stop the current response before starting another image task.')
+      return
+    }
+    shouldStickToBottomRef.current = true
+    void send(instruction, model, [artifact.url])
+  }
+
   return (
     <div className="flex h-full max-w-full min-h-0 min-w-0 flex-col overflow-hidden">
       <div className="flex shrink-0 items-center gap-1.5 border-b border-white/[0.05] bg-[#0a0a0c] px-2 py-1.5 sm:px-4">
@@ -107,11 +169,11 @@ export function ChatView() {
         }}
       >
         {!conversation || conversation.messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center px-6 gap-6">
+          <div className="flex h-full flex-col items-center justify-center gap-6 px-6 text-center">
             <div className="flex flex-col items-center gap-3">
               <VeniceLogo size={32} className="opacity-80" />
               <div className="text-[20px] font-semibold text-white/85">How can I help today?</div>
-              <p className="text-[14px] text-white/45 max-w-sm">
+              <p className="max-w-sm text-[14px] text-white/45">
                 {providerReady
                   ? `Connected through ${chatProvider === 'qwen' ? 'Private Qwen' : 'Venice'}. Ask a question or attach an image.`
                   : chatProvider === 'qwen'
@@ -120,17 +182,17 @@ export function ChatView() {
               </p>
             </div>
             {providerReady && (
-              <div className="w-full max-w-md flex flex-col gap-2">
-                <div className="text-[12px] uppercase tracking-[0.08em] text-white/35 font-medium text-left">Try one of these</div>
+              <div className="flex w-full max-w-md flex-col gap-2">
+                <div className="text-left text-[12px] font-medium uppercase tracking-[0.08em] text-white/35">Try one of these</div>
                 <div className="flex flex-col gap-1.5">
-                  {STARTER_PROMPTS.map((p) => (
+                  {STARTER_PROMPTS.map((prompt) => (
                     <button
-                      key={p}
+                      key={prompt}
                       type="button"
-                      onClick={() => send(p, model)}
-                      className="text-left px-3 py-2.5 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:border-white/[0.14] hover:bg-white/[0.04] transition-all text-[14px] text-white/65 focus-visible:outline focus-visible:outline-1 focus-visible:outline-white/40"
+                      onClick={() => send(prompt, model)}
+                      className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5 text-left text-[14px] text-white/65 transition-all hover:border-white/[0.14] hover:bg-white/[0.04] focus-visible:outline focus-visible:outline-1 focus-visible:outline-white/40"
                     >
-                      {p}
+                      {prompt}
                     </button>
                   ))}
                 </div>
@@ -144,23 +206,39 @@ export function ChatView() {
               <VeniceParams />
             </div>
             <div className="mx-auto flex w-full max-w-[960px] min-w-0 flex-col gap-5 overflow-x-hidden px-3 py-4 sm:px-5 sm:py-5">
-              {conversation.messages.map((msg, i) => (
-                <MessageBubble
-                  key={i}
-                  message={msg}
-                  index={i}
-                  onCopy={() => {}}
-                  onDelete={() => { if (conversation) deleteMessage(conversation.id, i) }}
-                  onRegenerate={msg.role === 'assistant' && i === conversation.messages.length - 1 ? () => regenerate(model) : undefined}
-                />
-              ))}
+              {conversation.messages.map((message, index) => {
+                const canRetry = message.role === 'assistant' && index === conversation.messages.length - 1
+                return (
+                  <MessageBubble
+                    key={index}
+                    message={message}
+                    index={index}
+                    onCopy={() => {}}
+                    onDelete={() => deleteOneMessage(index, message)}
+                    onRegenerate={canRetry ? () => regenerate(model) : undefined}
+                    onArtifactEdit={(artifact) => sendArtifactRequest(
+                      artifact,
+                      'I want to edit this image. Ask me what I want changed before running an image tool, then use the best local workflow for my instructions.',
+                    )}
+                    onArtifactLocalDream={(artifact) => sendArtifactRequest(
+                      artifact,
+                      'Use Local Dream for the next edit of this image. Ask me what changes I want before running Local Dream, then choose img2img, inpaint, or upscale as appropriate.',
+                    )}
+                    onArtifactFaceFusion={(artifact) => sendArtifactRequest(
+                      artifact,
+                      'Use FaceFusion with this image. Ask me whether I want a face swap, face restoration, or final enhancement and what source image is needed before running the tool.',
+                    )}
+                    onDiscardArtifact={(artifact) => discardArtifact(index, artifact)}
+                  />
+                )
+              })}
               <div ref={messagesEndRef} />
             </div>
           </>
         )}
       </div>
       <ChatInput
-        onSend={(msg, images) => send(msg, model, images)}
+        onSend={(message, images) => send(message, model, images)}
         onStop={stop}
         isStreaming={isStreaming}
         disabled={!providerReady}
