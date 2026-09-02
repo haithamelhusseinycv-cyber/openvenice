@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useChatStore } from '../../stores/chat-store'
 import { useSettingsStore } from '../../stores/settings-store'
+import { useProviderStore } from '../../stores/provider-store'
 import { useModels } from '../../hooks/use-models'
 import { useChat } from '../../hooks/use-chat'
 import { useAuthStore } from '../../stores/auth-store'
@@ -28,12 +29,19 @@ export function ChatView() {
     return id ? s.conversations.find((c) => c.id === id) : undefined
   })
   const apiKey = useAuthStore((s) => s.apiKey)
+  const chatProvider = useProviderStore((s) => s.chatProvider)
+  const qwenBaseUrl = useProviderStore((s) => s.qwenBaseUrl)
+  const qwenModelId = useProviderStore((s) => s.qwenModelId)
   const selectedModel = useSettingsStore((s) => s.selectedModels.chat)
-  const { data: models } = useModels('text')
-  const model =
+  const { data: models } = useModels('text', chatProvider === 'venice')
+  const veniceModel =
     selectedModel && isAllowedChatModel(selectedModel) && models?.some((m) => m.id === selectedModel)
       ? selectedModel
       : models?.find((m) => m.id === DEFAULT_CHAT_MODEL_ID)?.id || models?.[0]?.id || DEFAULT_CHAT_MODEL_ID
+  const model = chatProvider === 'qwen' ? qwenModelId : veniceModel
+  const providerReady = chatProvider === 'qwen'
+    ? qwenBaseUrl.trim().length > 0 && qwenModelId.trim().length > 0
+    : Boolean(apiKey)
   const { send, stop, regenerate, isStreaming } = useChat()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -104,12 +112,14 @@ export function ChatView() {
               <VeniceLogo size={32} className="opacity-80" />
               <div className="text-[20px] font-semibold text-white/85">How can I help today?</div>
               <p className="text-[14px] text-white/45 max-w-sm">
-                {apiKey
-                  ? 'Ask a question, analyze an idea, draft text, or attach an image.'
-                  : 'Connect a Venice API key from the header above to get started.'}
+                {providerReady
+                  ? `Connected through ${chatProvider === 'qwen' ? 'Private Qwen' : 'Venice'}. Ask a question or attach an image.`
+                  : chatProvider === 'qwen'
+                    ? 'Configure the private Qwen OpenAI-compatible endpoint below to get started.'
+                    : 'Connect a Venice API key from the header above to get started.'}
               </p>
             </div>
-            {apiKey && (
+            {providerReady && (
               <div className="w-full max-w-md flex flex-col gap-2">
                 <div className="text-[12px] uppercase tracking-[0.08em] text-white/35 font-medium text-left">Try one of these</div>
                 <div className="flex flex-col gap-1.5">
@@ -153,7 +163,7 @@ export function ChatView() {
         onSend={(msg, images) => send(msg, model, images)}
         onStop={stop}
         isStreaming={isStreaming}
-        disabled={!apiKey}
+        disabled={!providerReady}
         onOpenHistory={() => setHistoryOpen(true)}
       />
       <ChatHistoryDialog open={historyOpen} onClose={() => setHistoryOpen(false)} />
