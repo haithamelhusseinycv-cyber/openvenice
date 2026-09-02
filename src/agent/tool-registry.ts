@@ -1,4 +1,11 @@
-import { describeTool, type AgentTool, type AgentToolContext, type AgentToolDescriptor, type AgentToolResult } from './types'
+import {
+  describeTool,
+  type AgentTool,
+  type AgentToolContext,
+  type AgentToolDescriptor,
+  type AgentToolResult,
+  type ToolPermission,
+} from './types'
 
 export class AgentToolRegistry {
   private readonly tools = new Map<string, AgentTool>()
@@ -23,8 +30,8 @@ export class AgentToolRegistry {
     return Array.from(this.tools.values()).map(describeTool)
   }
 
-  findByPermission(permission: string): AgentToolDescriptor[] {
-    return this.list().filter((tool) => tool.permissions.includes(permission as never))
+  findByPermission(permission: ToolPermission): AgentToolDescriptor[] {
+    return this.list().filter((tool) => tool.permissions.includes(permission))
   }
 
   async execute<T = unknown>(
