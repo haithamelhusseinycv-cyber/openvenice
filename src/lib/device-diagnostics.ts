@@ -5,16 +5,10 @@ import { FaceFusionConnector } from '../connectors/facefusion/facefusion-connect
 export type DiagnosticStatus = 'pass' | 'warn' | 'fail'
 
 export interface DiagnosticResult {
-  id: 'platform' | 'qwen' | 'localdream' | 'facefusion' | 'voice' | 'storage'
+  id: 'platform' | 'localdream' | 'facefusion' | 'voice' | 'storage'
   label: string
   status: DiagnosticStatus
   detail: string
-}
-
-export interface QwenDiagnosticConfig {
-  baseUrl: string
-  modelId: string
-  apiKey?: string
 }
 
 function compactError(error: unknown) {
@@ -33,10 +27,6 @@ async function withTimeout<T>(work: (signal: AbortSignal) => Promise<T>, timeout
   }
 }
 
-function joinUrl(baseUrl: string, path: string) {
-  return `${baseUrl.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`
-}
-
 export function checkPlatform(): DiagnosticResult {
   const native = isNativeOpenVeniceAndroid()
   const runtime = typeof window !== 'undefined'
@@ -52,75 +42,22 @@ export function checkPlatform(): DiagnosticResult {
   }
 }
 
-export async function checkQwen(config: QwenDiagnosticConfig): Promise<DiagnosticResult> {
-  const baseUrl = config.baseUrl.trim()
-  const modelId = config.modelId.trim()
-  if (!baseUrl || !modelId) {
-    return {
-      id: 'qwen',
-      label: 'Private Qwen',
-      status: 'fail',
-      detail: 'Base URL or model ID is not configured.',
-    }
-  }
-
-  try {
-    const response = await withTimeout((signal) => fetch(joinUrl(baseUrl, '/models'), {
-      method: 'GET',
-      headers: config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : undefined,
-      signal,
-    }))
-
-    if (response.ok) {
-      return {
-        id: 'qwen',
-        label: 'Private Qwen',
-        status: 'pass',
-        detail: `Reachable · ${modelId}`,
-      }
-    }
-
-    if (response.status === 404 || response.status === 405) {
-      return {
-        id: 'qwen',
-        label: 'Private Qwen',
-        status: 'warn',
-        detail: `Configured · ${modelId} · server does not expose GET /models`,
-      }
-    }
-
-    return {
-      id: 'qwen',
-      label: 'Private Qwen',
-      status: 'fail',
-      detail: `Endpoint returned HTTP ${response.status}.`,
-    }
-  } catch (error) {
-    return {
-      id: 'qwen',
-      label: 'Private Qwen',
-      status: 'fail',
-      detail: `Connection failed · ${compactError(error)}`,
-    }
-  }
-}
-
 export async function checkLocalDream(): Promise<DiagnosticResult> {
   const connector = new LocalDreamConnector()
   try {
     const info = await withTimeout((signal) => connector.info(signal), 3000)
     return {
       id: 'localdream',
-      label: 'Local Dream',
+      label: 'Local Dream · optional',
       status: 'pass',
       detail: `${info.version || 'host'} · ${info.device || 'device'} · 127.0.0.1`,
     }
   } catch (error) {
     return {
       id: 'localdream',
-      label: 'Local Dream',
+      label: 'Local Dream · optional',
       status: 'warn',
-      detail: `Host API not reachable · ${compactError(error)}`,
+      detail: `Not currently connected · ${compactError(error)}`,
     }
   }
 }
@@ -129,7 +66,7 @@ export async function checkFaceFusion(): Promise<DiagnosticResult> {
   if (!isNativeOpenVeniceAndroid()) {
     return {
       id: 'facefusion',
-      label: 'FaceFusion',
+      label: 'FaceFusion · optional',
       status: 'warn',
       detail: 'Native Android bridge is unavailable in browser/PWA mode.',
     }
@@ -141,25 +78,25 @@ export async function checkFaceFusion(): Promise<DiagnosticResult> {
     if (!available) {
       return {
         id: 'facefusion',
-        label: 'FaceFusion',
+        label: 'FaceFusion · optional',
         status: 'warn',
-        detail: 'Bridge present, but the FaceFusion companion is unavailable.',
+        detail: 'Bridge is present; install or start the matching FaceFusion companion to enable it.',
       }
     }
 
     const catalog = await withTimeout(() => connector.listModels(), 4000)
     return {
       id: 'facefusion',
-      label: 'FaceFusion',
+      label: 'FaceFusion · optional',
       status: 'pass',
       detail: `Connected · ${catalog.swappers.length} swapper${catalog.swappers.length === 1 ? '' : 's'} · ${catalog.faceEnhancers.length} face enhancer${catalog.faceEnhancers.length === 1 ? '' : 's'}`,
     }
   } catch (error) {
     return {
       id: 'facefusion',
-      label: 'FaceFusion',
-      status: 'fail',
-      detail: `Bridge check failed · ${compactError(error)}`,
+      label: 'FaceFusion · optional',
+      status: 'warn',
+      detail: `Companion check unavailable · ${compactError(error)}`,
     }
   }
 }
@@ -176,16 +113,16 @@ export function checkVoice(): DiagnosticResult {
   if (nativePlugin) {
     return {
       id: 'voice',
-      label: 'Voice chat',
+      label: 'Noor voice commands',
       status: 'pass',
-      detail: 'Native Android speech bridge available · en-US + ar-EG',
+      detail: 'Native Android speech bridge available · English en-US + Egyptian Arabic ar-EG',
     }
   }
 
   if (browserRecognition && browserTts) {
     return {
       id: 'voice',
-      label: 'Voice chat',
+      label: 'Noor voice commands',
       status: 'warn',
       detail: 'Browser speech fallback available · native Android bridge not active',
     }
@@ -193,7 +130,7 @@ export function checkVoice(): DiagnosticResult {
 
   return {
     id: 'voice',
-    label: 'Voice chat',
+    label: 'Noor voice commands',
     status: 'fail',
     detail: 'Speech recognition or text-to-speech is unavailable.',
   }
@@ -221,12 +158,11 @@ export function checkStorage(): DiagnosticResult {
   }
 }
 
-export async function runDeviceDiagnostics(qwen: QwenDiagnosticConfig): Promise<DiagnosticResult[]> {
+export async function runDeviceDiagnostics(): Promise<DiagnosticResult[]> {
   const immediate = [checkPlatform(), checkVoice(), checkStorage()]
-  const [qwenResult, localDreamResult, faceFusionResult] = await Promise.all([
-    checkQwen(qwen),
+  const [localDreamResult, faceFusionResult] = await Promise.all([
     checkLocalDream(),
     checkFaceFusion(),
   ])
-  return [immediate[0], qwenResult, localDreamResult, faceFusionResult, immediate[1], immediate[2]]
+  return [immediate[0], immediate[1], immediate[2], localDreamResult, faceFusionResult]
 }
