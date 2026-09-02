@@ -37,7 +37,7 @@ export function useChat() {
         return true
       })
       const baseSystemPrompt = lockChatSystemPrompt(useChatStore.getState().systemPrompt)
-      const safeSystemPrompt = buildNourSystemPrompt(baseSystemPrompt)
+      const safeSystemPrompt = buildNourSystemPrompt(baseSystemPrompt, messages)
       if (safeSystemPrompt) {
         messages.unshift({ role: 'system', content: safeSystemPrompt })
       }
