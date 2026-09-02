@@ -9,8 +9,8 @@ import { DEFAULT_CHAT_MODEL_ID, isAllowedChatModel } from '../../lib/allowed-mod
 import { MessageBubble } from './message-bubble'
 import { ChatInput } from './chat-input'
 import { VeniceParams } from './venice-params'
-import { VeniceLogo } from '../ui/logo'
 import { ChatHistoryDialog } from './chat-history-dialog'
+import { NOUR_FIRST_MESSAGE } from '../../agent/personas/nour'
 import { toast } from '../../stores/toast-store'
 import type { ImageRetryMode } from './artifact-actions'
 import type { ChatArtifact, ChatMessage } from '../../types/venice'
@@ -48,6 +48,19 @@ function setMessageArtifacts(conversationId: string, index: number, artifacts: C
   }))
 }
 
+function NourAvatar({ large = false }: { large?: boolean }) {
+  return (
+    <div
+      className={`flex shrink-0 items-center justify-center rounded-full border border-white/[0.12] bg-gradient-to-br from-white/95 to-white/72 font-semibold text-[#0a0a0c] shadow-sm ${
+        large ? 'h-14 w-14 text-[22px]' : 'h-8 w-8 text-[13px]'
+      }`}
+      aria-hidden="true"
+    >
+      N
+    </div>
+  )
+}
+
 export function ChatView() {
   const deleteMessage = useChatStore((s) => s.deleteMessage)
   const conversations = useChatStore((s) => s.conversations)
@@ -71,6 +84,7 @@ export function ChatView() {
   const providerReady = chatProvider === 'qwen'
     ? qwenBaseUrl.trim().length > 0 && qwenModelId.trim().length > 0
     : Boolean(apiKey)
+  const providerLabel = chatProvider === 'qwen' ? 'Private Qwen' : 'Venice'
   const { send, stop, regenerate, isStreaming } = useChat()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -179,18 +193,30 @@ export function ChatView() {
 
   return (
     <div className="flex h-full max-w-full min-h-0 min-w-0 flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center gap-1.5 border-b border-white/[0.05] bg-[#0a0a0c] px-2 py-1.5 sm:px-4">
-        <button type="button" onClick={startNewChat} className="flex min-h-10 items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-white/70 hover:bg-white/[0.06] hover:text-white">
+      <div className="flex shrink-0 items-center gap-1 border-b border-white/[0.05] bg-[#0a0a0c] px-2 py-1.5 sm:gap-1.5 sm:px-4">
+        <div className="mr-1 flex min-w-0 items-center gap-2 pr-1 sm:mr-2">
+          <NourAvatar />
+          <div className="min-w-0 leading-tight">
+            <div className="truncate text-[13px] font-semibold text-white/90">Nour</div>
+            <div className="flex items-center gap-1.5 text-[10px] text-white/35">
+              <span className={`h-1.5 w-1.5 rounded-full ${providerReady ? 'bg-emerald-300/70' : 'bg-white/25'}`} />
+              <span className="hidden truncate min-[390px]:inline">{providerReady ? providerLabel : 'offline'}</span>
+            </div>
+          </div>
+        </div>
+        <button type="button" onClick={startNewChat} title="New chat" aria-label="New chat" className="flex min-h-10 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium text-white/70 hover:bg-white/[0.06] hover:text-white sm:px-3">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-          New chat
+          <span className="hidden sm:inline">New chat</span>
         </button>
-        <button type="button" onClick={() => setHistoryOpen(true)} className="flex min-h-10 items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-white/70 hover:bg-white/[0.06] hover:text-white">
+        <button type="button" onClick={() => setHistoryOpen(true)} title="History" aria-label="History" className="flex min-h-10 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium text-white/70 hover:bg-white/[0.06] hover:text-white sm:px-3">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8" /><path d="M3 3v5h5M12 7v5l3 2" /></svg>
-          History{conversations.length ? ` (${conversations.length})` : ''}
+          <span className="hidden sm:inline">History{conversations.length ? ` (${conversations.length})` : ''}</span>
+          {conversations.length > 0 && <span className="sm:hidden">{conversations.length}</span>}
         </button>
         {conversation && (
-          <button type="button" onClick={deleteCurrentChat} className="ml-auto flex min-h-10 items-center rounded-lg px-3 text-[13px] font-medium text-rose-200/65 hover:bg-rose-500/10 hover:text-rose-200">
-            Delete chat
+          <button type="button" onClick={deleteCurrentChat} title="Delete chat" aria-label="Delete chat" className="ml-auto flex min-h-10 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium text-rose-200/65 hover:bg-rose-500/10 hover:text-rose-200 sm:px-3">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
+            <span className="hidden sm:inline">Delete chat</span>
           </button>
         )}
       </div>
@@ -203,13 +229,17 @@ export function ChatView() {
         }}
       >
         {!conversation || conversation.messages.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-6 px-6 text-center">
-            <div className="flex flex-col items-center gap-3">
-              <VeniceLogo size={32} className="opacity-80" />
-              <div className="text-[20px] font-semibold text-white/85">How can I help today?</div>
-              <p className="max-w-sm text-[14px] text-white/45">
+          <div className="flex h-full flex-col items-center justify-center gap-5 px-5 text-center sm:px-6">
+            <div className="flex max-w-md flex-col items-center gap-3">
+              <NourAvatar large />
+              <div>
+                <div className="text-[22px] font-semibold text-white/90">Nour</div>
+                <div className="mt-1 text-[12px] text-white/35">Egyptian-American agent · {providerLabel}</div>
+              </div>
+              <p className="max-w-sm text-[15px] leading-relaxed text-white/65">{NOUR_FIRST_MESSAGE}</p>
+              <p className="max-w-sm text-[12.5px] text-white/35">
                 {providerReady
-                  ? `Connected through ${chatProvider === 'qwen' ? 'Private Qwen' : 'Venice'}. Ask a question or attach an image.`
+                  ? 'Ask anything, attach an image, or tell Nour to use a local tool.'
                   : chatProvider === 'qwen'
                     ? 'Configure the private Qwen OpenAI-compatible endpoint below to get started.'
                     : 'Connect a Venice API key from the header above to get started.'}
