@@ -12,6 +12,7 @@ import { VeniceParams } from './venice-params'
 import { VeniceLogo } from '../ui/logo'
 import { ChatHistoryDialog } from './chat-history-dialog'
 import { toast } from '../../stores/toast-store'
+import type { ImageRetryMode } from './artifact-actions'
 import type { ChatArtifact, ChatMessage } from '../../types/venice'
 
 const STARTER_PROMPTS = [
@@ -130,7 +131,7 @@ export function ChatView() {
     })
   }
 
-  const sendArtifactRequest = (artifact: ChatArtifact, instruction: string) => {
+  const sendAgentRequest = (instruction: string, imageAttachments?: string[]) => {
     if (!providerReady) {
       toast.info('Connect the agent first', 'Configure the selected chat provider before continuing.')
       return
@@ -140,7 +141,40 @@ export function ChatView() {
       return
     }
     shouldStickToBottomRef.current = true
-    void send(instruction, model, [artifact.url])
+    void send(instruction, model, imageAttachments)
+  }
+
+  const sendArtifactRequest = (artifact: ChatArtifact, instruction: string) => {
+    sendAgentRequest(instruction, [artifact.url])
+  }
+
+  const retryArtifact = (artifact: ChatArtifact, mode: ImageRetryMode) => {
+    if (mode === 'repeat') {
+      sendAgentRequest(
+        'Repeat the most recent image task now. Preserve the original user intent and use the same local tool/model family where it is still available. Produce a fresh result instead of merely describing the previous image. Do not claim exact parameter replay unless those parameters are actually available.',
+      )
+      return
+    }
+
+    if (mode === 'new-seed') {
+      sendAgentRequest(
+        'Repeat the most recent image generation or edit task with a new random seed. Preserve the requested subject, composition, style, dimensions, and tool/model family as closely as possible while producing a genuinely new result. Do not use the previous output as an img2img source unless the original task itself was an edit that requires a source image.',
+      )
+      return
+    }
+
+    if (mode === 'improve') {
+      sendArtifactRequest(
+        artifact,
+        'Improve this image using the best available local workflow. Preserve the subject identity, composition, framing, and overall intent unless a correction requires otherwise. Focus on realism, anatomy, skin and material texture, lighting, perspective, edge quality, and visible artifacts. Use Local Dream or FaceFusion only when technically appropriate, and return the improved image.',
+      )
+      return
+    }
+
+    sendArtifactRequest(
+      artifact,
+      'I want to change the generation or edit settings for this image. Ask only for the settings that materially affect the next result, such as model, dimensions or aspect ratio, denoise strength, steps, CFG, seed behavior, or enhancement choice. Do not run another image tool until I answer.',
+    )
   }
 
   return (
@@ -216,6 +250,7 @@ export function ChatView() {
                     onCopy={() => {}}
                     onDelete={() => deleteOneMessage(index, message)}
                     onRegenerate={canRetry ? () => regenerate(model) : undefined}
+                    onArtifactRetry={canRetry ? retryArtifact : undefined}
                     onArtifactEdit={(artifact) => sendArtifactRequest(
                       artifact,
                       'I want to edit this image. Ask me what I want changed before running an image tool, then use the best local workflow for my instructions.',
