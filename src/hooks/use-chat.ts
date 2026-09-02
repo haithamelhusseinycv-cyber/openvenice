@@ -14,7 +14,8 @@ import type { ChatCompletionRequest, ChatMessage, ContentPart } from '../types/v
 type VoiceAwareChatMessage = ChatMessage & { voice_locale?: 'en-US' | 'ar-EG' }
 
 function providerSafeMessage(message: ChatMessage): ChatMessage {
-  const { voice_locale: _voiceLocale, ...clean } = message as VoiceAwareChatMessage
+  const clean = { ...(message as VoiceAwareChatMessage) }
+  delete clean.voice_locale
   return clean as ChatMessage
 }
 
