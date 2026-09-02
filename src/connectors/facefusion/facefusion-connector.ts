@@ -5,6 +5,11 @@ export interface FaceFusionModelCatalog {
   swappers: string[]
   faceEnhancers: string[]
   frameEnhancers: string[]
+  selected?: {
+    swapper?: string
+    faceEnhancer?: string
+    frameEnhancer?: string
+  }
 }
 
 export interface FaceFusionDetectedFace {
@@ -34,13 +39,18 @@ export interface FaceFusionEnhanceRequest {
 export interface FaceFusionJobResult {
   outputUri: string
   elapsedMs?: number
+  image?: string
+  format?: string
+  mimeType?: string
+  width?: number
+  height?: number
   metadata?: Record<string, unknown>
 }
 
 /**
- * Android implementation will be supplied by the native OpenVenice bridge.
- * Keeping this interface transport-neutral lets the web app compile and lets
- * the future Capacitor shell call a signature-protected FaceFusion service.
+ * Android implementation is supplied by the native OpenVenice Capacitor
+ * bridge. Keeping this interface transport-neutral preserves the browser/PWA
+ * build while the Android shell binds to the signature-protected service.
  */
 export interface FaceFusionBridgeTransport {
   isAvailable(): Promise<boolean>
