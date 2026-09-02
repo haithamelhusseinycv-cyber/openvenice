@@ -7,6 +7,7 @@ import { useAgentModels } from '../../hooks/use-agent-models'
 import { callAgent, DEFAULT_AGENT_MODEL, FALLBACK_AGENT_MODEL } from '../../lib/playground-agent'
 import { runAgentTools, type RunStep } from '../../lib/playground-agent-tools'
 import { shouldUseModelFallback } from '../../lib/model-routing'
+import { cancelVoiceListening, listenForVoice, voiceLocaleShortLabel, type VoiceLocale } from '../../lib/voice-chat'
 import {
   NOUR_AGE,
   NOUR_LANGUAGE_LABELS,
@@ -51,7 +52,7 @@ function summarizeStep(step: RunStep): PlaygroundActivity {
       return { tool: step.tool, summary: ok ? `Removed ${String(a.id ?? '')}` : `remove failed: ${(step.result as { error?: string }).error}`, ok }
     case 'pick_model': {
       const model = (step.result as { model?: string }).model
-      return { tool: step.tool, summary: ok ? `Picked ${model} for ${String(a.node_type ?? '')}` : `pick_model failed`, ok }
+      return { tool: step.tool, summary: ok ? `Picked ${model} for ${String(a.node_type ?? '')}` : 'pick_model failed', ok }
     }
     case 'ask_user':
       return { tool: step.tool, summary: 'Awaiting your reply', ok }
@@ -60,6 +61,10 @@ function summarizeStep(step: RunStep): PlaygroundActivity {
     default:
       return { tool: step.tool, summary: step.tool, ok }
   }
+}
+
+function languageModeForVoice(locale: VoiceLocale): NourLanguageMode {
+  return locale === 'ar-EG' ? 'cairo-street' : 'american-egyptian'
 }
 
 export function PlaygroundChat() {
@@ -76,6 +81,7 @@ export function PlaygroundChat() {
   const [input, setInput] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [speakingId, setSpeakingId] = useState<string | null>(null)
+  const [listeningLocale, setListeningLocale] = useState<VoiceLocale | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const shouldStickToBottomRef = useRef(true)
   const abortRef = useRef<AbortController | null>(null)
@@ -110,9 +116,10 @@ export function PlaygroundChat() {
       current.audio.pause()
       URL.revokeObjectURL(current.url)
     }
+    void cancelVoiceListening()
   }, [])
 
-  const speak = async (id: string, transcript: string) => {
+  const speak = async (id: string, transcript: string, mode: NourLanguageMode = languageMode) => {
     if (speakingId === id) {
       stopVoice()
       return
@@ -130,7 +137,7 @@ export function PlaygroundChat() {
         model: NOUR_TTS_MODEL,
         voice: NOUR_TTS_VOICE,
         input: prepareNourSpeechText(transcript).slice(0, 4096),
-        language: nourTtsLanguage(languageMode),
+        language: nourTtsLanguage(mode),
         temperature: 0.85,
         response_format: 'mp3',
       })
@@ -153,7 +160,7 @@ export function PlaygroundChat() {
     }
   }
 
-  const send = async (text: string) => {
+  const send = async (text: string, options: { languageMode?: NourLanguageMode; autoSpeak?: boolean } = {}) => {
     const trimmed = text.trim()
     if (!trimmed || isThinking) return
     if (!hasKey) {
@@ -168,6 +175,7 @@ export function PlaygroundChat() {
       setError('No compatible Noor model is currently available from Venice.')
       return
     }
+    const effectiveLanguageMode = options.languageMode ?? languageMode
     setError(null)
     setInput('')
     shouldStickToBottomRef.current = true
@@ -181,6 +189,7 @@ export function PlaygroundChat() {
     abortRef.current?.abort()
     const controller = new AbortController()
     abortRef.current = controller
+    let spokenReply = ''
 
     const history = messages
       .filter((m) => !m.pending && !m.error)
@@ -191,7 +200,6 @@ export function PlaygroundChat() {
       const useTools = agentCaps?.supportsFunctionCalling === true
 
       if (useTools) {
-        // Tool-call mode — incremental, streams activity, self-corrects on errors.
         const activity: PlaygroundActivity[] = []
         const result = await runAgentTools({
           userMessage: trimmed,
@@ -201,7 +209,7 @@ export function PlaygroundChat() {
           agentModels,
           model: activeAgentModelId,
           capabilities: agentCaps,
-          languageMode,
+          languageMode: effectiveLanguageMode,
           signal: controller.signal,
           applyPatch: (patch: WorkflowPatch) => {
             try {
@@ -219,13 +227,13 @@ export function PlaygroundChat() {
           },
         })
 
+        spokenReply = result.say || 'Done.'
         updateMessage(pendingMsg.id, {
-          content: result.say || 'Done.',
+          content: spokenReply,
           activity,
           pending: false,
         })
       } else {
-        // Legacy JSON-patch mode for models without function calling.
         const requestAgent = (modelId: string, capabilities: typeof agentCaps) => callAgent({
           userMessage: trimmed,
           draft,
@@ -233,7 +241,7 @@ export function PlaygroundChat() {
           catalog,
           model: modelId,
           capabilities,
-          languageMode,
+          languageMode: effectiveLanguageMode,
           signal: controller.signal,
         })
 
@@ -264,8 +272,9 @@ export function PlaygroundChat() {
           ? 'The agent returned an unparseable response. Try a different model from the picker above, or simplify the request.'
           : response.say || (response.patches.length > 0 ? 'Updated the workflow.' : '')
 
+        spokenReply = fallbackSay + invalidNote
         updateMessage(pendingMsg.id, {
-          content: fallbackSay + invalidNote,
+          content: spokenReply,
           patches: response.patches,
           error: patchError,
           pending: false,
@@ -281,6 +290,34 @@ export function PlaygroundChat() {
     } finally {
       setThinking(false)
       abortRef.current = null
+    }
+
+    if (options.autoSpeak && spokenReply.trim() && !controller.signal.aborted) {
+      await speak(pendingMsg.id, spokenReply, effectiveLanguageMode)
+    }
+  }
+
+  const listenAndSend = async (locale: VoiceLocale) => {
+    if (isThinking) return
+    if (listeningLocale) {
+      await cancelVoiceListening()
+      setListeningLocale(null)
+      return
+    }
+
+    stopVoice()
+    setError(null)
+    setListeningLocale(locale)
+    try {
+      const result = await listenForVoice(locale)
+      if (result.cancelled || !result.text.trim()) return
+      const mode = languageModeForVoice(locale)
+      setLanguageMode(mode)
+      await send(result.text, { languageMode: mode, autoSpeak: true })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Voice recognition failed')
+    } finally {
+      setListeningLocale(null)
     }
   }
 
@@ -313,12 +350,12 @@ export function PlaygroundChat() {
               </div>
             </div>
             <div className="text-[15px] text-white/85 font-semibold mb-1">Tell me what you want done.</div>
-            <div className="text-[13px] text-white/45 mb-4">Chat naturally. I&apos;ll reason with you, assemble the right creative workflow, and keep every subject and reference clearly mapped.</div>
+            <div className="text-[13px] text-white/45 mb-4">Chat naturally or use the English / Egyptian microphone buttons below. Noor can answer by voice and execute supported agent commands.</div>
             <div className="flex flex-col gap-2">
               {STARTER_PROMPTS.map((p) => (
                 <button
                   key={p}
-                  onClick={() => send(p)}
+                  onClick={() => void send(p)}
                   className="text-left px-3 py-2.5 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:border-white/[0.16] hover:bg-white/[0.04] transition-all text-[13px] text-white/65 hover:text-white/85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2"
                 >
                   {p}
@@ -356,7 +393,7 @@ export function PlaygroundChat() {
                 {m.role === 'assistant' && !m.pending && !m.error && m.content && (
                   <button
                     type="button"
-                    onClick={() => speak(m.id, m.content)}
+                    onClick={() => void speak(m.id, m.content)}
                     aria-label={speakingId === m.id ? 'Stop Noor voice' : 'Play Noor voice'}
                     className="min-h-11 px-3 rounded-lg text-[12px] text-white/55 hover:text-white/85 hover:bg-white/[0.05] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
                   >
@@ -415,6 +452,36 @@ export function PlaygroundChat() {
           ))}
           <span className="shrink-0 text-[11px] text-white/35">Voice · {NOUR_TTS_VOICE}</span>
         </div>
+
+        <div className="mb-2 grid grid-cols-2 gap-2" aria-label="Noor voice commands">
+          <button
+            type="button"
+            disabled={isThinking || Boolean(listeningLocale)}
+            onClick={() => void listenAndSend('en-US')}
+            className={cn(
+              'min-h-11 rounded-xl border px-3 text-[12px] font-semibold transition-colors disabled:opacity-40',
+              listeningLocale === 'en-US'
+                ? 'border-rose-300/35 bg-rose-300/10 text-rose-100'
+                : 'border-white/[0.09] bg-white/[0.035] text-white/70 hover:text-white',
+            )}
+          >
+            {listeningLocale === 'en-US' ? '● Listening EN…' : '🎙 Mic EN'}
+          </button>
+          <button
+            type="button"
+            disabled={isThinking || Boolean(listeningLocale)}
+            onClick={() => void listenAndSend('ar-EG')}
+            className={cn(
+              'min-h-11 rounded-xl border px-3 text-[12px] font-semibold transition-colors disabled:opacity-40',
+              listeningLocale === 'ar-EG'
+                ? 'border-rose-300/35 bg-rose-300/10 text-rose-100'
+                : 'border-white/[0.09] bg-white/[0.035] text-white/70 hover:text-white',
+            )}
+          >
+            {listeningLocale === 'ar-EG' ? '● Listening مصري…' : '🎙 Mic مصري'}
+          </button>
+        </div>
+        {listeningLocale && <div className="mb-2 text-center text-[11px] text-white/45">Listening · {voiceLocaleShortLabel(listeningLocale)} · speak naturally, then Noor will send and answer by voice.</div>}
         {error && <div role="alert" className="mb-2 break-words [overflow-wrap:anywhere] text-[13px] text-red-300/95">{error}</div>}
         <div className="flex max-w-full min-w-0 items-end gap-2">
           <textarea
@@ -423,12 +490,12 @@ export function PlaygroundChat() {
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault()
-                send(input)
+                void send(input)
               }
             }}
             placeholder={isThinking ? 'Noor is working…' : 'Message Noor or ask her to create something…'}
             rows={2}
-            disabled={isThinking}
+            disabled={isThinking || Boolean(listeningLocale)}
             aria-label="Message Noor"
             className="min-h-11 min-w-0 flex-1 resize-none rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-[16px] text-white/90 outline-none placeholder:text-white/30 focus:border-white/[0.2] disabled:opacity-60"
           />
@@ -441,8 +508,8 @@ export function PlaygroundChat() {
             </button>
           ) : (
             <button
-              onClick={() => send(input)}
-              disabled={!input.trim() || !hasKey || agentModelsLoading || !activeAgentModel}
+              onClick={() => void send(input)}
+              disabled={!input.trim() || !hasKey || agentModelsLoading || !activeAgentModel || Boolean(listeningLocale)}
               className="shrink-0 min-h-11 px-4 py-2 text-[13px] font-medium bg-white text-black rounded-lg hover:bg-white/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             >
               Send
