@@ -3,9 +3,11 @@ import type { ChatArtifact } from '../../types/venice'
 import { copyImage, defaultImageFileName, saveImage, shareImage } from '../../lib/native-media'
 import { toast } from '../../stores/toast-store'
 
+export type ImageRetryMode = 'repeat' | 'new-seed' | 'improve' | 'settings'
+
 interface ArtifactActionsProps {
   artifact: ChatArtifact
-  onRetry?: () => void
+  onRetry?: (mode: ImageRetryMode) => void
   onEdit?: () => void
   onSendLocalDream?: () => void
   onSendFaceFusion?: () => void
@@ -21,6 +23,7 @@ export function ArtifactActions({
   onDiscard,
 }: ArtifactActionsProps) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [retryOpen, setRetryOpen] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [busy, setBusy] = useState<'save' | 'share' | 'copy' | null>(null)
   const fileName = defaultImageFileName(artifact.id, artifact.mimeType)
@@ -67,6 +70,11 @@ export function ArtifactActions({
     }
   }
 
+  const chooseRetry = (mode: ImageRetryMode) => {
+    setRetryOpen(false)
+    onRetry?.(mode)
+  }
+
   return (
     <div className="border-t border-white/[0.06] bg-[#0c0c10]/95 px-2 py-1.5">
       <div className="flex min-w-0 items-center gap-0.5 overflow-x-auto overscroll-x-contain">
@@ -77,9 +85,31 @@ export function ArtifactActions({
           <PathIcon path="M12 16V4m0 0L8 8m4-4l4 4M5 12v7h14v-7" />
         </ImageAction>
         {onRetry && (
-          <ImageAction label="Retry" onClick={onRetry} disabled={Boolean(busy)}>
-            <PathIcon path="M4 4v6h6M5.5 15a8 8 0 101.8-8.3L4 10" />
-          </ImageAction>
+          <div
+            className="relative shrink-0"
+            onBlur={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setRetryOpen(false)
+            }}
+          >
+            <ImageAction
+              label="Retry"
+              onClick={() => {
+                setRetryOpen((value) => !value)
+                setMenuOpen(false)
+              }}
+              disabled={Boolean(busy)}
+            >
+              <PathIcon path="M4 4v6h6M5.5 15a8 8 0 101.8-8.3L4 10" />
+            </ImageAction>
+            {retryOpen && (
+              <div className="absolute bottom-full left-0 z-30 mb-1 w-48 overflow-hidden rounded-xl border border-white/[0.12] bg-[#17171c] p-1 shadow-2xl shadow-black/60">
+                <MenuButton label="Repeat task" onClick={() => chooseRetry('repeat')} />
+                <MenuButton label="New seed" onClick={() => chooseRetry('new-seed')} />
+                <MenuButton label="Improve result" onClick={() => chooseRetry('improve')} />
+                <MenuButton label="Change settings" onClick={() => chooseRetry('settings')} />
+              </div>
+            )}
+          </div>
         )}
         {onEdit && (
           <ImageAction label="Edit" onClick={onEdit} disabled={Boolean(busy)}>
@@ -93,7 +123,14 @@ export function ArtifactActions({
             if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setMenuOpen(false)
           }}
         >
-          <ImageAction label="More" onClick={() => setMenuOpen((value) => !value)} disabled={Boolean(busy)}>
+          <ImageAction
+            label="More"
+            onClick={() => {
+              setMenuOpen((value) => !value)
+              setRetryOpen(false)
+            }}
+            disabled={Boolean(busy)}
+          >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>
           </ImageAction>
           {menuOpen && (
