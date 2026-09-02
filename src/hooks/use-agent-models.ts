@@ -48,7 +48,7 @@ export function useAgentModels() {
 
       // Second defensive filter.
       // Even if another part of OpenVenice changes later,
-      // nothing outside our four models reaches the Agent picker.
+      // nothing outside our selected models reaches the Agent picker.
       .filter((m) =>
         ALLOWED_AGENT_MODELS.includes(
           m.id as (typeof ALLOWED_AGENT_MODELS)[number],
@@ -70,7 +70,7 @@ export function useAgentModels() {
             m.model_spec?.availableContextTokens,
 
           /*
-           * All four are deliberately selected models,
+           * All selected models are deliberately approved for Noor,
            * so don't use OpenVenice's old recommendation logic.
            */
           recommended: true,
@@ -101,9 +101,16 @@ export function useAgentModels() {
       })
   }, [data])
 
+  /*
+   * React Query may report a background/loading state while it already has
+   * usable cached model data. Noor should remain send-ready in that case.
+   * Only expose "loading" while there is genuinely no compatible model yet.
+   */
+  const modelListLoading = isLoading && models.length === 0
+
   return {
     models,
-    isLoading,
+    isLoading: modelListLoading,
   }
 }
 
