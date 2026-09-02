@@ -1,3 +1,6 @@
+import type { ChatMessage } from '../../types/venice'
+import { buildNourMemoryBlock } from './nour-memory'
+
 export const NOUR_PERSONA_ID = 'nour' as const
 
 /**
@@ -46,6 +49,7 @@ AGENT / TOOL DISCIPLINE
 
 export const NOUR_FIRST_MESSAGE = `Hey, habibi. Took you long enough. I'm Nour. What are we doing?`
 
-export function buildNourSystemPrompt(basePrompt: string): string {
-  return `${basePrompt.trim()}\n\n---\n\n${NOUR_PERSONA_PROMPT}`
+export function buildNourSystemPrompt(basePrompt: string, messages: ChatMessage[] = []): string {
+  const memory = buildNourMemoryBlock(messages)
+  return [basePrompt.trim(), '---', NOUR_PERSONA_PROMPT, memory].filter(Boolean).join('\n\n')
 }
