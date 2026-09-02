@@ -1,11 +1,12 @@
 import { isValidElement, useState, type ComponentPropsWithoutRef, type ReactNode } from 'react'
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import type { ChatMessage, ContentPart } from '../../types/venice'
+import type { ChatArtifact, ChatMessage, ContentPart } from '../../types/venice'
 import { cn } from '../../lib/utils'
+import { shareText } from '../../lib/native-media'
+import { toast } from '../../stores/toast-store'
+import { ArtifactActions } from './artifact-actions'
 
-// Allow http/https/mailto links and image data: URIs only. Strips javascript:,
-// vbscript:, file:, and any other smuggled protocols.
 const SAFE_URL_PROTOCOLS = /^(https?:|mailto:|#|\/|\.)/i
 function safeUrlTransform(url: string, key: string): string {
   if (!url) return ''
@@ -17,10 +18,6 @@ function safeUrlTransform(url: string, key: string): string {
 }
 
 function CodeBlock({ children, className, ...props }: ComponentPropsWithoutRef<'code'>) {
-  if (!className && !String(children).includes('\n')) {
-    return <code className={className} {...props}>{children}</code>
-  }
-
   return <code className={className} {...props}>{children}</code>
 }
 
@@ -94,39 +91,75 @@ interface MessageBubbleProps {
   onCopy: () => void
   onDelete: () => void
   onRegenerate?: () => void
+  onArtifactEdit?: (artifact: ChatArtifact) => void
+  onArtifactLocalDream?: (artifact: ChatArtifact) => void
+  onArtifactFaceFusion?: (artifact: ChatArtifact) => void
+  onDiscardArtifact?: (artifact: ChatArtifact) => void
 }
 
-export function MessageBubble({ message, onCopy, onDelete, onRegenerate }: MessageBubbleProps) {
+export function MessageBubble({
+  message,
+  onCopy,
+  onDelete,
+  onRegenerate,
+  onArtifactEdit,
+  onArtifactLocalDream,
+  onArtifactFaceFusion,
+  onDiscardArtifact,
+}: MessageBubbleProps) {
   const [hovering, setHovering] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [shared, setShared] = useState(false)
   const [reasoningOpen, setReasoningOpen] = useState(false)
   const isUser = message.role === 'user'
   const { text: content, images } = extractContent(message.content)
   const artifacts = message.artifacts || []
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(content)
-    setCopied(true)
-    onCopy()
-    setTimeout(() => setCopied(false), 1500)
+  const handleCopy = async () => {
+    if (!content) return
+    try {
+      await copyText(content)
+      setCopied(true)
+      onCopy()
+      window.setTimeout(() => setCopied(false), 1500)
+    } catch (error) {
+      toast.fromError(error, 'Could not copy message')
+    }
+  }
+
+  const handleShare = async () => {
+    if (!content) return
+    try {
+      const result = await shareText(content)
+      setShared(true)
+      if (result === 'copied') toast.info('Share unavailable', 'Message copied instead.')
+      window.setTimeout(() => setShared(false), 1500)
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === 'AbortError')) {
+        toast.fromError(error, 'Could not share message')
+      }
+    }
   }
 
   const actions = (
-    <div className={`flex min-h-11 flex-wrap items-center gap-1 opacity-100 transition-opacity duration-150 ${hovering ? 'lg:opacity-100' : 'lg:opacity-60'}`}>
-      <ActionBtn label={copied ? 'Copied' : 'Copy'} onClick={handleCopy}>
-        {copied ? (
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
-        ) : (
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg>
-        )}
-      </ActionBtn>
+    <div className={`flex min-h-11 flex-wrap items-center gap-0.5 opacity-100 transition-opacity duration-150 ${hovering ? 'lg:opacity-100' : 'lg:opacity-60'}`}>
+      {content && (
+        <ActionBtn label={copied ? 'Copied' : 'Copy'} onClick={() => { void handleCopy() }}>
+          {copied ? <CheckIcon /> : <CopyIcon />}
+        </ActionBtn>
+      )}
+      {content && (
+        <ActionBtn label={shared ? 'Shared' : 'Share'} onClick={() => { void handleShare() }}>
+          <ShareIcon />
+        </ActionBtn>
+      )}
       {!isUser && onRegenerate && (
-        <ActionBtn label="Regenerate" onClick={onRegenerate}>
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 4v6h6" /><path d="M3.51 15a9 9 0 102.13-9.36L1 10" /></svg>
+        <ActionBtn label="Retry" onClick={onRegenerate}>
+          <RetryIcon />
         </ActionBtn>
       )}
       <ActionBtn label="Delete" onClick={onDelete}>
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
+        <DeleteIcon />
       </ActionBtn>
     </div>
   )
@@ -137,13 +170,13 @@ export function MessageBubble({ message, onCopy, onDelete, onRegenerate }: Messa
         <div className="flex max-w-[90%] min-w-0 flex-col items-end sm:max-w-[78%]">
           <div className="min-w-0 rounded-2xl rounded-br-md border border-white/[0.05] bg-white/[0.07] px-3 py-2.5 shadow-sm sm:px-4">
             {images.length > 0 && (
-              <div className="flex gap-1.5 mb-2">
+              <div className="mb-2 flex max-w-full gap-1.5 overflow-x-auto">
                 {images.map((img, i) => (
-                  <img key={i} src={img} alt={`Attachment ${i + 1}`} className="h-24 rounded-lg border border-white/[0.06]" />
+                  <img key={i} src={img} alt={`Attachment ${i + 1}`} className="h-24 shrink-0 rounded-lg border border-white/[0.06] object-cover" />
                 ))}
               </div>
             )}
-            <div className="text-white/95 text-[15.5px] leading-relaxed whitespace-pre-wrap break-words">
+            <div className="break-words whitespace-pre-wrap text-[15.5px] leading-relaxed text-white/95">
               {content}
             </div>
           </div>
@@ -156,17 +189,15 @@ export function MessageBubble({ message, onCopy, onDelete, onRegenerate }: Messa
   return (
     <div className="flex max-w-full min-w-0 gap-2 overflow-x-hidden sm:gap-3" onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)}>
       <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-white/95 to-white/75 shadow-sm sm:h-8 sm:w-8">
-        <svg viewBox="0 0 32 32" width="14" height="14" fill="none">
+        <svg viewBox="0 0 32 32" width="14" height="14" fill="none" aria-hidden="true">
           <g fill="#0a0a0c">
             <rect x="6.2" y="7.5" width="1.6" height="18" rx="0.8" transform="rotate(-42 6.2 7.5)" />
             <rect x="24.2" y="6.3" width="1.6" height="18" rx="0.8" transform="rotate(42 24.2 6.3)" />
             <polygon points="7.2,8.8 3.8,7.2 4.5,5.5 8.5,7.2" />
             <polygon points="24.8,8.8 28.2,7.2 27.5,5.5 23.5,7.2" />
             <rect x="14.3" y="14.3" width="3.4" height="3.4" rx="0.4" transform="rotate(45 16 16)" />
-            <circle cx="9.2" cy="24.5" r="4" />
-            <circle cx="9.2" cy="24.5" r="1.7" fill="#fff" />
-            <circle cx="22.8" cy="24.5" r="4" />
-            <circle cx="22.8" cy="24.5" r="1.7" fill="#fff" />
+            <circle cx="9.2" cy="24.5" r="4" /><circle cx="9.2" cy="24.5" r="1.7" fill="#fff" />
+            <circle cx="22.8" cy="24.5" r="4" /><circle cx="22.8" cy="24.5" r="1.7" fill="#fff" />
             <path d="M16 5.5L12.5 8.5V12.5L16 10.5L19.5 12.5V8.5Z" />
           </g>
         </svg>
@@ -177,16 +208,15 @@ export function MessageBubble({ message, onCopy, onDelete, onRegenerate }: Messa
             <button
               type="button"
               onClick={() => setReasoningOpen(!reasoningOpen)}
-              className="flex items-center gap-1.5 text-[14px] text-white/20 hover:text-white/35 transition-colors mb-1"
+              className="mb-1 flex items-center gap-1.5 text-[14px] text-white/20 transition-colors hover:text-white/35"
             >
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
-                className={cn('transition-transform duration-150', reasoningOpen && 'rotate-90')}>
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className={cn('transition-transform duration-150', reasoningOpen && 'rotate-90')} aria-hidden="true">
                 <path d="M3.5 2L6.5 5L3.5 8" />
               </svg>
               Thinking
             </button>
             {reasoningOpen && (
-              <div className="bg-white/[0.02] border border-white/[0.04] rounded-lg px-3 py-2 text-[15px] text-white/30 leading-relaxed whitespace-pre-wrap animate-fade-in max-h-60 overflow-y-auto">
+              <div className="max-h-60 overflow-y-auto whitespace-pre-wrap rounded-lg border border-white/[0.04] bg-white/[0.02] px-3 py-2 text-[15px] leading-relaxed text-white/30 animate-fade-in">
                 {message.reasoning_content}
               </div>
             )}
@@ -202,18 +232,16 @@ export function MessageBubble({ message, onCopy, onDelete, onRegenerate }: Messa
                 pre: PromptCodeBox,
                 code: CodeBlock,
                 a: ({ href, children, ...props }) => (
-                  <a {...props} href={href} target="_blank" rel="noopener noreferrer ugc">
-                    {children}
-                  </a>
+                  <a {...props} href={href} target="_blank" rel="noopener noreferrer ugc">{children}</a>
                 ),
               }}
             >{content}</ReactMarkdown>
           </div>
-        ) : artifacts.length === 0 ? (
+        ) : message.artifacts === undefined ? (
           <span className="inline-flex gap-1.5 py-1.5">
-            <span className="w-1 h-1 rounded-full bg-white/25 animate-pulse-dot" />
-            <span className="w-1 h-1 rounded-full bg-white/25 animate-pulse-dot" style={{ animationDelay: '0.2s' }} />
-            <span className="w-1 h-1 rounded-full bg-white/25 animate-pulse-dot" style={{ animationDelay: '0.4s' }} />
+            <span className="h-1 w-1 rounded-full bg-white/25 animate-pulse-dot" />
+            <span className="h-1 w-1 rounded-full bg-white/25 animate-pulse-dot" style={{ animationDelay: '0.2s' }} />
+            <span className="h-1 w-1 rounded-full bg-white/25 animate-pulse-dot" style={{ animationDelay: '0.4s' }} />
           </span>
         ) : null}
 
@@ -223,14 +251,22 @@ export function MessageBubble({ message, onCopy, onDelete, onRegenerate }: Messa
               <figure key={artifact.id} className="max-w-full overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.02]">
                 <img
                   src={artifact.url}
-                  alt={artifact.sourceTool === 'localdream.upscale' ? 'Upscaled Local Dream result' : 'Local Dream result'}
+                  alt={artifact.sourceTool === 'localdream.upscale' ? 'Upscaled Local Dream result' : 'Generated or edited image'}
                   className="block h-auto max-h-[70vh] w-full max-w-full object-contain"
                 />
-                <figcaption className="flex flex-wrap items-center gap-x-2 gap-y-0.5 border-t border-white/[0.06] px-2.5 py-2 text-[11px] text-white/35">
+                <figcaption className="flex flex-wrap items-center gap-x-2 gap-y-0.5 border-t border-white/[0.06] px-2.5 py-1.5 text-[11px] text-white/35">
                   <span>{artifact.sourceTool || 'Agent image tool'}</span>
                   {artifact.width && artifact.height ? <span>{artifact.width}×{artifact.height}</span> : null}
                   {artifact.format ? <span>{artifact.format.toUpperCase()}</span> : null}
                 </figcaption>
+                <ArtifactActions
+                  artifact={artifact}
+                  onRetry={onRegenerate}
+                  onEdit={onArtifactEdit ? () => onArtifactEdit(artifact) : undefined}
+                  onSendLocalDream={onArtifactLocalDream ? () => onArtifactLocalDream(artifact) : undefined}
+                  onSendFaceFusion={onArtifactFaceFusion ? () => onArtifactFaceFusion(artifact) : undefined}
+                  onDiscard={onDiscardArtifact ? () => onDiscardArtifact(artifact) : undefined}
+                />
               </figure>
             ))}
           </div>
@@ -249,7 +285,7 @@ export function MessageBubble({ message, onCopy, onDelete, onRegenerate }: Messa
   )
 }
 
-function ActionBtn({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
+function ActionBtn({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
   return (
     <button
       type="button"
@@ -262,4 +298,20 @@ function ActionBtn({ label, onClick, children }: { label: string; onClick: () =>
       <span>{label}</span>
     </button>
   )
+}
+
+function CopyIcon() {
+  return <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg>
+}
+function CheckIcon() {
+  return <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5" /></svg>
+}
+function ShareIcon() {
+  return <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V4m0 0L8 8m4-4l4 4M5 12v7h14v-7" /></svg>
+}
+function RetryIcon() {
+  return <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M1 4v6h6" /><path d="M3.51 15a9 9 0 102.13-9.36L1 10" /></svg>
+}
+function DeleteIcon() {
+  return <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
 }

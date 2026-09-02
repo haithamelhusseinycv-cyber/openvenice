@@ -51,8 +51,49 @@ function failedToolResult(message: string): AgentToolResult {
 function mimeTypeForFormat(format?: string) {
   if (format === 'jpeg' || format === 'jpg') return 'image/jpeg'
   if (format === 'png') return 'image/png'
+  if (format === 'webp') return 'image/webp'
   if (format === 'raw') return 'application/octet-stream'
   return undefined
+}
+
+function imageMetadataFromUrl(url: string) {
+  if (!url.startsWith('data:image/')) return { mimeType: undefined, format: undefined }
+  const match = /^data:(image\/[^;,]+)/i.exec(url)
+  const mimeType = match?.[1]?.toLowerCase()
+  const format = mimeType?.split('/')[1]?.replace('jpg', 'jpeg')
+  return { mimeType, format }
+}
+
+/**
+ * Give tool calls compact handles for user image attachments while leaving the
+ * original multimodal message untouched so Qwen-VL can still see the images.
+ */
+function seedAttachmentArtifacts(messages: unknown[], artifacts: AgentArtifactStore) {
+  const handles: Array<{ index: number; ref: string }> = []
+  let index = 0
+
+  for (const message of messages) {
+    if (!message || typeof message !== 'object') continue
+    const content = (message as { content?: unknown }).content
+    if (!Array.isArray(content)) continue
+    for (const part of content) {
+      if (!part || typeof part !== 'object') continue
+      const value = part as { type?: string; image_url?: { url?: string } }
+      const url = value.type === 'image_url' ? value.image_url?.url : undefined
+      if (!url) continue
+      index += 1
+      const { mimeType, format } = imageMetadataFromUrl(url)
+      const artifact = artifacts.put(url, {
+        sourceTool: 'chat.attachment',
+        mimeType,
+        format,
+        attachmentIndex: index,
+      })
+      handles.push({ index, ref: artifact.ref })
+    }
+  }
+
+  return handles
 }
 
 /**
@@ -73,10 +114,11 @@ function externalizeImagePayload(
   if (typeof image !== 'string' || image.length <= 4096) return result
 
   const format = typeof data.format === 'string' ? data.format : undefined
+  const mimeType = typeof data.mimeType === 'string' ? data.mimeType : mimeTypeForFormat(format)
   const artifact = artifacts.put(image, {
     sourceTool,
     format,
-    mimeType: mimeTypeForFormat(format),
+    mimeType,
     width: typeof data.width === 'number' ? data.width : undefined,
     height: typeof data.height === 'number' ? data.height : undefined,
   })
@@ -103,6 +145,14 @@ export async function runQwenAgent(options: QwenAgentRunOptions) {
   const messages = [...options.messages]
   const maxRounds = Math.max(1, options.maxToolRounds ?? 4)
   const artifacts = new AgentArtifactStore()
+  const attachments = seedAttachmentArtifacts(messages, artifacts)
+
+  if (attachments.length > 0) {
+    messages.push({
+      role: 'system',
+      content: `Tool image handles for the user attachments: ${attachments.map((item) => `attachment ${item.index} = ${item.ref}`).join(', ')}. Use these artifact:// handles in Local Dream and FaceFusion tool image fields instead of copying base64. The original images remain visible in the multimodal user message.`,
+    })
+  }
 
   for (let round = 0; round < maxRounds; round++) {
     const stream = await qwenChatStream(

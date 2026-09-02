@@ -1,0 +1,8 @@
+{
+  "appId": "ai.openvenice.app",
+  "appName": "OpenVenice",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}

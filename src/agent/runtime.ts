@@ -1,6 +1,7 @@
 import { AgentToolRegistry } from './tool-registry'
 import { createLocalDreamTools } from './toolsets/localdream-tools'
-import type { FaceFusionConnector } from '../connectors/facefusion/facefusion-connector'
+import { FaceFusionConnector } from '../connectors/facefusion/facefusion-connector'
+import { CapacitorFaceFusionBridge, isNativeOpenVeniceAndroid } from '../connectors/facefusion/capacitor-facefusion-bridge'
 import { createFaceFusionTools } from './toolsets/facefusion-tools'
 
 let defaultRegistry: AgentToolRegistry | null = null
@@ -14,12 +15,20 @@ export function createAgentRegistry(options: { faceFusion?: FaceFusionConnector 
   return registry
 }
 
+function nativeFaceFusionConnector() {
+  if (!isNativeOpenVeniceAndroid()) return undefined
+  return new FaceFusionConnector(new CapacitorFaceFusionBridge())
+}
+
 /**
- * Browser/PWA runtime. Local Dream works through its localhost HTTP service.
- * FaceFusion is registered later by the native Android shell once its
- * signature-protected bridge transport is available.
+ * Local Dream works through its localhost HTTP service in both the PWA and
+ * Android shell. FaceFusion tools are registered automatically only inside the
+ * native OpenVenice Android app, where the signature-protected Capacitor
+ * plugin can bind to FaceFusion's AgentBridgeService.
  */
 export function getDefaultAgentRegistry() {
-  if (!defaultRegistry) defaultRegistry = createAgentRegistry()
+  if (!defaultRegistry) {
+    defaultRegistry = createAgentRegistry({ faceFusion: nativeFaceFusionConnector() })
+  }
   return defaultRegistry
 }
