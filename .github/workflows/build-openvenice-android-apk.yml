@@ -8,6 +8,7 @@ on:
       - 'android-openvenice-custom/**'
       - 'capacitor.config.json'
       - 'src/**'
+      - 'services/voicetut-api/**'
       - 'package.json'
       - 'package-lock.json'
 
@@ -18,6 +19,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      # Configure repository variable VOICETUT_BASE_URL once a GPU service is deployed.
+      # Leaving it empty is safe: Noor automatically falls back to Venice/Serena.
+      VITE_VOICETUT_BASE_URL: ${{ vars.VOICETUT_BASE_URL }}
 
     steps:
       - name: Checkout OpenVenice
