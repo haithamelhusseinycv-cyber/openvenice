@@ -1,0 +1,110 @@
+name: Build signed Android release APKs
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      VITE_VOICETUT_BASE_URL: ${{ vars.VOICETUT_BASE_URL }}
+      OPENVENICE_RELEASE_KEYSTORE: /home/runner/work/release/openvenice-release.jks
+      OPENVENICE_RELEASE_STORE_PASSWORD: ${{ secrets.OPENVENICE_RELEASE_STORE_PASSWORD }}
+      OPENVENICE_RELEASE_KEY_ALIAS: ${{ secrets.OPENVENICE_RELEASE_KEY_ALIAS }}
+      OPENVENICE_RELEASE_KEY_PASSWORD: ${{ secrets.OPENVENICE_RELEASE_KEY_PASSWORD }}
+      FACEFUSION_UPSTREAM_SHA: f38a70e4bacaab4132538421c471f9d4d3ccac00
+
+    steps:
+      - name: Checkout OpenVenice
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Set up Java 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Materialize protected release keystore
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.OPENVENICE_RELEASE_KEYSTORE_BASE64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for value in "$RELEASE_KEYSTORE_BASE64" "$OPENVENICE_RELEASE_STORE_PASSWORD" "$OPENVENICE_RELEASE_KEY_ALIAS" "$OPENVENICE_RELEASE_KEY_PASSWORD"; do
+            test -n "$value" || { echo "Required Android release-signing secret is missing" >&2; exit 1; }
+          done
+          install -d -m 700 "$(dirname "$OPENVENICE_RELEASE_KEYSTORE")"
+          printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$OPENVENICE_RELEASE_KEYSTORE"
+          chmod 600 "$OPENVENICE_RELEASE_KEYSTORE"
+          keytool -list -keystore "$OPENVENICE_RELEASE_KEYSTORE"             -storepass "$OPENVENICE_RELEASE_STORE_PASSWORD"             -alias "$OPENVENICE_RELEASE_KEY_ALIAS" >/dev/null
+
+      - name: Install and test web application
+        run: |
+          npm ci
+          npm run lint
+          npm run test:run
+          npm run build
+
+      - name: Package OpenVenice release
+        shell: bash
+        run: |
+          npm install --no-save --package-lock=false @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7
+          rm -rf android
+          npx cap add android
+          npx cap sync android
+          python3 android-openvenice-custom/apply_android_agent.py
+          python3 android-openvenice-custom/configure_release_signing.py android/app/build.gradle
+          cd android
+          chmod +x ./gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Clone pinned FaceFusion source
+        shell: bash
+        run: |
+          git clone --no-checkout https://github.com/Parasaran-Python/android-face-fusion.git android-face-fusion
+          git -C android-face-fusion checkout --detach "$FACEFUSION_UPSTREAM_SHA"
+          test "$(git -C android-face-fusion rev-parse HEAD)" = "$FACEFUSION_UPSTREAM_SHA"
+
+      - name: Package FaceFusion release
+        shell: bash
+        run: |
+          python3 android-face-fusion-custom/apply_custom.py
+          python3 android-face-fusion-custom/fix_downloads_v31.py
+          python3 android-face-fusion-custom/apply_agent_bridge.py
+          python3 android-openvenice-custom/configure_release_signing.py android-face-fusion/app/build.gradle.kts
+          cd android-face-fusion
+          chmod +x ./gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Verify matching release certificates
+        shell: bash
+        run: |
+          openvenice_apk='android/app/build/outputs/apk/release/app-release.apk'
+          facefusion_apk='android-face-fusion/app/build/outputs/apk/release/app-release.apk'
+          apksigner="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner"
+          "$apksigner" verify --verbose --print-certs "$openvenice_apk"
+          "$apksigner" verify --verbose --print-certs "$facefusion_apk"
+          first=$("$apksigner" verify --print-certs "$openvenice_apk" | awk '/certificate SHA-256 digest:/{print $NF; exit}')
+          second=$("$apksigner" verify --print-certs "$facefusion_apk" | awk '/certificate SHA-256 digest:/{print $NF; exit}')
+          test -n "$first"
+          test "$first" = "$second"
+
+      - name: Upload signed releases
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: openvenice-signed-release-apks
+          path: |
+            android/app/build/outputs/apk/release/app-release.apk
+            android-face-fusion/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
