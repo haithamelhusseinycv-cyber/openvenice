@@ -29,7 +29,7 @@ describe('pruneOversized', () => {
     const parsed = JSON.parse(result!) as { state: Record<string, unknown[]> & { setting: string } }
     expect(parsed.state.conversations).toEqual([0, 1, 2, 3, 4, 5])
     expect(parsed.state.workflows).toEqual([0, 1, 2, 3, 4, 5])
-    expect(parsed.state.messages).toEqual([0, 1, 2, 3, 4, 5])
+    expect(parsed.state.messages).toEqual([6, 7, 8, 9, 10, 11])
     expect(parsed.state.setting).toBe('kept')
   })
 })
