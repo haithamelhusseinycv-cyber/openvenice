@@ -16,7 +16,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -32,6 +32,12 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      - name: Test web application
+        run: npm run test:run
+
+      - name: Test VoiceTut security layer
+        run: python3 -m unittest discover -s services/voicetut-api -p 'test_*.py'
 
       - name: Build
         run: npm run build
