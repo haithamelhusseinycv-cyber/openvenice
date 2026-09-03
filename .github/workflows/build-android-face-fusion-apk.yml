@@ -51,10 +51,14 @@ jobs:
           fi
           keytool -list -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey | grep 'SHA256:'
 
-      - name: Clone Android Face Fusion
+      - name: Clone pinned Android Face Fusion
         shell: bash
+        env:
+          FACEFUSION_UPSTREAM_SHA: f38a70e4bacaab4132538421c471f9d4d3ccac00
         run: |
-          git clone --depth 1 --branch master https://github.com/Parasaran-Python/android-face-fusion.git android-face-fusion
+          git clone --no-checkout https://github.com/Parasaran-Python/android-face-fusion.git android-face-fusion
+          git -C android-face-fusion checkout --detach "$FACEFUSION_UPSTREAM_SHA"
+          test "$(git -C android-face-fusion rev-parse HEAD)" = "$FACEFUSION_UPSTREAM_SHA"
 
       - name: Apply Complete Models customization
         shell: bash
