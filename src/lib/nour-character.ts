@@ -15,8 +15,13 @@ export const NOUR_LANGUAGE_LABELS: Record<NourLanguageMode, string> = {
   'cairo-street': 'Cairo Street',
 }
 
-export const NOUR_TTS_MODEL = 'tts-qwen3-1-7b'
-export const NOUR_TTS_VOICE = 'Serena'
+/** Primary Noor speech profile. VoiceTut is served by our companion TTS service. */
+export const NOUR_TTS_MODEL = 'voicetut'
+export const NOUR_TTS_VOICE = 'Omnia'
+
+/** Reliable hosted fallback while the VoiceTut service is offline or unconfigured. */
+export const NOUR_TTS_FALLBACK_MODEL = 'tts-qwen3-1-7b'
+export const NOUR_TTS_FALLBACK_VOICE = 'Serena'
 
 export interface NourRequestProfile {
   mode: 'tool' | 'technical' | 'conversation' | 'creative-prompt'
