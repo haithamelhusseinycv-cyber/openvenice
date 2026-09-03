@@ -1,5 +1,7 @@
 import type { VeniceError } from '../types/venice'
 import { useAuthStore } from '../stores/auth-store'
+import { useVoiceStore } from '../stores/voice-store'
+import { NOUR_TTS_FALLBACK_MODEL, NOUR_TTS_FALLBACK_VOICE } from './nour-character'
 
 const ENV_BASE = (import.meta.env.VITE_VENICE_BASE_URL as string | undefined)?.replace(/\/$/, '')
 const BASE_URL = ENV_BASE || (import.meta.env.DEV ? '/venice/api/v1' : 'https://api.venice.ai/api/v1')
@@ -217,10 +219,98 @@ export async function veniceFormData<T>(path: string, formData: FormData, init: 
   return res.json() as Promise<T>
 }
 
+interface VoiceTutSpeechRequest {
+  model?: string
+  voice?: string
+  input?: string
+  language?: string
+  response_format?: string
+}
+
+function dispatchTtsProvider(provider: 'voicetut' | 'venice', reason?: string) {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent('nour-tts-provider', { detail: { provider, reason } }))
+}
+
+async function voiceTutBlob(body: VoiceTutSpeechRequest, init: { signal?: AbortSignal } = {}): Promise<Blob> {
+  const settings = useVoiceStore.getState()
+  const baseUrl = settings.voiceTutBaseUrl.trim().replace(/\/$/, '')
+  if (!baseUrl) throw new Error('VoiceTut service URL is not configured')
+
+  const controller = new AbortController()
+  const timeout = globalThis.setTimeout(() => controller.abort(), 45_000)
+  const abortFromCaller = () => controller.abort()
+  init.signal?.addEventListener('abort', abortFromCaller, { once: true })
+
+  try {
+    const response = await fetch(`${baseUrl}/v1/audio/speech`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'mohammedaly22/VoiceTut-TTS',
+        voice: settings.ttsVoice || body.voice || 'Omnia',
+        input: body.input || '',
+        language: body.language === 'English' ? 'en' : 'arz',
+        speed: settings.voiceRate,
+        response_format: 'wav',
+      }),
+      signal: controller.signal,
+    })
+
+    if (!response.ok) {
+      let detail = `HTTP ${response.status}`
+      try {
+        const payload = await response.json() as { detail?: string; message?: string }
+        detail = payload.detail || payload.message || detail
+      } catch {
+        /* keep HTTP status */
+      }
+      throw new Error(`VoiceTut: ${detail}`)
+    }
+
+    const contentType = response.headers.get('content-type') || ''
+    if (contentType.includes('application/json')) {
+      const payload = await response.json() as { detail?: string; message?: string }
+      throw new Error(payload.detail || payload.message || 'VoiceTut returned JSON instead of audio')
+    }
+
+    dispatchTtsProvider('voicetut')
+    return await response.blob()
+  } finally {
+    globalThis.clearTimeout(timeout)
+    init.signal?.removeEventListener('abort', abortFromCaller)
+  }
+}
+
 export async function veniceBlob(path: string, body: object, init: { signal?: AbortSignal } = {}): Promise<Blob> {
+  let effectiveBody = body
+  const speechBody = body as VoiceTutSpeechRequest
+
+  if (path === '/audio/speech' && speechBody.model === 'voicetut') {
+    const settings = useVoiceStore.getState()
+    if (settings.ttsProvider === 'voicetut' && settings.voiceTutBaseUrl.trim()) {
+      try {
+        return await voiceTutBlob(speechBody, init)
+      } catch (error) {
+        if (init.signal?.aborted || (error instanceof DOMException && error.name === 'AbortError')) throw error
+        const reason = error instanceof Error ? error.message : 'VoiceTut unavailable'
+        dispatchTtsProvider('venice', reason)
+      }
+    } else {
+      dispatchTtsProvider('venice', settings.ttsProvider === 'voicetut' ? 'VoiceTut service URL is not configured' : 'Venice selected')
+    }
+
+    effectiveBody = {
+      ...speechBody,
+      model: NOUR_TTS_FALLBACK_MODEL,
+      voice: NOUR_TTS_FALLBACK_VOICE,
+      response_format: 'mp3',
+    }
+  }
+
   const res = await veniceFetch(path, {
     method: 'POST',
-    body: JSON.stringify(body),
+    body: JSON.stringify(effectiveBody),
     signal: init.signal,
     retries: 1,
   })
