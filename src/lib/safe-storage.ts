@@ -46,8 +46,8 @@ export function pruneOversized(value: string): string | null {
       const arr = state[key]
       if (Array.isArray(arr) && arr.length > 5) {
         const keep = Math.max(5, Math.floor(arr.length / 2))
-        // Persisted collections are newest-first; retain recent user data.
-        state[key] = arr.slice(0, keep)
+        // Conversations/workflows are newest-first; messages are chronological.
+        state[key] = key === 'messages' ? arr.slice(-keep) : arr.slice(0, keep)
         modified = true
       }
     }
