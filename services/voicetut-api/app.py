@@ -1,11 +1,13 @@
 import io
 import os
+import threading
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 import numpy as np
 import soundfile as sf
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -16,8 +18,10 @@ MODEL_ID = os.getenv("VOICETUT_MODEL", "mohammedaly22/VoiceTut-TTS")
 DEFAULT_VOICE = os.getenv("VOICETUT_VOICE", "Omnia")
 DEFAULT_STEPS = int(os.getenv("VOICETUT_STEPS", "32"))
 DEFAULT_GUIDANCE = float(os.getenv("VOICETUT_GUIDANCE", "2.5"))
+RUNPOD_HF_CACHE_ROOT = Path("/runpod-volume/huggingface-cache/hub")
 
-app = FastAPI(title="OpenVenice VoiceTut TTS", version="1.0.0")
+app = FastAPI(title="OpenVenice VoiceTut TTS", version="1.1.0")
+_model_load_error: str | None = None
 
 origins = [
     origin.strip()
@@ -45,22 +49,72 @@ class SpeechRequest(BaseModel):
     normalize: bool = True
 
 
+def resolve_runpod_cached_model(model_id: str) -> str | None:
+    """Use RunPod's cached Hugging Face snapshot when the endpoint provides one."""
+    if "/" not in model_id or not RUNPOD_HF_CACHE_ROOT.is_dir():
+        return None
+
+    org, name = model_id.split("/", 1)
+    model_root = RUNPOD_HF_CACHE_ROOT / f"models--{org}--{name}"
+    snapshots_dir = model_root / "snapshots"
+    refs_main = model_root / "refs" / "main"
+
+    if refs_main.is_file():
+        snapshot_hash = refs_main.read_text(encoding="utf-8").strip()
+        candidate = snapshots_dir / snapshot_hash
+        if candidate.is_dir():
+            return str(candidate)
+
+    if snapshots_dir.is_dir():
+        snapshots = sorted(path for path in snapshots_dir.iterdir() if path.is_dir())
+        if snapshots:
+            return str(snapshots[0])
+
+    return None
+
+
 @lru_cache(maxsize=1)
 def get_tts() -> VoiceTutTTS:
-    return VoiceTutTTS.from_pretrained(MODEL_ID)
+    model_source = resolve_runpod_cached_model(MODEL_ID) or MODEL_ID
+    return VoiceTutTTS.from_pretrained(model_source)
 
 
 def installed_voices() -> list[str]:
     return [speaker.speaker_name for speaker in get_tts().list_speakers()]
 
 
+def warm_model() -> None:
+    global _model_load_error
+    try:
+        get_tts()
+        _model_load_error = None
+    except Exception as exc:
+        _model_load_error = str(exc)
+
+
+@app.on_event("startup")
+def start_model_warmup() -> None:
+    threading.Thread(target=warm_model, name="voicetut-warmup", daemon=True).start()
+
+
+@app.get("/ping")
+def ping() -> Response:
+    """RunPod Load Balancer health check: 204 while warming, 200 when ready."""
+    if _model_load_error:
+        return Response(content="model load failed", status_code=500)
+    if get_tts.cache_info().currsize > 0:
+        return Response(content="ok", status_code=200)
+    return Response(status_code=204)
+
+
 @app.get("/health")
 def health():
     return {
-        "ok": True,
+        "ok": _model_load_error is None,
         "model": MODEL_ID,
         "default_voice": DEFAULT_VOICE,
         "loaded": get_tts.cache_info().currsize > 0,
+        "error": _model_load_error,
     }
 
 
