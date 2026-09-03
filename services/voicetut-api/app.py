@@ -104,18 +104,15 @@ def authorize(request: Request) -> str:
 
 
 def apply_quota(principal: str, characters: int) -> None:
-    decisions = (
-        quota.consume(principal, characters),
-        global_quota.consume("global", characters),
-    )
-    denied = next((decision for decision in decisions if not decision.allowed), None)
-    if denied:
-        metrics.increment("quota_rejected")
-        raise HTTPException(
-            status_code=429,
-            detail="VoiceTut quota exceeded",
-            headers={"Retry-After": str(denied.retry_after)},
-        )
+    for limiter, key in ((quota, principal), (global_quota, "global")):
+        decision = limiter.consume(key, characters)
+        if not decision.allowed:
+            metrics.increment("quota_rejected")
+            raise HTTPException(
+                status_code=429,
+                detail="VoiceTut quota exceeded",
+                headers={"Retry-After": str(decision.retry_after)},
+            )
 
 
 def resolve_runpod_cached_model(model_id: str) -> str | None:
