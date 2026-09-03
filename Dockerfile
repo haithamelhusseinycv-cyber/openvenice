@@ -23,16 +23,12 @@ RUN printf '%s\n' \
   '  add_header X-Frame-Options "DENY" always;' \
   '  add_header Referrer-Policy "no-referrer" always;' \
   '  add_header Permissions-Policy "camera=(), geolocation=(), payment=(), usb=()" always;' \
-  '  location = / {' \
-  '    add_header Cache-Control "no-store, no-cache, must-revalidate";' \
-  '    try_files /index.html =404;' \
-  '  }' \
-  '  location = /index.html { add_header Cache-Control "no-store, no-cache, must-revalidate"; }' \
-  '  location = /sw.js { add_header Cache-Control "no-store, no-cache, must-revalidate"; }' \
-  '  location = /manifest.webmanifest { add_header Cache-Control "no-cache, must-revalidate"; }' \
+  '  add_header Cache-Control "$openvenice_cache_control" always;' \
+  '  location = / { try_files /index.html =404; }' \
   '  location / { try_files $uri $uri/ /index.html; }' \
-  '  location ~* \\.(?:js|css|woff2?)$ { expires 1y; add_header Cache-Control "public, immutable"; }' \
-  '}' > /etc/nginx/conf.d/default.conf
+  '}' > /etc/nginx/conf.d/default.conf && \
+  sed -i 's#pid[[:space:]].*;#pid /tmp/nginx.pid;#' /etc/nginx/nginx.conf && \
+  chown -R nginx:nginx /var/cache/nginx /var/run /usr/share/nginx/html
 EXPOSE 8080
 USER nginx
 CMD ["nginx", "-g", "daemon off;"]
