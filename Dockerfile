@@ -13,11 +13,11 @@ RUN npm run build
 # --- Runtime stage: tiny static server ---
 FROM nginx:1.29.1-alpine
 COPY --from=builder /app/dist /usr/share/nginx/html
-RUN printf '%s\\n' \
+RUN printf '%s\n' \
   'map $uri $openvenice_cache_control {' \
   '  default "";' \
-  '  ~*\\.(?:js|css|woff2?)$ "public, max-age=31536000, immutable";' \
-  '  ~^(?:/|/index\\.html|/sw\\.js)$ "no-store, no-cache, must-revalidate";' \
+  '  ~*\.(?:js|css|woff2?)$ "public, max-age=31536000, immutable";' \
+  '  ~^(?:/|/index\.html|/sw\.js)$ "no-store, no-cache, must-revalidate";' \
   '  /manifest.webmanifest "no-cache, must-revalidate";' \
   '}' \
   'server {' \
