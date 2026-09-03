@@ -36,7 +36,7 @@ function isQuotaErr(err: unknown): boolean {
   return err.name === 'QuotaExceededError' || err.code === 22 || err.code === 1014
 }
 
-function pruneOversized(value: string): string | null {
+export function pruneOversized(value: string): string | null {
   try {
     const parsed = JSON.parse(value) as { state?: Record<string, unknown>; version?: number }
     if (!parsed?.state) return null
@@ -45,7 +45,9 @@ function pruneOversized(value: string): string | null {
     for (const key of ['conversations', 'workflows', 'messages']) {
       const arr = state[key]
       if (Array.isArray(arr) && arr.length > 5) {
-        state[key] = arr.slice(0, Math.max(5, Math.floor(arr.length / 2)))
+        const keep = Math.max(5, Math.floor(arr.length / 2))
+        // Persisted collections are newest-first; retain recent user data.
+        state[key] = arr.slice(0, keep)
         modified = true
       }
     }
