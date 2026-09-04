@@ -7,6 +7,7 @@ import {
   isAllowedChatModel,
   isAllowedEditModel,
   isAllowedImageModel,
+  normalizeModelId,
 } from '../lib/allowed-models'
 import type {
   ModelsResponse,
@@ -22,7 +23,7 @@ const PRIORITY: Record<VeniceType, string[]> = {
 }
 
 function normalize(value?: string) {
-  return (value || '').trim().toLowerCase()
+  return normalizeModelId(value)
 }
 
 function getModelName(model: VeniceModel) {

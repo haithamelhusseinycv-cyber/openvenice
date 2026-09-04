@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { useModels } from './use-models'
+import { normalizeModelId } from '../lib/allowed-models'
 import type {
   ModelCapabilities,
   ModelTrait,
@@ -35,7 +36,7 @@ export const ALLOWED_AGENT_MODELS = [
  * Exact UI order.
  */
 const MODEL_ORDER = new Map<string, number>(
-  ALLOWED_AGENT_MODELS.map((id, index) => [id, index]),
+  ALLOWED_AGENT_MODELS.map((id, index) => [normalizeModelId(id), index]),
 )
 
 export function useAgentModels() {
@@ -50,8 +51,8 @@ export function useAgentModels() {
       // Even if another part of OpenVenice changes later,
       // nothing outside our selected models reaches the Agent picker.
       .filter((m) =>
-        ALLOWED_AGENT_MODELS.includes(
-          m.id as (typeof ALLOWED_AGENT_MODELS)[number],
+        ALLOWED_AGENT_MODELS.map(normalizeModelId).includes(
+          normalizeModelId(m.id),
         ),
       )
 
@@ -91,7 +92,7 @@ export function useAgentModels() {
           /*
            * Tier follows our preferred model order.
            */
-          tier: MODEL_ORDER.get(m.id) ?? 999,
+          tier: MODEL_ORDER.get(normalizeModelId(m.id)) ?? 999,
 
           reasoning:
             caps.supportsReasoning === true,
@@ -106,9 +107,9 @@ export function useAgentModels() {
 
       .sort((a, b) => {
         const orderA =
-          MODEL_ORDER.get(a.id) ?? 999
+          MODEL_ORDER.get(normalizeModelId(a.id)) ?? 999
         const orderB =
-          MODEL_ORDER.get(b.id) ?? 999
+          MODEL_ORDER.get(normalizeModelId(b.id)) ?? 999
 
         return orderA - orderB
       })
@@ -135,5 +136,6 @@ export function findAgentModel(
   models: AgentModel[],
   id: string,
 ): AgentModel | undefined {
-  return models.find((m) => m.id === id)
+  const normalizedId = normalizeModelId(id)
+  return models.find((m) => normalizeModelId(m.id) === normalizedId)
 }

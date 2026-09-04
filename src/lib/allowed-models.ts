@@ -51,6 +51,10 @@ export const FALLBACK_CHAT_MODEL_ID = 'qwen-3-6-plus'
 export const DEFAULT_IMAGE_MODEL_ID = 'flux-2-max'
 export const DEFAULT_EDIT_MODEL_ID = 'qwen-edit-uncensored'
 
+export function normalizeModelId(id?: string) {
+  return (id ?? '').trim().toLowerCase().replace(/\./g, '-')
+}
+
 // The API response remains authoritative and is already filtered by modality
 // and online status. These families allow compatible successors to appear
 // automatically without exposing unrelated model types.
@@ -71,20 +75,24 @@ export const VISIBLE_TABS = ['playground', 'image'] as const
 export type VisibleTab = (typeof VISIBLE_TABS)[number]
 
 export function isAllowedChatModel(id?: string) {
-  return !!id && (ALLOWED_CHAT_MODEL_IDS as readonly string[]).includes(id)
+  if (!id) return false
+  const normalized = normalizeModelId(id)
+  return (ALLOWED_CHAT_MODEL_IDS as readonly string[])
+    .map(normalizeModelId)
+    .includes(normalized)
 }
 
 export function isAllowedImageModel(id?: string) {
   if (!id) return false
-  const normalized = id.toLowerCase()
-  return (ALLOWED_IMAGE_MODEL_IDS as readonly string[]).includes(normalized)
+  const normalized = normalizeModelId(id)
+  return (ALLOWED_IMAGE_MODEL_IDS as readonly string[]).map(normalizeModelId).includes(normalized)
     || IMAGE_MODEL_FAMILY_PREFIXES.some((prefix) => normalized.startsWith(prefix))
 }
 
 export function isAllowedEditModel(id?: string) {
   if (!id) return false
-  const normalized = id.toLowerCase()
-  return (ALLOWED_EDIT_MODEL_IDS as readonly string[]).includes(normalized)
+  const normalized = normalizeModelId(id)
+  return (ALLOWED_EDIT_MODEL_IDS as readonly string[]).map(normalizeModelId).includes(normalized)
     || EDIT_MODEL_FAMILY_PREFIXES.some((prefix) => normalized.startsWith(prefix) && normalized.includes('edit'))
 }
 
