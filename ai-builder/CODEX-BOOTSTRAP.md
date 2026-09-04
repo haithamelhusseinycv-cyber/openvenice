@@ -34,9 +34,11 @@ Use the official RunPod MCP/CLI path, not hand-written legacy REST calls.
 
 Run a real authentication check (`runpodctl user` or equivalent structured MCP call).
 
-Enumerate current pods, volumes, endpoints, and relevant CPU catalog entries.
+Enumerate current pods, volumes, endpoints, relevant CPU catalog entries, and current pricing/availability.
 
-Identify the existing Open WebUI workload and record its ID/status/storage without modifying it.
+Identify the existing Open WebUI workload and record its ID/status/storage without modifying, stopping, restarting, resizing, or reimaging it.
+
+If an `AI-Builder` workload already exists, inspect and reuse/repair it rather than creating a duplicate.
 
 ## 2. Persistent storage
 
@@ -48,7 +50,9 @@ Mount it at:
 
 `/workspace`
 
-Do not reuse or detach the Open WebUI volume.
+Do not reuse, detach, resize, or modify the Open WebUI volume.
+
+The deployment is invalid if `/workspace` is merely a writable directory on disposable container storage.
 
 ## 3. Create AI-Builder
 
@@ -60,54 +64,86 @@ Target approximately 8 vCPU / 16 GB RAM. Select the closest currently available 
 
 No GPU is required for this pod.
 
-Expose HTTP port:
+Expose:
 
 `4096/http`
 
-Use a stable Ubuntu/Debian-compatible image suitable for the repository bootstrap scripts.
+Use a current x86-64 Ubuntu-based universal development image such as:
+
+`mcr.microsoft.com/devcontainers/universal:noble`
+
+Resolve and record the exact image digest at deployment time. Prefer an immutable digest once selected rather than permanently relying on a mutable tag.
 
 Inject the required secrets as environment variables without exposing their values.
 
-## 4. Bootstrap
+Initially keep the new pod alive with a benign temporary start command long enough to clone/bootstrap the persistent workspace.
 
-Once the pod is reachable, execute the repository bootstrap described in:
+## 4. Bootstrap from canonical repository state
 
-`ai-builder/runpod/AI-BUILDER-SPEC.md`
+The canonical deployment source is now:
 
-Use branch:
+- repository: `haithamelhusseinycv-cyber/openvenice`
+- branch: `master`
 
-`infra/ai-builder-bootstrap`
+PR #49 has already been merged. Do **not** deploy the historical `infra/ai-builder-bootstrap` branch.
 
-Run:
+Inside the new AI-Builder only:
 
-- `ai-builder/scripts/bootstrap.sh`
-- `ai-builder/scripts/start.sh`
-- `ai-builder/scripts/verify.sh`
+```bash
+mkdir -p /workspace/projects
+cd /workspace/projects
+if [ ! -d openvenice/.git ]; then
+  git clone https://github.com/haithamelhusseinycv-cyber/openvenice.git
+fi
+cd openvenice
+git fetch origin master
+git checkout master
+git pull --ff-only origin master
+bash ai-builder/scripts/bootstrap.sh
+```
 
-If a package name or upstream installation detail has changed, research the current official documentation, make the smallest reliable correction on this branch, test it, commit it, and continue.
+If a package name or upstream installation detail has changed, research current official documentation, make the smallest reliable correction on a dedicated branch, test it, commit it, merge it after CI, update the persistent checkout, and continue.
 
 Do not abandon the mission because one dependency or command changed.
 
-## 5. OpenCode configuration
+## 5. Configure permanent restart-safe startup
+
+After bootstrap succeeds, configure the **AI-Builder pod only** so an ordinary RunPod container/pod restart automatically executes the persistent entrypoint.
+
+Desired behavior is equivalent to:
+
+- Docker entrypoint: `/bin/bash -lc`
+- Docker start command: `exec bash /workspace/projects/openvenice/ai-builder/scripts/entrypoint.sh`
+
+Use the exact live RunPod MCP/runpodctl schema for `dockerEntrypoint`/`dockerStartCmd`; do not guess stale CLI flags.
+
+Then restart only AI-Builder once to prove the normal lifecycle uses this startup path.
+
+The foreground `entrypoint.sh` must be the long-running process. Do not depend on `nohup` as the production lifecycle.
+
+## 6. OpenCode configuration and persistence
 
 Confirm:
 
-- OpenCode stable is installed;
-- persistent config/state is under `/workspace/state`;
-- `builder-max` exists and is the default agent;
-- the global private-agent policy is loaded;
+- current stable OpenCode is installed in persistent tool storage under `/workspace/tools`;
+- global config/rules are below persistent `XDG_CONFIG_HOME` under `/workspace/state`;
+- session/database/auth/log data are below persistent `XDG_DATA_HOME` under `/workspace/state`;
+- cache/state directories are also below `/workspace/state`;
+- `builder-max` exists, is discoverable, and is the default primary agent;
+- the global private/mature/direct policy is loaded;
 - session sharing is disabled;
 - broad ordinary reversible builder permissions are enabled;
 - OpenCode Web is protected with Basic Auth;
-- OpenCode listens on `0.0.0.0:4096`.
+- OpenCode listens on `0.0.0.0:4096`;
+- `OPENCODE_SERVER_PASSWORD` is never present in repository files or command output.
 
 Do not hard-code speculative frontier model IDs.
 
-Verify OpenRouter connectivity and retrieve the live model catalog. Record candidate coding/reasoning models for the next routing phase rather than inventing IDs.
+Verify OpenRouter connectivity and retrieve the live model catalog. Record current candidate coding/reasoning models for the later routing phase rather than inventing IDs.
 
-## 6. Tool verification
+## 7. Tool verification
 
-Verify at minimum:
+Run `ai-builder/scripts/verify.sh` and independently verify where necessary:
 
 - Git read/write capability to the authorized repository;
 - GitHub CLI/API authentication;
@@ -120,52 +156,73 @@ Verify at minimum:
 - Java/adb baseline;
 - Hugging Face authentication;
 - RunPod CLI authentication;
-- persistent file read/write.
+- persistent file read/write;
+- OpenCode agent discovery.
 
 Use disposable test files/branches where needed. Do not modify production code merely for an acceptance test.
 
-## 7. External service verification
+## 8. External service verification
 
 A RunPod pod reporting `RUNNING` is not completion.
 
-Verify the OpenCode login/web page from outside the pod using the RunPod proxy URL for port 4096.
+Obtain the real RunPod proxy URL for port 4096 and verify from outside the pod:
 
-Confirm authentication is required.
+1. the endpoint is reachable;
+2. an unauthenticated request is rejected;
+3. a correctly authenticated request succeeds;
+4. the returned page/service is OpenCode Web, not a generic proxy/container response.
 
-Confirm a valid authenticated request succeeds.
+## 9. Full persistence/restart test
 
-## 8. Persistence test
+A process-only restart is not sufficient.
 
-Create a disposable marker and OpenCode/session state below `/workspace`, restart only the new OpenCode process (or the new AI-Builder pod if safe and necessary), and confirm the persistent data remains.
+Before restart:
+
+- create unique marker files under `/workspace/state` and `/workspace/projects`;
+- establish at least one OpenCode state/session artifact;
+- record checksums/identifiers without exposing secrets.
+
+Then restart **only AI-Builder** through its normal RunPod lifecycle.
+
+After restart, without manual in-container startup:
+
+- port 4096 must come back automatically;
+- markers must remain;
+- OpenCode state/session data must remain;
+- `builder-max` must remain discoverable/default;
+- `ai-builder/scripts/verify.sh` must pass again;
+- the authenticated external proxy must work again.
 
 Do not restart the existing Open WebUI workload.
 
-## 9. Repository handling
+## 10. Repository handling
 
-Keep GitHub only as source/version control; it is not part of model inference.
+GitHub is source/version control only; it is not part of model inference.
 
-If bootstrap fixes are required, commit them to `infra/ai-builder-bootstrap` and update PR #49.
+Any deployment fixes must be made on a dedicated branch from `master`, validated by repository CI, and merged only after checks pass. Do not maintain deployment against a stale historical branch.
 
-Do not expose secrets in commits or PR text.
+Do not expose secrets in commits, PR text, logs, screenshots, shell tracing, or generated artifacts.
 
-## 10. Completion gate
+## 11. Completion gate
 
 Do not finish until all critical checks are true:
 
 - RunPod control plane authenticated;
-- existing Open WebUI preserved;
+- existing Open WebUI positively identified and preserved;
 - dedicated AI-Builder pod exists;
-- dedicated persistent storage is mounted at `/workspace`;
-- OpenCode Web starts successfully;
+- dedicated persistent storage is a real mount at `/workspace`;
+- OpenCode Web starts automatically after AI-Builder restart;
 - external proxy works;
-- Basic Auth works;
+- unauthenticated access is rejected;
+- authenticated access succeeds;
 - Builder Max policy is loaded;
+- OpenCode config/session state is persistent;
 - GitHub access works;
 - OpenRouter catalog works;
 - Hugging Face authentication works;
 - RunPod CLI works;
-- development tools work;
-- persistence is verified after restart;
+- required development tools work;
+- persistence is verified after a full AI-Builder restart;
 - outstanding limitations are precisely documented.
 
 Then report only:
@@ -180,4 +237,4 @@ OPEN WEBUI PRESERVATION
 REPOSITORY
 LIMITATIONS
 
-Include concrete pod/volume IDs, proxy URL, OpenCode version, PR status, and verification evidence. Never include secret values.
+Include concrete AI-Builder pod/volume IDs, proxy URL, image digest, OpenCode version, repository commit/PR status, and verification evidence. Never include secret values.
