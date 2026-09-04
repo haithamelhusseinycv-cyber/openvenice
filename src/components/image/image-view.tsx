@@ -97,23 +97,50 @@ export function ImageView() {
     try { sessionStorage.removeItem('venice-image-gallery') } catch { /* private mode */ }
   }, [])
 
-  useEffect(() => {
-    setAspectRatio(pickAspectFromPrompt(prompt))
-  }, [prompt])
+  const effectiveAspectRatio = useMemo(() => {
+    const suggested = pickAspectFromPrompt(prompt)
+    if (!hasAspectRatios) return suggested
+    const supported = constraints?.aspectRatios || []
+    if (supported.includes(aspectRatio)) return aspectRatio
+    if (supported.includes(suggested)) return suggested
+    if (constraints?.defaultAspectRatio && supported.includes(constraints.defaultAspectRatio)) {
+      return constraints.defaultAspectRatio
+    }
+    return supported[0] || suggested
+  }, [aspectRatio, constraints, hasAspectRatios, prompt])
+
+  const effectiveResolution = useMemo(() => {
+    if (!hasResolutions) return ''
+    const supported = constraints?.resolutions || []
+    if (supported.includes(resolution)) return resolution
+    if (constraints?.defaultResolution && supported.includes(constraints.defaultResolution)) {
+      return constraints.defaultResolution
+    }
+    return supported[0] || ''
+  }, [constraints, hasResolutions, resolution])
+
+  const effectiveSteps = Math.max(1, Math.min(steps, maxSteps))
+
+  const updatePrompt = (value: string) => {
+    setPrompt(value)
+    const suggested = pickAspectFromPrompt(value)
+    const supported = constraints?.aspectRatios || []
+    if (!hasAspectRatios || supported.includes(suggested)) setAspectRatio(suggested)
+  }
 
   useEffect(() => {
     try {
       localStorage.setItem('venice-image-prompt', prompt)
       localStorage.setItem('venice-image-negative', negativePrompt)
       localStorage.setItem('venice-image-size', sizeIdx)
-      localStorage.setItem('venice-image-aspect', aspectRatio)
-      localStorage.setItem('venice-image-resolution', resolution)
-      localStorage.setItem('venice-image-steps', String(steps))
+      localStorage.setItem('venice-image-aspect', effectiveAspectRatio)
+      localStorage.setItem('venice-image-resolution', effectiveResolution)
+      localStorage.setItem('venice-image-steps', String(effectiveSteps))
       localStorage.setItem('venice-image-seed', seed)
     } catch {
       // Ignore quota / private-mode storage errors
     }
-  }, [prompt, negativePrompt, sizeIdx, aspectRatio, resolution, steps, seed])
+  }, [prompt, negativePrompt, sizeIdx, effectiveAspectRatio, effectiveResolution, effectiveSteps, seed])
 
   const sendToTool = useImageWorkspace((s) => s.sendToTool)
   const [undressTarget, setUndressTarget] = useState<{ src: string; name: string } | null>(null)
@@ -176,9 +203,10 @@ export function ImageView() {
   }
 
   const mutation = useImageGenerate()
+  const promptTooLong = prompt.length > promptLimit
 
   const handleGenerate = () => {
-    if (!prompt.trim()) return
+    if (!prompt.trim() || promptTooLong) return
     mutation.reset()
     const seedNum = seed.trim() === '' ? undefined : Number(seed)
     const validSeed = seedNum !== undefined && Number.isFinite(seedNum) ? Math.trunc(seedNum) : undefined
@@ -193,19 +221,19 @@ export function ImageView() {
       format: 'jpeg',
       safe_mode: false,
       enhance_prompt: false,
-      steps,
+      steps: effectiveSteps,
     }
     if (validSeed !== undefined) req.seed = validSeed
 
     if (hasAspectRatios) {
-      req.aspect_ratio = aspectRatio
+      req.aspect_ratio = effectiveAspectRatio
     } else {
       req.width = size.w
       req.height = size.h
     }
 
-    if (hasResolutions && resolution) {
-      req.resolution = resolution
+    if (hasResolutions && effectiveResolution) {
+      req.resolution = effectiveResolution
     }
 
     mutation.mutate(
@@ -233,7 +261,7 @@ export function ImageView() {
             </button>
           </div>
         </div>
-        <div className="touch-pan-x mb-2 flex max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-1" aria-label="Prompt presets">
+        <div className="mb-2 grid max-w-full grid-cols-3 gap-2" aria-label="Prompt presets">
           {[
             ['Portrait', 'Photorealistic full-body portrait, natural skin texture, realistic lighting, sharp eyes, accurate anatomy'],
             ['Couple', 'Photorealistic adult couple together, natural interaction, both identities clear, realistic skin and anatomy'],
@@ -243,32 +271,32 @@ export function ImageView() {
               key={label}
               type="button"
               aria-pressed={prompt === value}
-              onClick={() => { setPrompt(value); mutation.reset() }}
+              onClick={() => { updatePrompt(value); mutation.reset() }}
               className={prompt === value
-                ? 'min-h-11 shrink-0 rounded-full border border-white bg-white px-3 text-[13px] text-black'
-                : 'min-h-11 shrink-0 rounded-full border border-white/[0.1] px-3 text-[13px] text-white/70 hover:border-white/25 hover:text-white'}
+                ? 'min-h-11 min-w-0 rounded-full border border-white bg-white px-2 text-[13px] text-black'
+                : 'min-h-11 min-w-0 rounded-full border border-white/[0.1] px-2 text-[13px] text-white/70 hover:border-white/25 hover:text-white'}
             >
               {label}
             </button>
           ))}
         </div>
-        <TextArea value={prompt} onChange={setPrompt} placeholder="Describe the image you want to create…" rows={5} />
+        <TextArea value={prompt} onChange={updatePrompt} placeholder="Describe the image you want to create…" rows={5} maxLength={promptLimit} />
       </div>
       <div><Label>Negative prompt</Label><TextArea value={negativePrompt} onChange={setNegativePrompt} placeholder="blurry, clothes, CGI…" rows={2} /></div>
 
       {hasAspectRatios ? (
-        <div><Label>Aspect Ratio</Label><PillGroup options={aspectOptions} value={aspectRatio} onChange={setAspectRatio} /></div>
+        <div><Label>Aspect Ratio</Label><PillGroup options={aspectOptions} value={effectiveAspectRatio} onChange={setAspectRatio} /></div>
       ) : (
         <div><Label>Size</Label><PillGroup options={DEFAULT_SIZES} value={sizeIdx} onChange={setSizeIdx} /></div>
       )}
 
       {hasResolutions && (
-        <div><Label>Resolution</Label><PillGroup options={resolutionOptions} value={resolution || resolutionOptions[0]?.value || ''} onChange={setResolution} /></div>
+        <div><Label>Resolution</Label><PillGroup options={resolutionOptions} value={effectiveResolution} onChange={setResolution} /></div>
       )}
 
       <div>
-        <Label hint={String(steps)}>Steps</Label>
-        <input type="range" min={1} max={maxSteps} value={steps} onChange={(e) => setSteps(Number(e.target.value))} className="w-full min-h-11" />
+        <Label hint={String(effectiveSteps)}>Steps</Label>
+        <input type="range" min={1} max={maxSteps} value={effectiveSteps} onChange={(e) => setSteps(Number(e.target.value))} className="w-full min-h-11" />
       </div>
       <div>
         <Label hint={String(variants)}>Variants</Label>
@@ -286,11 +314,17 @@ export function ImageView() {
         />
       </div>
 
-      <div className="text-[14px] leading-relaxed text-white/60" role="status" aria-live="polite">
-        {prompt.trim() ? `Ready with ${model}` : 'Enter a prompt or choose a preset.'}
+      <div
+        className={promptTooLong ? 'text-[14px] leading-relaxed text-red-300/95' : 'text-[14px] leading-relaxed text-white/60'}
+        role="status"
+        aria-live="polite"
+      >
+        {promptTooLong
+          ? `Prompt is ${prompt.length - promptLimit} characters over this model’s limit.`
+          : prompt.trim() ? `Ready with ${model}` : 'Enter a prompt or choose a preset.'}
       </div>
 
-      <PrimaryButton onClick={handleGenerate} disabled={!prompt.trim() || !apiKey} loading={mutation.isPending} size="lg">
+      <PrimaryButton onClick={handleGenerate} disabled={!prompt.trim() || promptTooLong || !apiKey} loading={mutation.isPending} size="lg">
         {mutation.isPending ? 'Generating…' : 'Generate'}
       </PrimaryButton>
       {mutation.isPending && (

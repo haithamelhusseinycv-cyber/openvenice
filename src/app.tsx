@@ -105,7 +105,7 @@ export function App() {
   }, [setActiveTab])
 
   return (
-    <div className="flex h-[100dvh] w-full max-w-[100vw] overflow-hidden pb-[env(safe-area-inset-bottom)]">
+    <div className="flex h-[100dvh] w-full max-w-[100vw] overflow-hidden pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       {mobileSidebarOpen && (
         <button
           aria-label="Close menu"

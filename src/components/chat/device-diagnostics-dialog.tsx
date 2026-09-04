@@ -49,7 +49,6 @@ export function DeviceDiagnosticsDialog({ open, onClose }: DeviceDiagnosticsDial
     setVoiceResult('')
     void runAll()
     // Run only when the sheet opens. The explicit Re-run button refreshes it.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   if (!open) return null

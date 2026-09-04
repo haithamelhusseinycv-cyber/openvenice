@@ -307,7 +307,9 @@ export async function veniceBlob(path: string, body: object, init: { signal?: Ab
       ...speechBody,
       model: NOUR_TTS_FALLBACK_MODEL,
       voice: NOUR_TTS_FALLBACK_VOICE,
-      response_format: 'mp3',
+      // Venice TTS output formats are model-specific. Omitting the field lets
+      // the selected hosted fallback return its documented default format.
+      response_format: undefined,
     }
   }
 

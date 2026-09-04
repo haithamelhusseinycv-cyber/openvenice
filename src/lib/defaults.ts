@@ -43,10 +43,10 @@ export const LOCKED_SOLO_SIZE = { w: 832, h: 1280 }
 
 export function isCouplePrompt(prompt?: string) {
   const t = (prompt || '').toLowerCase()
-  if (t.includes('2people') || t.includes('2 people') || t.includes('couple')) return true
+  if (t.includes('2people') || t.includes('2 people') || t.includes('couple') || t.includes('two people')) return true
   if (t.includes('1girl') && t.includes('1boy')) return true
-  if (t.includes('tall portrait') || t.includes('solo full body') || t.includes('1girl only') || t.includes('1boy only')) return false
-  return true
+  if (t.includes('tall portrait') || t.includes('solo full body') || t.includes('full-body portrait') || t.includes('1girl only') || t.includes('1boy only')) return false
+  return false
 }
 
 export function pickAspectFromPrompt(prompt?: string) {

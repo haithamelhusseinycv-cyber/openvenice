@@ -18,6 +18,10 @@ describe('preferred Qwen routing', () => {
     expect(FALLBACK_AGENT_MODEL).toBe('qwen-3-6-plus')
   })
 
+  it('keeps every Noor model reachable through the shared text-model filter', () => {
+    expect(ALLOWED_AGENT_MODELS.every((model) => ALLOWED_CHAT_MODEL_IDS.includes(model as typeof ALLOWED_CHAT_MODEL_IDS[number]))).toBe(true)
+  })
+
   it('falls back for busy/unavailable models but not auth, credit, abort, or partial output', () => {
     expect(shouldUseModelFallback({ status: 503 })).toBe(true)
     expect(shouldUseModelFallback({ status: 429 })).toBe(true)

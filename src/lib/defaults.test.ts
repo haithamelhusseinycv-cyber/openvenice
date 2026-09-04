@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_CHAT_SYSTEM_PROMPT,
   DEFAULT_CHAT_SEARCH_PARAMS,
+  isCouplePrompt,
   isStaleSystemPrompt,
   lockChatSystemPrompt,
+  pickAspectFromPrompt,
 } from './defaults'
 
 describe('chat system prompt migration', () => {
@@ -39,5 +41,12 @@ describe('chat system prompt migration', () => {
       enable_web_search: 'on',
       enable_web_citations: true,
     })
+  })
+
+  it('uses portrait sizing for a single-subject preset and landscape for couples', () => {
+    expect(isCouplePrompt('Photorealistic full-body portrait with natural light')).toBe(false)
+    expect(pickAspectFromPrompt('Photorealistic full-body portrait with natural light')).toBe('2:3')
+    expect(isCouplePrompt('Photorealistic adult couple together')).toBe(true)
+    expect(pickAspectFromPrompt('Photorealistic adult couple together')).toBe('3:2')
   })
 })

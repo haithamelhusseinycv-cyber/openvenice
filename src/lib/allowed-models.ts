@@ -1,8 +1,10 @@
 export const ALLOWED_CHAT_MODEL_IDS = [
   'qwen-3-8-27b',
   'qwen-3-6-plus',
+  'venice-uncensored',
   'venice-uncensored-1-2',
   'venice-uncensored-role-play',
+  'zai-org-glm-5-1',
   'olafangensan-glm-4.7-flash-heretic',
   'olafangensan-glm-4-7-flash-heretic',
 ] as const

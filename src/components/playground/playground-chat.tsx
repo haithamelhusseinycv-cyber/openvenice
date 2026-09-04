@@ -8,7 +8,7 @@ import { useAgentModels } from '../../hooks/use-agent-models'
 import { callAgent, DEFAULT_AGENT_MODEL, FALLBACK_AGENT_MODEL } from '../../lib/playground-agent'
 import { runAgentTools, type RunStep } from '../../lib/playground-agent-tools'
 import { shouldUseModelFallback } from '../../lib/model-routing'
-import { cancelVoiceListening, listenForVoice, voiceLocaleShortLabel, type VoiceLocale } from '../../lib/voice-chat'
+import { cancelVoiceListening, listenForVoice, speakVoice, stopVoiceSpeaking, voiceLocaleShortLabel, type VoiceLocale } from '../../lib/voice-chat'
 import {
   NOUR_AGE,
   NOUR_LANGUAGE_LABELS,
@@ -17,7 +17,7 @@ import {
   NOUR_TTS_MODEL,
   NOUR_TTS_VOICE,
   nourTtsLanguage,
-  prepareNourSpeechText,
+  splitNourSpeechText,
   type NourLanguageMode,
 } from '../../lib/nour-character'
 import { formatVeniceError, veniceBlob } from '../../lib/venice-client'
@@ -76,6 +76,9 @@ export function PlaygroundChat() {
   const setLanguageMode = useSettingsStore((s) => s.setNourLanguageMode)
   const speakReplies = useVoiceStore((s) => s.speakReplies)
   const setSpeakReplies = useVoiceStore((s) => s.setSpeakReplies)
+  const playbackMode = useVoiceStore((s) => s.playbackMode)
+  const setPlaybackMode = useVoiceStore((s) => s.setPlaybackMode)
+  const voiceRate = useVoiceStore((s) => s.voiceRate)
   const { catalog } = useModelCatalog()
   const { models: agentModels, isLoading: agentModelsLoading } = useAgentModels()
   const activeAgentModel = agentModels.find((m) => m.id === agentModelId) || agentModels[0]
@@ -84,11 +87,14 @@ export function PlaygroundChat() {
   const [input, setInput] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [speakingId, setSpeakingId] = useState<string | null>(null)
+  const [voiceStatus, setVoiceStatus] = useState<string | null>(null)
   const [listeningLocale, setListeningLocale] = useState<VoiceLocale | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const shouldStickToBottomRef = useRef(true)
   const abortRef = useRef<AbortController | null>(null)
   const audioRef = useRef<{ audio: HTMLAudioElement; url: string } | null>(null)
+  const speechAbortRef = useRef<AbortController | null>(null)
+  const speechSessionRef = useRef(0)
 
   const messageCount = messages.length
   const lastMessage = messages[messageCount - 1]
@@ -104,6 +110,10 @@ export function PlaygroundChat() {
   }, [scrollTrigger])
 
   const stopVoice = () => {
+    speechSessionRef.current += 1
+    speechAbortRef.current?.abort()
+    speechAbortRef.current = null
+    void stopVoiceSpeaking()
     const current = audioRef.current
     if (current) {
       current.audio.pause()
@@ -111,14 +121,18 @@ export function PlaygroundChat() {
       audioRef.current = null
     }
     setSpeakingId(null)
+    setVoiceStatus(null)
   }
 
   useEffect(() => () => {
+    speechSessionRef.current += 1
+    speechAbortRef.current?.abort()
     const current = audioRef.current
     if (current) {
       current.audio.pause()
       URL.revokeObjectURL(current.url)
     }
+    void stopVoiceSpeaking()
     void cancelVoiceListening()
   }, [])
 
@@ -127,39 +141,124 @@ export function PlaygroundChat() {
       stopVoice()
       return
     }
-    if (!hasKey) {
+    if (playbackMode === 'studio' && !hasKey) {
       setError('Connect your Venice API key first.')
       return
     }
 
     stopVoice()
+    const session = ++speechSessionRef.current
+    const controller = new AbortController()
+    speechAbortRef.current = controller
     setError(null)
     setSpeakingId(id)
-    try {
-      const blob = await veniceBlob('/audio/speech', {
-        model: NOUR_TTS_MODEL,
-        voice: NOUR_TTS_VOICE,
-        input: prepareNourSpeechText(transcript).slice(0, 4096),
-        language: nourTtsLanguage(mode),
-        temperature: 0.85,
-        response_format: 'mp3',
-      })
+    // Mobile browser speech engines are more reliable with short utterances;
+    // studio TTS can use larger chunks because each one is a complete file.
+    const segments = playbackMode === 'fast'
+      ? splitNourSpeechText(transcript, 180, 280)
+      : splitNourSpeechText(transcript)
+    if (segments.length === 0) {
+      stopVoice()
+      return
+    }
+
+    const locale: VoiceLocale = mode === 'cairo-street' ? 'ar-EG' : 'en-US'
+    let completedSegments = 0
+
+    const speakFast = async (from = 0) => {
+      for (let index = from; index < segments.length; index += 1) {
+        if (controller.signal.aborted || speechSessionRef.current !== session) return
+        setVoiceStatus(`Speaking ${index + 1} of ${segments.length}`)
+        await speakVoice(segments[index], locale, {
+          rate: Math.max(1, voiceRate),
+          signal: controller.signal,
+        })
+        completedSegments = index + 1
+      }
+    }
+
+    const requestStudioSegment = (segment: string) => veniceBlob('/audio/speech', {
+      model: NOUR_TTS_MODEL,
+      voice: NOUR_TTS_VOICE,
+      input: segment,
+      language: nourTtsLanguage(mode),
+      temperature: 0.85,
+      response_format: 'mp3',
+    }, { signal: controller.signal })
+      .then((blob) => ({ blob }))
+      .catch((requestError: unknown) => ({ error: requestError }))
+
+    const playStudioBlob = async (blob: Blob, index: number) => {
       const url = URL.createObjectURL(blob)
       const audio = new Audio(url)
+      audio.preload = 'auto'
       audioRef.current = { audio, url }
-      const finish = () => {
-        if (audioRef.current?.audio === audio) {
+      setVoiceStatus(`Speaking ${index + 1} of ${segments.length}`)
+
+      await new Promise<void>((resolve, reject) => {
+        const cleanup = () => {
+          audio.removeEventListener('ended', onEnded)
+          audio.removeEventListener('error', onError)
+          controller.signal.removeEventListener('abort', onAbort)
+          if (audioRef.current?.audio === audio) audioRef.current = null
           URL.revokeObjectURL(url)
-          audioRef.current = null
-          setSpeakingId(null)
+        }
+        const onEnded = () => { cleanup(); resolve() }
+        const onError = () => { cleanup(); reject(new Error('Studio voice playback failed')) }
+        const onAbort = () => {
+          audio.pause()
+          cleanup()
+          reject(new DOMException('The operation was aborted.', 'AbortError'))
+        }
+        audio.addEventListener('ended', onEnded, { once: true })
+        audio.addEventListener('error', onError, { once: true })
+        controller.signal.addEventListener('abort', onAbort, { once: true })
+        audio.play().catch((playError) => { cleanup(); reject(playError) })
+      })
+    }
+
+    try {
+      if (playbackMode === 'fast') {
+        await speakFast()
+      } else {
+        let pending = requestStudioSegment(segments[0])
+        for (let index = 0; index < segments.length; index += 1) {
+          setVoiceStatus(`Preparing ${index + 1} of ${segments.length}`)
+          const result = await pending
+          if ('error' in result) throw result.error
+          if (controller.signal.aborted || speechSessionRef.current !== session) return
+          pending = index + 1 < segments.length
+            ? requestStudioSegment(segments[index + 1])
+            : Promise.resolve({ blob: new Blob() })
+          try {
+            await playStudioBlob(result.blob, index)
+            completedSegments = index + 1
+          } catch (playError) {
+            await pending
+            throw playError
+          }
         }
       }
-      audio.addEventListener('ended', finish, { once: true })
-      audio.addEventListener('error', finish, { once: true })
-      await audio.play()
     } catch (e) {
-      stopVoice()
-      setError(formatVeniceError(e))
+      if (controller.signal.aborted || speechSessionRef.current !== session) return
+      if (playbackMode === 'studio' && completedSegments < segments.length) {
+        setVoiceStatus('Studio unavailable · continuing with Fast')
+        try {
+          await speakFast(completedSegments)
+        } catch (fallbackError) {
+          if (!(fallbackError instanceof DOMException && fallbackError.name === 'AbortError')) {
+            setError(formatVeniceError(fallbackError))
+          }
+        }
+      } else if (!(e instanceof DOMException && e.name === 'AbortError')) {
+        setError(formatVeniceError(e))
+      }
+    } finally {
+      if (speechSessionRef.current === session) {
+        speechAbortRef.current = null
+        setSpeakingId(null)
+        setVoiceStatus(null)
+      }
     }
   }
 
@@ -298,7 +397,7 @@ export function PlaygroundChat() {
     }
 
     if (shouldAutoSpeak && spokenReply.trim() && !controller.signal.aborted) {
-      await speak(pendingMsg.id, spokenReply, effectiveLanguageMode)
+      void speak(pendingMsg.id, spokenReply, effectiveLanguageMode)
     }
   }
 
@@ -377,7 +476,7 @@ export function PlaygroundChat() {
               >
                 <div
                   className={cn(
-                    'max-w-[88%] min-w-0 break-words [overflow-wrap:anywhere] px-3.5 py-2 rounded-xl text-[13.5px] leading-relaxed whitespace-pre-wrap',
+                    'max-w-[90%] min-w-0 break-words [overflow-wrap:anywhere] px-3.5 py-2.5 rounded-xl text-[15px] leading-[1.6] whitespace-pre-wrap sm:max-w-[88%]',
                     m.role === 'user'
                       ? 'bg-white/[0.09] text-white border border-white/[0.05]'
                       : 'bg-white/[0.04] border border-white/[0.07] text-white/85',
@@ -402,7 +501,7 @@ export function PlaygroundChat() {
                     aria-label={speakingId === m.id ? 'Stop Noor voice' : 'Play Noor voice'}
                     className="min-h-11 px-3 rounded-lg text-[12px] text-white/55 hover:text-white/85 hover:bg-white/[0.05] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
                   >
-                    {speakingId === m.id ? '■ Stop voice' : '▶ Play Noor voice'}
+                    {speakingId === m.id ? `■ ${voiceStatus || 'Stop voice'}` : '▶ Play Noor voice'}
                   </button>
                 )}
 
@@ -435,7 +534,7 @@ export function PlaygroundChat() {
       </div>
 
       <div className="max-w-full min-w-0 shrink-0 overflow-x-hidden border-t border-white/[0.06] p-3">
-        <div className="touch-pan-x mb-2 flex max-w-full items-center gap-2 overflow-x-auto overscroll-x-contain pb-0.5" aria-label="Noor language mode">
+        <div className="mb-2 grid max-w-full grid-cols-2 gap-2" aria-label="Noor language mode">
           {(Object.entries(NOUR_LANGUAGE_LABELS) as Array<[NourLanguageMode, string]>).map(([mode, label]) => (
             <button
               key={mode}
@@ -446,7 +545,7 @@ export function PlaygroundChat() {
               }}
               aria-pressed={languageMode === mode}
               className={cn(
-                'min-h-11 shrink-0 rounded-full border px-3 text-[12px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]',
+                'min-h-11 min-w-0 rounded-full border px-2 text-[12px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]',
                 languageMode === mode
                   ? 'border-fuchsia-300/40 bg-fuchsia-400/15 text-white'
                   : 'border-white/[0.09] bg-white/[0.03] text-white/55 hover:text-white/85',
@@ -455,25 +554,38 @@ export function PlaygroundChat() {
               {label}
             </button>
           ))}
-          <span className="shrink-0 text-[11px] text-white/35">Voice · {NOUR_TTS_VOICE}</span>
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            if (speakReplies) stopVoice()
-            setSpeakReplies(!speakReplies)
-          }}
-          aria-pressed={speakReplies}
-          className={cn(
-            'mb-2 min-h-11 w-full rounded-xl border px-3 text-[12px] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]',
-            speakReplies
-              ? 'border-fuchsia-300/35 bg-fuchsia-400/10 text-white'
-              : 'border-white/[0.09] bg-white/[0.03] text-white/55 hover:text-white/85',
-          )}
-        >
-          {speakReplies ? '🔊 Auto-read replies on' : '🔇 Auto-read replies off'}
-        </button>
+        <div className="mb-2 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              if (speakReplies) stopVoice()
+              setSpeakReplies(!speakReplies)
+            }}
+            aria-pressed={speakReplies}
+            aria-label={speakReplies ? 'Auto-read replies on' : 'Auto-read replies off'}
+            className={cn(
+              'min-h-11 min-w-0 rounded-xl border px-2 text-[12px] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]',
+              speakReplies
+                ? 'border-fuchsia-300/35 bg-fuchsia-400/10 text-white'
+                : 'border-white/[0.09] bg-white/[0.03] text-white/55 hover:text-white/85',
+            )}
+          >
+            {speakReplies ? '🔊 Auto-read on' : '🔇 Auto-read off'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              stopVoice()
+              setPlaybackMode(playbackMode === 'fast' ? 'studio' : 'fast')
+            }}
+            aria-label={`Voice mode: ${playbackMode}`}
+            className="min-h-11 min-w-0 rounded-xl border border-white/[0.09] bg-white/[0.03] px-2 text-[12px] font-semibold text-white/70 hover:border-fuchsia-300/30 hover:text-white"
+          >
+            {playbackMode === 'fast' ? '⚡ Fast · device' : `✦ Studio · ${NOUR_TTS_VOICE}`}
+          </button>
+        </div>
 
         <div className="mb-2 grid grid-cols-2 gap-2" aria-label="Noor voice commands">
           <button

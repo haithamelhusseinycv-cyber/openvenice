@@ -57,10 +57,10 @@ export function useModels(type?: string, enabled = true) {
     queryKey: ['models', type],
     queryFn: () => venice<ModelsResponse>(`/models${type ? `?type=${type}` : ''}`),
     enabled,
-    staleTime: 0,
-    gcTime: 0,
-    refetchOnMount: 'always',
-    refetchOnWindowFocus: true,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
     select: (data) =>
       data.data
         .filter((m) => !m.model_spec?.offline)
