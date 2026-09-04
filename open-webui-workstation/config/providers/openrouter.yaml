@@ -1,0 +1,19 @@
+provider: openrouter
+api_type: openai_compatible
+base_url: https://openrouter.ai/api/v1
+streaming: true
+native_function_calling: true
+security:
+  browser_key_exposure: forbidden
+  secrets_location: server_side_only
+  expose_full_catalog: false
+catalog_verification:
+  method: scripts/verify_models_catalog.sh
+  required_model_roles:
+    fast: openai/gpt-5.6-luna
+    smart: openai/gpt-5.6-sol
+    max: openai/gpt-5.6-sol-pro
+    builder: anthropic/claude-opus-5
+    marathon: anthropic/claude-fable-5.1
+    multimodal: google/gemini-3.8-flash
+    verifier: x-ai/grok-4.6

@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Model capability registry",
+  "type": "object",
+  "required": ["generated_at", "models"],
+  "properties": {
+    "generated_at": {"type": "string"},
+    "models": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "provider", "model_id", "display_name", "role", "context_capacity",
+          "output_capacity", "reasoning_support", "reasoning_parameter_syntax",
+          "tool_calling", "multimodal", "image", "audio", "cost_class",
+          "expected_latency", "provider_limitations", "availability_status"
+        ],
+        "properties": {
+          "provider": {"type": "string"},
+          "model_id": {"type": "string"},
+          "display_name": {"type": "string"},
+          "role": {"type": "string"},
+          "context_capacity": {"type": "integer"},
+          "output_capacity": {"type": "integer"},
+          "reasoning_support": {"type": "boolean"},
+          "reasoning_parameter_syntax": {"type": "string"},
+          "tool_calling": {"type": "boolean"},
+          "multimodal": {"type": "boolean"},
+          "image": {"type": "object"},
+          "audio": {"type": "object"},
+          "cost_class": {"type": "string"},
+          "expected_latency": {"type": "string"},
+          "provider_limitations": {"type": "array", "items": {"type": "string"}},
+          "availability_status": {"type": "string"}
+        }
+      }
+    }
+  }
+}

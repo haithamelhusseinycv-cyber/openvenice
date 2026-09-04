@@ -1,0 +1,5 @@
+provider: openai
+model: text-embedding-3-small
+policy:
+  local_cpu_embedding_inference: discouraged
+  reindex_required_on_model_change: true

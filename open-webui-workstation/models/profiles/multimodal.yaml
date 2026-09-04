@@ -1,0 +1,6 @@
+name: MULTIMODAL
+model: google/gemini-3.8-flash
+use_cases:
+  - image_audio_video
+  - large_multimodal_files
+reasoning_effort: high

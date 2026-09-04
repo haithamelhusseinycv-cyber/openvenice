@@ -1,0 +1,7 @@
+name: MARATHON
+model: anthropic/claude-fable-5.1
+use_cases:
+  - long_horizon_autonomy
+  - major_refactors
+  - extensive_research
+reasoning_effort: high

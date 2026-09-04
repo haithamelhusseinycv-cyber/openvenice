@@ -1,0 +1,10 @@
+provider: openai
+base_url: https://api.openai.com/v1
+model: gpt-transcribe
+requirements:
+  - low_latency
+  - english_arabic_quality
+  - mixed_language_handling
+  - punctuation
+  - long_voice_notes
+  - retry_transient_failures

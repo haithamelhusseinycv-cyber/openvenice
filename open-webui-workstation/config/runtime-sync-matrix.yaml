@@ -1,0 +1,46 @@
+sync_classes:
+  - REPO_APPLIED_AUTOMATICALLY
+  - RUNTIME_API_APPLIED
+  - OPEN_WEBUI_ADMIN_MANUAL
+  - PROVIDER_DASHBOARD_MANUAL
+  - SECRET_REQUIRED
+items:
+  - key: providers.openrouter.base_url
+    class: REPO_APPLIED_AUTOMATICALLY
+    source: config/providers/openrouter.yaml
+  - key: providers.openrouter.api_key
+    class: SECRET_REQUIRED
+    source: server_environment
+  - key: open_webui.global_system_prompt
+    class: OPEN_WEBUI_ADMIN_MANUAL
+    source: prompts/global/core.md + prompts/global/open-mature-direct.md
+    admin_ui_path: Admin > Settings > Interface > Default Prompt / System Prompt
+  - key: open_webui.model_visibility
+    class: OPEN_WEBUI_ADMIN_MANUAL
+    source: models/curated-models.json
+    admin_ui_path: Admin > Models > Visibility/Allowed Models
+  - key: open_webui.caching
+    class: OPEN_WEBUI_ADMIN_MANUAL
+    source: config/performance.yaml
+    admin_ui_path: Admin > Settings > Performance/Cache
+  - key: open_webui.web_search.providers
+    class: OPEN_WEBUI_ADMIN_MANUAL
+    source: config/research/providers.yaml
+    admin_ui_path: Admin > Settings > Web Search
+  - key: open_webui.rag.hybrid
+    class: OPEN_WEBUI_ADMIN_MANUAL
+    source: rag/retrieval.yaml
+    admin_ui_path: Admin > Settings > RAG
+  - key: open_webui.auth.disable_public_signup
+    class: OPEN_WEBUI_ADMIN_MANUAL
+    source: security/control-matrix.md
+    admin_ui_path: Admin > Users/Auth
+  - key: openai.api_key
+    class: SECRET_REQUIRED
+    source: server_environment
+  - key: exa.api_key
+    class: SECRET_REQUIRED
+    source: server_environment
+  - key: tavily.api_key
+    class: SECRET_REQUIRED
+    source: server_environment

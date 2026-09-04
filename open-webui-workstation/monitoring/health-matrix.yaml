@@ -1,0 +1,19 @@
+checks:
+  - name: open_webui_health
+    endpoint: /health
+    expected_http: 200
+  - name: open_webui_version
+    endpoint: /api/version
+    expected_json_key: version
+  - name: database_health
+    method: runtime_api_or_logs
+  - name: openrouter_connectivity
+    method: provider_catalog_ping
+  - name: search_provider_connectivity
+    method: exa_tavily_ping
+  - name: image_provider_connectivity
+    method: generation_smoke_test
+  - name: stt_tts_connectivity
+    method: media_smoke_test
+  - name: tool_service_health
+    method: tool_ping

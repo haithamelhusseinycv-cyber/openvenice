@@ -1,0 +1,9 @@
+name: SMART
+model: openai/gpt-5.6-sol
+default: true
+use_cases:
+  - daily_complex_work
+  - analysis
+  - coding
+  - documents
+reasoning_effort: high

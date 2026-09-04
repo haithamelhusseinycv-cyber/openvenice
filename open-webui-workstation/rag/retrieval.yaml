@@ -1,0 +1,11 @@
+ENABLE_RAG_HYBRID_SEARCH: true
+ENABLE_KB_EXEC: true
+retrieval:
+  candidates: 8
+  bm25: true
+  vector: true
+rerank:
+  final_chunks: [4, 5]
+threshold:
+  initial_mode: low_or_disabled
+  calibration_required: true

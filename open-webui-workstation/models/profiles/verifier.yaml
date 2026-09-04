@@ -1,0 +1,6 @@
+name: VERIFIER
+model: x-ai/grok-4.6
+use_cases:
+  - stem_second_opinion
+  - independent_verification
+reasoning_effort: high

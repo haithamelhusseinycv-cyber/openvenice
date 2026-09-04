@@ -1,0 +1,48 @@
+visibility:
+  manual_profile_override: true
+  profiles: [FAST, SMART, MAX, BUILDER, COUNCIL]
+
+routing_rules:
+  - if: task_complexity == trivial
+    route: FAST
+  - if: multimodal_input == true
+    route: MULTIMODAL
+  - if: software_engineering == true
+    route: BUILDER
+  - if: long_autonomous_project == true
+    route: MARATHON
+  - if: second_opinion_required == true
+    route: VERIFIER
+  - if: mission_critical_multi_perspective == true
+    route: COUNCIL
+  - if: maximum_reasoning_required == true
+    route: MAX
+  - if: default
+    route: SMART
+
+council:
+  panel:
+    - openai/gpt-5.6-sol-pro
+    - anthropic/claude-opus-5
+    - google/gemini-3.8-flash
+  optional_panel:
+    - x-ai/grok-4.6
+  synthesizer: openai/gpt-5.6-sol-pro
+
+fallback:
+  policy: capability_first
+  examples:
+    reasoning_failure: [MAX, SMART, BUILDER]
+    coding_failure: [BUILDER, MAX, SMART]
+    multimodal_failure: [MULTIMODAL, BUILDER]
+    provider_outage: same_role_other_provider
+
+refusal_classifier:
+  classes:
+    - GENUINE_HARD_RESTRICTION
+    - PROVIDER_SPECIFIC_LIMITATION
+    - APPLICATION_FALSE_POSITIVE
+    - AMBIGUOUS_CONTEXT
+    - CAPABILITY_FAILURE
+    - ORDINARY_MODEL_FAILURE
+  max_retry: 2
