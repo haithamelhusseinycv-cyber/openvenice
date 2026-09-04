@@ -1,0 +1,188 @@
+name: Deploy Open WebUI to RunPod
+
+on:
+  push:
+    branches:
+      - ops/runpod-openwebui-20260904
+    paths:
+      - .github/workflows/runpod-openwebui-deploy.yml
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY || secrets.RUNPOD_KEY || secrets.RUNPOD_TOKEN }}
+      POD_NAME: open-webui-v0-11-1-cpu-20260904
+      IMAGE: ghcr.io/open-webui/open-webui:v0.11.1
+    steps:
+      - name: Validate RunPod credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${RUNPOD_API_KEY:-}" ]; then
+            echo "No RunPod Actions secret found. Expected RUNPOD_API_KEY, RUNPOD_KEY, or RUNPOD_TOKEN."
+            exit 10
+          fi
+          echo "RunPod credential is present."
+
+      - name: Snapshot existing RunPod workloads
+        id: before
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS \
+            -H "Authorization: Bearer ${RUNPOD_API_KEY}" \
+            https://rest.runpod.io/v1/pods > /tmp/pods-before.json
+          echo "Existing pod count: $(jq 'if type==\"array\" then length else (.pods // [] | length) end' /tmp/pods-before.json)"
+          jq -r 'if type=="array" then .[] else (.pods // [])[] end | [.id,.name,.desiredStatus,(.imageName // "")] | @tsv' /tmp/pods-before.json || true
+
+      - name: Create isolated CPU Open WebUI pod if absent
+        id: create
+        shell: bash
+        run: |
+          set -euo pipefail
+          pods=/tmp/pods-before.json
+          existing_id=$(jq -r --arg n "$POD_NAME" 'if type=="array" then .[] else (.pods // [])[] end | select(.name==$n) | .id' "$pods" | head -n1)
+          if [ -n "$existing_id" ]; then
+            echo "Exact-name pod already exists; it will not be modified: $existing_id"
+            echo "pod_id=$existing_id" >> "$GITHUB_OUTPUT"
+            echo "created=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          jq -n \
+            --arg name "$POD_NAME" \
+            --arg image "$IMAGE" \
+            '{
+              name:$name,
+              imageName:$image,
+              computeType:"CPU",
+              cloudType:"SECURE",
+              containerDiskInGb:20,
+              volumeInGb:20,
+              volumeMountPath:"/app/backend/data",
+              ports:["8080/http"],
+              vcpuCount:2,
+              env:{
+                PORT:"8080",
+                HOST:"0.0.0.0",
+                WEBUI_AUTH:"True",
+                WEBUI_SECRET_KEY_FILE:"/app/backend/data/.webui_secret_key",
+                WEBUI_SECRET_KEY_LENGTH:"48",
+                SCARF_NO_ANALYTICS:"true",
+                DO_NOT_TRACK:"true",
+                ANONYMIZED_TELEMETRY:"false"
+              }
+            }' > /tmp/create-pod.json
+
+          status=$(curl -sS -o /tmp/create-response.json -w '%{http_code}' \
+            -X POST https://rest.runpod.io/v1/pods \
+            -H "Authorization: Bearer ${RUNPOD_API_KEY}" \
+            -H 'Content-Type: application/json' \
+            --data-binary @/tmp/create-pod.json)
+          cat /tmp/create-response.json | jq '.' || cat /tmp/create-response.json
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            echo "RunPod create failed with HTTP $status"
+            exit 20
+          fi
+          pod_id=$(jq -r '.id // empty' /tmp/create-response.json)
+          if [ -z "$pod_id" ]; then
+            echo "Create response did not contain a pod id."
+            exit 21
+          fi
+          echo "pod_id=$pod_id" >> "$GITHUB_OUTPUT"
+          echo "created=true" >> "$GITHUB_OUTPUT"
+          echo "Created new CPU pod: $pod_id"
+
+      - name: Wait for Open WebUI health through RunPod proxy
+        id: verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          POD_ID='${{ steps.create.outputs.pod_id }}'
+          URL="https://${POD_ID}-8080.proxy.runpod.net"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+          for i in $(seq 1 90); do
+            pod_json=$(curl -fsS -H "Authorization: Bearer ${RUNPOD_API_KEY}" "https://rest.runpod.io/v1/pods/${POD_ID}" || true)
+            desired=$(printf '%s' "$pod_json" | jq -r '.desiredStatus // "unknown"' 2>/dev/null || echo unknown)
+            echo "Attempt $i: desiredStatus=$desired"
+
+            if curl -fsS --max-time 15 "$URL/health" -o /tmp/health.json; then
+              cat /tmp/health.json
+              if jq -e '.status == true' /tmp/health.json >/dev/null 2>&1; then
+                echo "Open WebUI health endpoint is ready."
+                exit 0
+              fi
+            fi
+            sleep 10
+          done
+          echo "Open WebUI did not become healthy through the proxy."
+          exit 30
+
+      - name: Inspect RunPod pod logs
+        id: logs
+        shell: bash
+        run: |
+          set -euo pipefail
+          POD_ID='${{ steps.create.outputs.pod_id }}'
+          LOG_URL="https://v2-rest.runpod.io/v2/pods/${POD_ID}/logs"
+          set +e
+          http=$(curl -sS --max-time 20 -o /tmp/pod-logs.txt -w '%{http_code}' \
+            -H "Authorization: Bearer ${RUNPOD_API_KEY}" "$LOG_URL")
+          rc=$?
+          set -e
+          echo "Log API curl_rc=$rc http=$http"
+          if [ -s /tmp/pod-logs.txt ]; then
+            echo "--- RunPod log sample ---"
+            tail -n 120 /tmp/pod-logs.txt | sed -E 's/(Bearer|api[_-]?key|token)[=: ]+[^ ]+/\1=[REDACTED]/Ig'
+            echo "--- end log sample ---"
+          else
+            echo "No log payload returned by the current RunPod log API."
+          fi
+          if [ "$rc" -ne 0 ] || [ "$http" -lt 200 ] || [ "$http" -ge 300 ]; then
+            echo "Programmatic pod log endpoint was unavailable; deployment verification will continue with health + rendered login page checks."
+          fi
+
+      - name: Verify external login page in headless Chrome
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='${{ steps.verify.outputs.url }}'
+          curl -fsS --max-time 20 "$URL/" -o /tmp/index.html
+          echo "External root HTTP check passed."
+
+          CHROME=$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)
+          if [ -z "$CHROME" ]; then
+            echo "No headless Chrome binary available on runner."
+            exit 40
+          fi
+          "$CHROME" --headless --no-sandbox --disable-gpu --disable-dev-shm-usage \
+            --virtual-time-budget=15000 --dump-dom "$URL/" > /tmp/dom.html 2>/tmp/chrome.err || {
+              cat /tmp/chrome.err
+              exit 41
+            }
+          if grep -Eiq 'sign in|sign up|log in|Open WebUI' /tmp/dom.html; then
+            echo "Rendered Open WebUI authentication page verified externally."
+            grep -Eio '.{0,80}(sign in|sign up|log in|Open WebUI).{0,80}' /tmp/dom.html | head -n 10 || true
+          else
+            echo "Rendered page did not contain expected Open WebUI/authentication text."
+            head -n 80 /tmp/dom.html
+            exit 42
+          fi
+
+      - name: Confirm immutable deployment facts
+        shell: bash
+        run: |
+          set -euo pipefail
+          POD_ID='${{ steps.create.outputs.pod_id }}'
+          curl -fsS -H "Authorization: Bearer ${RUNPOD_API_KEY}" \
+            "https://rest.runpod.io/v1/pods/${POD_ID}" > /tmp/final-pod.json
+          jq '{id,name,imageName,desiredStatus,ports,volumeInGb,volumeMountPath,vcpuCount,gpuCount,env}' /tmp/final-pod.json \
+            | sed -E 's/(WEBUI_SECRET_KEY[^" ]*\"?: ?\")[^\"]+/\1[REDACTED]/g'
+          echo "External URL: ${{ steps.verify.outputs.url }}"
+          echo "Deployment verification complete."
