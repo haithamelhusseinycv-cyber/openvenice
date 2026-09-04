@@ -21,15 +21,17 @@ for d in "$WORKSPACE" "$WORKSPACE/projects" "$WORKSPACE/state" "$WORKSPACE/logs"
   if [[ -d "$d" && -w "$d" ]]; then ok "$d exists and is writable"; else fail "$d missing or not writable"; fi
 done
 
+# Persistence is a hard requirement. A writable directory inside an ephemeral
+# container is not sufficient.
+if mountpoint -q "$WORKSPACE" 2>/dev/null; then
+  ok "$WORKSPACE is a distinct mount point"
+else
+  fail "$WORKSPACE is not a distinct mount point; persistent RunPod storage is required"
+fi
+
 marker="$STATE/.persistence-write-test"
 printf '%s\n' "$(date -u +%s)" > "$marker"
 [[ -s "$marker" ]] && ok "persistent workspace write/read test" || fail "persistent workspace write/read test"
-
-if mountpoint -q "$WORKSPACE" 2>/dev/null; then
-  ok "$WORKSPACE is a mount point"
-else
-  warn "$WORKSPACE is not reported as a distinct mount point; confirm RunPod persistent/network volume mapping before production use"
-fi
 
 for v in RUNPOD_API_KEY GITHUB_TOKEN OPENROUTER_API_KEY HF_TOKEN OPENCODE_SERVER_PASSWORD; do
   if [[ -n "${!v:-}" ]]; then ok "$v is present"; else fail "$v is missing"; fi
