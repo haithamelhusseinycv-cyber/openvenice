@@ -17,7 +17,7 @@ fi
 printf '%s\n' 'AI Builder verification'
 printf '%s\n' '-----------------------'
 
-for d in "$WORKSPACE" "$WORKSPACE/projects" "$WORKSPACE/state" "$WORKSPACE/logs"; do
+for d in "$WORKSPACE" "$WORKSPACE/projects" "$STATE" "$WORKSPACE/logs" "$WORKSPACE/tools"; do
   if [[ -d "$d" && -w "$d" ]]; then ok "$d exists and is writable"; else fail "$d missing or not writable"; fi
 done
 
@@ -37,13 +37,43 @@ for v in RUNPOD_API_KEY GITHUB_TOKEN OPENROUTER_API_KEY HF_TOKEN OPENCODE_SERVER
   if [[ -n "${!v:-}" ]]; then ok "$v is present"; else fail "$v is missing"; fi
 done
 
-for cmd in opencode git node npm python3 curl jq gh runpodctl; do
+for cmd in opencode git node npm python3 curl jq gh runpodctl java adb ffmpeg pandoc; do
   if command -v "$cmd" >/dev/null 2>&1; then ok "$cmd available"; else fail "$cmd unavailable"; fi
 done
 
+if command -v chromium >/dev/null 2>&1 || command -v chromium-browser >/dev/null 2>&1; then
+  ok "Chromium browser available"
+else
+  fail "Chromium browser unavailable"
+fi
+
+if command -v pnpm >/dev/null 2>&1; then ok "pnpm available"; else fail "pnpm unavailable"; fi
+
 if command -v opencode >/dev/null 2>&1; then
   ok "OpenCode version: $(opencode --version 2>/dev/null || echo unknown)"
+  if opencode agent list 2>/dev/null | grep -qi 'builder-max'; then
+    ok "builder-max agent is discoverable"
+  else
+    fail "builder-max agent is not discoverable"
+  fi
 fi
+
+# Verify that state/config paths resolve inside the persistent volume. OpenCode
+# keeps auth/session/log data under XDG_DATA_HOME and personal rules under
+# XDG_CONFIG_HOME, so these must never point at disposable container storage.
+for pair in \
+  "XDG_CONFIG_HOME:${XDG_CONFIG_HOME:-}" \
+  "XDG_DATA_HOME:${XDG_DATA_HOME:-}" \
+  "XDG_CACHE_HOME:${XDG_CACHE_HOME:-}" \
+  "XDG_STATE_HOME:${XDG_STATE_HOME:-}" \
+  "NPM_CONFIG_PREFIX:${NPM_CONFIG_PREFIX:-}"; do
+  name="${pair%%:*}"
+  value="${pair#*:}"
+  case "$value" in
+    "$WORKSPACE"/*) ok "$name is persistent ($value)" ;;
+    *) fail "$name is not rooted under $WORKSPACE" ;;
+  esac
+done
 
 if [[ -n "${GITHUB_TOKEN:-}" ]]; then
   if GH_TOKEN="$GITHUB_TOKEN" gh api repos/haithamelhusseinycv-cyber/openvenice --jq '.full_name' >/dev/null 2>&1; then
