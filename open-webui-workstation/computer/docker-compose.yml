@@ -1,0 +1,38 @@
+# Isolated Computer / Open Terminal style worker.
+# Deploy SEPARATELY from the main Open WebUI container.
+# Do not share the OWUI public attack surface with shell/browser execution.
+
+services:
+  owui-computer:
+    image: mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm
+    container_name: owui-computer
+    restart: unless-stopped
+    working_dir: /workspace
+    environment:
+      - DEBIAN_FRONTEND=noninteractive
+    volumes:
+      - computer_data:/workspace
+    # Bind only to private network / tailscale / runpod private IP in production.
+    ports:
+      - "8001:8001"
+    command: >
+      bash -lc "
+      set -euo pipefail;
+      apt-get update;
+      apt-get install -y --no-install-recommends
+        python3 python3-pip python3-venv git curl wget unzip zip
+        build-essential ffmpeg pandoc
+        chromium || true;
+      pip3 install --break-system-packages
+        pandas openpyxl python-docx matplotlib pypdf pillow
+        playwright httpx fastapi uvicorn;
+      python3 -m playwright install chromium || true;
+      mkdir -p /workspace;
+      echo 'Computer base image ready. Attach your Open Terminal / MCP bridge here.';
+      sleep infinity
+      "
+    mem_limit: 8g
+    cpus: 4.0
+
+volumes:
+  computer_data:

@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "provider": {
+    "name": "OpenRouter",
+    "api_type": "openai_compatible",
+    "base_url": "https://openrouter.ai/api/v1",
+    "streaming": true,
+    "native_function_calling": true,
+    "credentials_location": "server_side_only"
+  },
+  "allowlist": [
+    "openai/gpt-5.6-sol",
+    "openai/gpt-5.6-sol-pro",
+    "openai/gpt-5.6-luna",
+    "openai/gpt-5.6-luna:nitro",
+    "anthropic/claude-opus-5",
+    "anthropic/claude-fable-5.1",
+    "google/gemini-3.8-flash",
+    "x-ai/grok-4.6"
+  ],
+  "profiles": {
+    "fast": {
+      "id": "openai/gpt-5.6-luna",
+      "display_name": "Fast",
+      "nitro_alias": "openai/gpt-5.6-luna:nitro",
+      "roles": ["task_model", "title", "tags", "query_generation", "classification", "summary", "lightweight_tools", "routing"]
+    },
+    "smart": {
+      "id": "openai/gpt-5.6-sol",
+      "display_name": "Smart",
+      "default": true,
+      "reasoning": "high_when_available",
+      "roles": ["daily_max", "reasoning", "finance", "analysis", "ar_en", "writing", "coding", "document_review", "general_agent"]
+    },
+    "max": {
+      "id": "openai/gpt-5.6-sol-pro",
+      "display_name": "Max",
+      "default": false,
+      "roles": ["absolute_max", "hard_analysis", "architecture", "legal_business", "multi_stage_research", "final_validation"]
+    },
+    "builder": {
+      "id": "anthropic/claude-opus-5",
+      "display_name": "Builder — Claude Opus 5",
+      "roles": ["application_development", "large_codebases", "ui_ux", "debugging", "computer_use", "office_deliverables", "multi_stage_tools"]
+    },
+    "marathon": {
+      "id": "anthropic/claude-fable-5.1",
+      "display_name": "Marathon — Claude Fable 5.1",
+      "roles": ["long_autonomous", "major_refactors", "extensive_research", "many_tool_calls"]
+    },
+    "multimodal": {
+      "id": "google/gemini-3.8-flash",
+      "display_name": "Multimodal — Gemini 3.8 Flash",
+      "roles": ["screenshots", "images", "pdfs", "audio", "video", "mixed_media"]
+    },
+    "second_opinion": {
+      "id": "x-ai/grok-4.6",
+      "display_name": "Second Opinion — Grok 4.6",
+      "roles": ["verification", "stem", "coding_second_opinion", "technical_challenge"]
+    },
+    "council": {
+      "id": "council_maximum_intelligence",
+      "display_name": "Council — Maximum Intelligence",
+      "type": "pipe",
+      "default": false,
+      "parallel": [
+        "openai/gpt-5.6-sol-pro",
+        "anthropic/claude-opus-5",
+        "google/gemini-3.8-flash"
+      ],
+      "optional_parallel": ["x-ai/grok-4.6"],
+      "synthesizer": "openai/gpt-5.6-sol-pro"
+    }
+  },
+  "routing_policy": [
+    { "when": "trivial_or_fast", "route": "fast" },
+    { "when": "normal_or_difficult", "route": "smart" },
+    { "when": "maximum_reasoning", "route": "max" },
+    { "when": "software_engineering_or_computer", "route": "builder" },
+    { "when": "extremely_long_autonomous", "route": "marathon" },
+    { "when": "video_audio_multimodal", "route": "multimodal" },
+    { "when": "independent_verification", "route": "second_opinion" },
+    { "when": "mission_critical_multi_perspective", "route": "council" }
+  ],
+  "generation_policy": {
+    "prefer_provider_defaults": true,
+    "streaming": true,
+    "max_output_tokens_normal": [16000, 32000],
+    "max_output_tokens_heavy": 64000,
+    "avoid_max_output_tokens_unless_needed": 128000,
+    "context_ordinary": 128000,
+    "context_substantial": 256000,
+    "context_full_million_only_when_required": true
+  },
+  "media": {
+    "stt": { "engine": "openai", "base_url": "https://api.openai.com/v1", "model": "gpt-transcribe" },
+    "tts": { "engine": "openai", "model": "tts-1", "hd_model": "tts-1-hd", "chunked_sentence_playback": true },
+    "image_primary": { "engine": "openai", "model": "gpt-image-2", "generation": true, "editing": true },
+    "image_secondary": { "name": "nano_banana_2_gemini_flash_image", "selection": "explicit_user_choice_only" }
+  },
+  "search": {
+    "primary": "exa",
+    "alternate": "tavily",
+    "fallback": "duckduckgo",
+    "agentic": true,
+    "result_ceiling": [8, 10],
+    "js_loader": "playwright",
+    "min_independent_sources_for_serious_research": 2
+  },
+  "rag": {
+    "embedding_model": "text-embedding-3-small",
+    "hybrid_search": true,
+    "kb_exec": true,
+    "candidates": 8,
+    "final_chunks": [4, 5]
+  }
+}
