@@ -1,6 +1,6 @@
-fastapi>=0.115,<1
-uvicorn[standard]>=0.34,<1
-numpy>=1.26,<3
-soundfile>=0.12,<1
-git+https://github.com/k2-fsa/OmniVoice.git
-voicetut-tts
+fastapi==0.115.14
+uvicorn[standard]==0.34.3
+numpy==2.2.6
+soundfile==0.13.1
+git+https://github.com/k2-fsa/OmniVoice.git@08be0b4ccbac3e13e374e86fbfead4b4cac343e2
+voicetut-tts==0.1.1

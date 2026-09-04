@@ -245,7 +245,10 @@ async function voiceTutBlob(body: VoiceTutSpeechRequest, init: { signal?: AbortS
   try {
     const response = await fetch(`${baseUrl}/v1/audio/speech`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${getApiKey().trim()}`,
+      },
       body: JSON.stringify({
         model: 'mohammedaly22/VoiceTut-TTS',
         voice: settings.ttsVoice || body.voice || 'Omnia',
