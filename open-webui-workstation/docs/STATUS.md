@@ -46,3 +46,10 @@ config: {"onboarding":true,"status":true,"name":"Open WebUI","version":"0.11.3",
 /home/runner/work/openvenice/openvenice/open-webui-workstation/functions/router_curated.py
 /home/runner/work/openvenice/openvenice/open-webui-workstation/scripts/apply_notes.md
 /home/runner/work/openvenice/openvenice/open-webui-workstation/scripts/verify_live.sh
+
+## Prompt package (2026-09-04)
+
+- Global policy written to `config/system-prompt.txt` (sections 1–27 including image, mobile, secrets, context-over-keywords, anti-overblocking, hierarchy, final directive).
+- Short model overlays in `config/model-prompts/` (no full-policy duplication).
+- Admin checklist §3, ARCHITECTURE, BUILD_ORDER Phase 2/7, model-profiles `prompts` map, Council synthesizer tone aligned.
+- Live apply still blocked on admin onboarding + provider keys (paste policy after login).

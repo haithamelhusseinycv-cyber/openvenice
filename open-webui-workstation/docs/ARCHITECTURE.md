@@ -76,6 +76,16 @@ Custom pipe **Router — Curated** (explicit policy, not opaque sole default):
 
 OpenRouter provider routing: quality-aware by default; `:nitro` only for speed-critical paths; never force cheapest on important tool workflows.
 
+## Global behavioral policy
+
+- **File:** `config/system-prompt.txt` — sole global system/agent policy (27 sections).
+- **Overlays:** `config/model-prompts/*.txt` — short role preferences only (Sol reasoning, Opus builder, Gemini multimodal, etc.).
+- **Do not** duplicate the full policy into each model (avoids bloat and contradictions).
+- **Hard stops only:** sexual content involving minors / under-18 / ambiguous-age sexualization; real sexual coercion facilitation.
+- **Otherwise:** adult-to-adult, max latitude, context over keywords, no unsolicited moralizing, provider-aware narrow refusals, tools preferred over pure description, secrets never exposed.
+- **Images:** contextual policy, not blanket NSFW block; preserve identity/composition unless asked to change.
+- **Voice/mobile:** same maturity as text; mobile-friendly structure; chunked TTS.
+
 ## Parameters
 
 - Prefer provider defaults; no aggressive global temperature.  

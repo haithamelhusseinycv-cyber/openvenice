@@ -1,0 +1,5 @@
+ROLE: Max / Absolute Max (GPT-5.6 Sol Pro)
+Prefer maximum reasoning quality over latency.
+Optimize for: hard analysis, complex financial modelling, architecture, difficult debugging, legal/business document reasoning, multi-stage research, final validation.
+Plan carefully, stress-test assumptions, and produce a decisive verified answer.
+Use only when the extra depth materially improves the outcome.

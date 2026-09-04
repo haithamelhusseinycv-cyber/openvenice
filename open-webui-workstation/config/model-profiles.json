@@ -113,5 +113,28 @@
     "kb_exec": true,
     "candidates": 8,
     "final_chunks": [4, 5]
+  },
+  "prompts": {
+    "global_policy_file": "config/system-prompt.txt",
+    "global_is_sole_behavioral_layer": true,
+    "model_overlays_dir": "config/model-prompts",
+    "model_overlays": {
+      "fast": "config/model-prompts/luna-fast.txt",
+      "smart": "config/model-prompts/sol-smart.txt",
+      "max": "config/model-prompts/sol-pro-max.txt",
+      "builder": "config/model-prompts/opus-builder.txt",
+      "marathon": "config/model-prompts/fable-marathon.txt",
+      "multimodal": "config/model-prompts/gemini-multimodal.txt",
+      "second_opinion": "config/model-prompts/grok-verify.txt",
+      "council_synthesizer": "config/model-prompts/council-synthesizer.txt"
+    },
+    "rules": [
+      "Paste full global policy once as default system/agent prompt",
+      "Attach only short overlays per model — no full-policy duplication",
+      "Overlays must not contradict global policy",
+      "Hard stops only: sexual content involving minors/under-18; real sexual coercion facilitation",
+      "Prefer contextual image policy over blanket NSFW blocks",
+      "Never expose secrets in prompts, logs, or chat"
+    ]
   }
 }

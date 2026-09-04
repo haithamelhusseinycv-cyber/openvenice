@@ -24,7 +24,8 @@ Implement strictly in this sequence. Do not skip Phase 0.
 - [ ] Enable Sol Pro, Opus 5, Fable 5.1, Gemini 3.8 Flash, Grok 4.6  
 - [ ] Display names: Fast / Smart / Max / specialists  
 - [ ] Luna `:nitro` alias if supported  
-- [ ] System prompt applied  
+- [ ] Global policy `config/system-prompt.txt` applied once as default system/agent prompt  
+- [ ] Short overlays from `config/model-prompts/` applied per curated model (no full-policy duplication)  
 
 ## Phase 3 — Research
 
@@ -55,9 +56,10 @@ Implement strictly in this sequence. Do not skip Phase 0.
 ## Phase 7 — Media
 
 - [ ] GPT Image 2 generation + editing  
+- [ ] Contextual image policy (no blanket NSFW auto-sanitize of permitted adult requests)  
 - [ ] Optional Nano Banana 2 tool (explicit choice)  
 - [ ] OpenAI STT `gpt-transcribe`  
-- [ ] OpenAI TTS `tts-1` + chunked playback path  
+- [ ] OpenAI TTS `tts-1` + chunked sentence playback path (same maturity as text)  
 
 ## Phase 8 — Maximum intelligence
 

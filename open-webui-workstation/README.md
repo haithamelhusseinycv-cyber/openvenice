@@ -27,8 +27,18 @@ open-webui-workstation/
 ├── config/
 │   ├── env.phase1.example          # Core OpenRouter + cache + defaults
 │   ├── env.full.example            # All phases (secrets redacted)
-│   ├── model-profiles.json         # Curated allowlist + roles
-│   ├── system-prompt.txt           # Agent system prompt
+│   ├── model-profiles.json         # Curated allowlist + roles + prompt map
+│   ├── system-prompt.txt           # GLOBAL behavioral policy (sections 1–27)
+│   ├── model-prompts/              # Short per-model overlays only
+│   │   ├── README.md
+│   │   ├── luna-fast.txt
+│   │   ├── sol-smart.txt
+│   │   ├── sol-pro-max.txt
+│   │   ├── opus-builder.txt
+│   │   ├── fable-marathon.txt
+│   │   ├── gemini-multimodal.txt
+│   │   ├── grok-verify.txt
+│   │   └── council-synthesizer.txt
 │   └── admin-checklist.md          # UI steps after admin login
 ├── functions/
 │   ├── council_maximum_intelligence.py
@@ -43,6 +53,13 @@ open-webui-workstation/
     ├── STATUS.md
     └── BUILD_ORDER.md
 ```
+
+## Global behavior layer
+
+- **Source of truth:** `config/system-prompt.txt` (OPEN WEBUI GLOBAL SYSTEM POLICY).
+- **Model overlays:** short role/capability preferences only — never restate the full policy.
+- **Hierarchy:** non-overridable provider/system rules → hard age/consent bounds → user’s actual request → max useful completion → accuracy → direct adult communication → minimum restriction.
+- Apply globally after admin onboarding (see `config/admin-checklist.md` §3).
 
 ## Four user-facing choices (end state)
 

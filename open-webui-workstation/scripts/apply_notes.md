@@ -25,9 +25,10 @@ Available secret: `RUNPOD_API_KEY` only.
    - OpenRouter key + base URL  
    - OpenAI key for audio/embeddings/images  
    - Exa + Tavily  
-3. You (or the agent with an admin JWT) import the two Functions from `functions/`.  
-4. Follow `config/admin-checklist.md`.  
-5. Run `scripts/verify_live.sh`.
+3. Paste `config/system-prompt.txt` as the **global** system/agent prompt; attach only short files from `config/model-prompts/` per model.  
+4. You (or the agent with an admin JWT) import the two Functions from `functions/`.  
+5. Follow `config/admin-checklist.md` (especially §3).  
+6. Run `scripts/verify_live.sh`.
 
 ## Pod sizing note
 

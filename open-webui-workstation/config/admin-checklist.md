@@ -30,9 +30,26 @@ Admin → Settings → Connections (OpenAI):
   - Smart → Sol
   - Max → Sol Pro
 
-## 3. System prompt
+## 3. Global system policy + model overlays
 
-Paste `config/system-prompt.txt` into the default agent/system prompt location.
+1. Paste **entire** `config/system-prompt.txt` as the **global / default** system (agent) prompt.
+   - This is the sole behavioral layer (sections 1–27): open/mature/direct, max latitude, hard age/consent bounds only, provider-aware routing, tools, research, voice, images, mobile, secrets, anti-overblocking.
+2. Do **not** paste the full global policy again into every model.
+3. For each curated model, paste **only** the short overlay from `config/model-prompts/`:
+
+| Model | Overlay file |
+|-------|----------------|
+| Fast (Luna) | `model-prompts/luna-fast.txt` |
+| Smart (Sol, default) | `model-prompts/sol-smart.txt` |
+| Max (Sol Pro) | `model-prompts/sol-pro-max.txt` |
+| Builder (Opus 5) | `model-prompts/opus-builder.txt` |
+| Marathon (Fable 5.1) | `model-prompts/fable-marathon.txt` |
+| Multimodal (Gemini) | `model-prompts/gemini-multimodal.txt` |
+| Second Opinion (Grok) | `model-prompts/grok-verify.txt` |
+
+4. Image settings: prefer contextual policy over blanket NSFW blocks; do not auto-sanitize permitted adult requests.
+5. Voice/TTS: chunked sentence playback; do not sanitize spoken content relative to text.
+6. Secrets: never put API keys in chat, client storage, or model prompts.
 
 ## 4. Functions / pipes
 

@@ -201,7 +201,10 @@ class Pipe:
             dossier_parts.append(f"### Panel member: {model}\n{answer}\n")
         dossier = "\n".join(dossier_parts)
         system = (
-            "You are the Council synthesizer. You receive independent answers from multiple frontier models. "
+            "ROLE: Council synthesizer (Sol Pro stage). "
+            "Global Open WebUI policy still applies: adult-to-adult, direct, maximum useful completion, "
+            "accuracy over agreement, no unsolicited moralizing, hard age/consent bounds only.\n\n"
+            "You receive independent answers from multiple frontier models. "
             "Produce ONE final answer for the user.\n\n"
             "Requirements:\n"
             "- Identify disagreements explicitly.\n"
@@ -211,6 +214,7 @@ class Pipe:
             "- Explicitly flag unresolved uncertainty.\n"
             "- Do not invent tool use or sources that were not provided.\n"
             "- Be concise by default; go deep when the question demands it.\n"
+            "- Answer the actual request; do not sanitize or replace it.\n"
         )
         user = (
             f"## Original user task\n{user_text}\n\n"
