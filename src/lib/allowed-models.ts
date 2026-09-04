@@ -3,9 +3,16 @@ export const ALLOWED_CHAT_MODEL_IDS = [
   'qwen-3-6-plus',
   'venice-uncensored-1-2',
   'venice-uncensored-role-play',
-  'olafangensan-glm-4.7-flash-heretic',
   'olafangensan-glm-4-7-flash-heretic',
 ] as const
+
+function normalizeModelId(value?: string) {
+  return (value ?? '').trim().toLowerCase().replace(/\./g, '-')
+}
+
+const NORMALIZED_CHAT_MODEL_IDS = new Set(
+  (ALLOWED_CHAT_MODEL_IDS as readonly string[]).map((id) => normalizeModelId(id)),
+)
 
 /**
  * The API response remains authoritative: IDs listed here are only displayed
@@ -71,7 +78,8 @@ export const VISIBLE_TABS = ['playground', 'image'] as const
 export type VisibleTab = (typeof VISIBLE_TABS)[number]
 
 export function isAllowedChatModel(id?: string) {
-  return !!id && (ALLOWED_CHAT_MODEL_IDS as readonly string[]).includes(id)
+  const normalized = normalizeModelId(id)
+  return !!normalized && NORMALIZED_CHAT_MODEL_IDS.has(normalized)
 }
 
 export function isAllowedImageModel(id?: string) {

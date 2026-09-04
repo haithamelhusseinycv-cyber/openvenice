@@ -3,6 +3,7 @@ import {
   ALLOWED_CHAT_MODEL_IDS,
   DEFAULT_CHAT_MODEL_ID,
   FALLBACK_CHAT_MODEL_ID,
+  isAllowedChatModel,
 } from './allowed-models'
 import { ALLOWED_AGENT_MODELS } from '../hooks/use-agent-models'
 import { DEFAULT_AGENT_MODEL, FALLBACK_AGENT_MODEL } from './playground-agent'
@@ -16,6 +17,12 @@ describe('preferred Qwen routing', () => {
     expect(FALLBACK_CHAT_MODEL_ID).toBe('qwen-3-6-plus')
     expect(DEFAULT_AGENT_MODEL).toBe('qwen-3-8-27b')
     expect(FALLBACK_AGENT_MODEL).toBe('qwen-3-6-plus')
+  })
+
+  it('accepts equivalent chat model IDs regardless of casing or dot separators', () => {
+    expect(isAllowedChatModel('QWEN-3-8-27B')).toBe(true)
+    expect(isAllowedChatModel('olafangensan-glm-4.7-flash-heretic')).toBe(true)
+    expect(isAllowedChatModel('unknown-model')).toBe(false)
   })
 
   it('falls back for busy/unavailable models but not auth, credit, abort, or partial output', () => {

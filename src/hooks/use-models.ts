@@ -22,7 +22,7 @@ const PRIORITY: Record<VeniceType, string[]> = {
 }
 
 function normalize(value?: string) {
-  return (value || '').trim().toLowerCase()
+  return (value || '').trim().toLowerCase().replace(/\./g, '-')
 }
 
 function getModelName(model: VeniceModel) {
