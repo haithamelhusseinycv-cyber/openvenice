@@ -100,7 +100,10 @@ export function useAgentModels() {
            * These are intentionally our selected
            * uncensored / least-restricted text models.
            */
-          uncensored: true,
+          uncensored:
+            traits.includes('most_uncensored')
+            || m.id.includes('uncensored')
+            || m.id.includes('heretic'),
         }
       })
 

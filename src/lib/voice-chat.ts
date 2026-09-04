@@ -174,9 +174,14 @@ function normalizeSpeechText(text: string) {
     .trim()
 }
 
-export async function speakVoice(text: string, locale: VoiceLocale, options: { rate?: number; pitch?: number } = {}) {
+export async function speakVoice(
+  text: string,
+  locale: VoiceLocale,
+  options: { rate?: number; pitch?: number; signal?: AbortSignal } = {},
+) {
   const clean = normalizeSpeechText(text)
   if (!clean) return
+  if (options.signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError')
 
   if (isNativeAndroid()) {
     await invokeNative('speak', {
@@ -197,8 +202,15 @@ export async function speakVoice(text: string, locale: VoiceLocale, options: { r
     utterance.lang = locale
     utterance.rate = options.rate ?? 1
     utterance.pitch = options.pitch ?? 1
-    utterance.onend = () => resolve()
-    utterance.onerror = () => reject(new Error('Text-to-speech failed'))
+    const cleanup = () => options.signal?.removeEventListener('abort', onAbort)
+    const onAbort = () => {
+      window.speechSynthesis.cancel()
+      cleanup()
+      reject(new DOMException('The operation was aborted.', 'AbortError'))
+    }
+    utterance.onend = () => { cleanup(); resolve() }
+    utterance.onerror = () => { cleanup(); reject(new Error('Text-to-speech failed')) }
+    options.signal?.addEventListener('abort', onAbort, { once: true })
     window.speechSynthesis.cancel()
     window.speechSynthesis.speak(utterance)
   })

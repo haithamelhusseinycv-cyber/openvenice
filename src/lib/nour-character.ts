@@ -23,6 +23,9 @@ export const NOUR_TTS_VOICE = 'Omnia'
 export const NOUR_TTS_FALLBACK_MODEL = 'tts-qwen3-1-7b'
 export const NOUR_TTS_FALLBACK_VOICE = 'Serena'
 
+export const NOUR_SPEECH_FIRST_CHUNK_CHARS = 220
+export const NOUR_SPEECH_CHUNK_CHARS = 520
+
 export interface NourRequestProfile {
   mode: 'tool' | 'technical' | 'conversation' | 'creative-prompt'
   temperature: number
@@ -135,5 +138,68 @@ export function prepareNourSpeechText(text: string): string {
     [/\b5alas\b/gi, 'khalas'],
     [/\bsharmuta\b/gi, 'sharmoota'],
   ]
-  return replacements.reduce((speech, [pattern, value]) => speech.replace(pattern, value), text)
+  const spokenText = text
+    .replace(/```[\s\S]*?```/g, ' Code block omitted. ')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/https?:\/\/\S+/g, '')
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/^\s*\d+[.)]\s+/gm, '')
+    .replace(/[>*_~]+/g, ' ')
+
+  return replacements
+    .reduce((speech, [pattern, value]) => speech.replace(pattern, value), spokenText)
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function speechBreakIndex(text: string, limit: number) {
+  const window = text.slice(0, limit)
+  const minimum = Math.floor(limit * 0.52)
+  const preferred = [...window.matchAll(/[.!?؟…](?:["')\]]*)\s+/g)]
+    .map((match) => (match.index ?? 0) + match[0].length)
+    .filter((index) => index >= minimum)
+    .at(-1)
+  if (preferred) return preferred
+
+  const secondary = Math.max(
+    window.lastIndexOf(', '),
+    window.lastIndexOf('; '),
+    window.lastIndexOf(': '),
+    window.lastIndexOf(' — '),
+  )
+  if (secondary >= minimum) return secondary + 2
+
+  const whitespace = window.lastIndexOf(' ')
+  return whitespace >= minimum ? whitespace + 1 : limit
+}
+
+/**
+ * Split a full Noor reply into complete, speakable chunks. The shorter first
+ * chunk minimizes time-to-first-audio; later chunks are synthesized while the
+ * current chunk is playing. No transcript content is silently discarded.
+ */
+export function splitNourSpeechText(
+  text: string,
+  firstLimit = NOUR_SPEECH_FIRST_CHUNK_CHARS,
+  laterLimit = NOUR_SPEECH_CHUNK_CHARS,
+): string[] {
+  let remaining = prepareNourSpeechText(text)
+  const chunks: string[] = []
+
+  while (remaining) {
+    const limit = chunks.length === 0 ? firstLimit : laterLimit
+    if (remaining.length <= limit) {
+      chunks.push(remaining)
+      break
+    }
+
+    const at = speechBreakIndex(remaining, limit)
+    chunks.push(remaining.slice(0, at).trim())
+    remaining = remaining.slice(at).trim()
+  }
+
+  return chunks.filter(Boolean)
 }

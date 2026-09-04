@@ -1,14 +1,44 @@
 import { LocalDreamConnector } from '../connectors/localdream/localdream-connector'
 import { CapacitorFaceFusionBridge, isNativeOpenVeniceAndroid } from '../connectors/facefusion/capacitor-facefusion-bridge'
 import { FaceFusionConnector } from '../connectors/facefusion/facefusion-connector'
+import { isAllowedChatModel, isAllowedImageModel } from './allowed-models'
+import { veniceWithTimeout } from './venice-client'
+import type { ModelsResponse } from '../types/venice'
 
 export type DiagnosticStatus = 'pass' | 'warn' | 'fail'
 
 export interface DiagnosticResult {
-  id: 'platform' | 'localdream' | 'facefusion' | 'voice' | 'storage'
+  id: 'platform' | 'venice' | 'localdream' | 'facefusion' | 'voice' | 'storage'
   label: string
   status: DiagnosticStatus
   detail: string
+}
+
+export async function checkVeniceModels(): Promise<DiagnosticResult> {
+  try {
+    const [text, image] = await Promise.all([
+      veniceWithTimeout<ModelsResponse>('/models?type=text', 8_000),
+      veniceWithTimeout<ModelsResponse>('/models?type=image', 8_000),
+    ])
+    const textModels = text.data.filter((model) => !model.model_spec?.offline && isAllowedChatModel(model.id))
+    const imageModels = image.data.filter((model) => !model.model_spec?.offline && isAllowedImageModel(model.id))
+    const ready = textModels.length > 0 && imageModels.length > 0
+    return {
+      id: 'venice',
+      label: 'Venice API and models',
+      status: ready ? 'pass' : 'fail',
+      detail: ready
+        ? `Authenticated · ${textModels.length} Noor text model${textModels.length === 1 ? '' : 's'} · ${imageModels.length} image model${imageModels.length === 1 ? '' : 's'}`
+        : `Catalog loaded, but compatible models are missing · text ${textModels.length} · image ${imageModels.length}`,
+    }
+  } catch (error) {
+    return {
+      id: 'venice',
+      label: 'Venice API and models',
+      status: 'fail',
+      detail: compactError(error),
+    }
+  }
 }
 
 function compactError(error: unknown) {
@@ -37,8 +67,8 @@ export function checkPlatform(): DiagnosticResult {
   return {
     id: 'platform',
     label: 'OpenVenice runtime',
-    status: native ? 'pass' : 'warn',
-    detail: native ? `Native Android · ${platform}` : `Browser/PWA · ${platform}`,
+    status: 'pass',
+    detail: native ? `Native Android · ${platform}` : `Browser/PWA runtime ready · ${platform}`,
   }
 }
 
@@ -123,8 +153,17 @@ export function checkVoice(): DiagnosticResult {
     return {
       id: 'voice',
       label: 'Noor voice commands',
+      status: 'pass',
+      detail: 'Browser microphone and fast device speech available',
+    }
+  }
+
+  if (browserTts) {
+    return {
+      id: 'voice',
+      label: 'Noor voice output',
       status: 'warn',
-      detail: 'Browser speech fallback available · native Android bridge not active',
+      detail: 'Fast device speech is available; browser microphone recognition is unavailable.',
     }
   }
 
@@ -160,9 +199,10 @@ export function checkStorage(): DiagnosticResult {
 
 export async function runDeviceDiagnostics(): Promise<DiagnosticResult[]> {
   const immediate = [checkPlatform(), checkVoice(), checkStorage()]
-  const [localDreamResult, faceFusionResult] = await Promise.all([
+  const [veniceResult, localDreamResult, faceFusionResult] = await Promise.all([
+    checkVeniceModels(),
     checkLocalDream(),
     checkFaceFusion(),
   ])
-  return [immediate[0], immediate[1], immediate[2], localDreamResult, faceFusionResult]
+  return [immediate[0], veniceResult, immediate[1], immediate[2], localDreamResult, faceFusionResult]
 }

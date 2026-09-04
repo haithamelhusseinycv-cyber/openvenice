@@ -4,6 +4,7 @@ import { createSafeStorage } from '../lib/safe-storage'
 import type { VoiceLocale } from '../lib/voice-chat'
 
 export type NourTtsProvider = 'voicetut' | 'venice'
+export type NourPlaybackMode = 'fast' | 'studio'
 
 const DEFAULT_VOICETUT_BASE_URL = (import.meta.env.VITE_VOICETUT_BASE_URL as string | undefined)?.trim() || ''
 
@@ -12,6 +13,7 @@ interface VoiceState {
   speakReplies: boolean
   autoSend: boolean
   ttsProvider: NourTtsProvider
+  playbackMode: NourPlaybackMode
   ttsVoice: string
   voiceTutBaseUrl: string
   voiceRate: number
@@ -21,6 +23,7 @@ interface VoiceState {
   setSpeakReplies: (enabled: boolean) => void
   setAutoSend: (enabled: boolean) => void
   setTtsProvider: (provider: NourTtsProvider) => void
+  setPlaybackMode: (mode: NourPlaybackMode) => void
   setTtsVoice: (voice: string) => void
   setVoiceTutBaseUrl: (baseUrl: string) => void
   setVoiceRate: (rate: number) => void
@@ -35,6 +38,7 @@ export const useVoiceStore = create<VoiceState>()(
       speakReplies: true,
       autoSend: true,
       ttsProvider: 'voicetut',
+      playbackMode: 'fast',
       ttsVoice: 'Omnia',
       voiceTutBaseUrl: DEFAULT_VOICETUT_BASE_URL,
       voiceRate: 0.95,
@@ -44,6 +48,7 @@ export const useVoiceStore = create<VoiceState>()(
       setSpeakReplies: (speakReplies) => set({ speakReplies }),
       setAutoSend: (autoSend) => set({ autoSend }),
       setTtsProvider: (ttsProvider) => set({ ttsProvider }),
+      setPlaybackMode: (playbackMode) => set({ playbackMode }),
       setTtsVoice: (ttsVoice) => set({ ttsVoice: ttsVoice.trim() || 'Omnia' }),
       setVoiceTutBaseUrl: (voiceTutBaseUrl) => set({ voiceTutBaseUrl: voiceTutBaseUrl.trim().replace(/\/$/, '') }),
       setVoiceRate: (voiceRate) => set({ voiceRate: Math.min(2, Math.max(0.5, voiceRate)) }),
@@ -56,13 +61,21 @@ export const useVoiceStore = create<VoiceState>()(
     }),
     {
       name: 'openvenice-voice-settings',
-      version: 1,
+      version: 2,
       storage: createJSONStorage(() => createSafeStorage()),
+      migrate: (persistedState) => {
+        const saved = (persistedState || {}) as Partial<VoiceState>
+        return {
+          ...saved,
+          playbackMode: saved.playbackMode === 'studio' ? 'studio' : 'fast',
+        }
+      },
       partialize: (state) => ({
         locale: state.locale,
         speakReplies: state.speakReplies,
         autoSend: state.autoSend,
         ttsProvider: state.ttsProvider,
+        playbackMode: state.playbackMode,
         ttsVoice: state.ttsVoice,
         voiceTutBaseUrl: state.voiceTutBaseUrl,
         voiceRate: state.voiceRate,
