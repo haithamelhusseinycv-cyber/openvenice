@@ -32,10 +32,29 @@ fi
 
 cd "$PROJECT_DIR"
 
-# Bootstrap is intentionally idempotent. Run it when the persistent OpenCode
-# binary/config is absent or when explicitly requested after an upgrade.
-if [[ ! -x "$TOOLS/npm/bin/opencode" || ! -f "$STATE/bootstrap-versions.txt" || "${AI_BUILDER_FORCE_BOOTSTRAP:-0}" == "1" ]]; then
-  log "Running AI Builder bootstrap"
+# RunPod documents that container-local storage may be recreated on restart.
+# Persistent OpenCode/Python/npm binaries survive under /workspace, but system
+# executables installed with apt do not. Detect the complete baseline rather
+# than assuming a previous bootstrap means the fresh container still has it.
+need_bootstrap=0
+for cmd in git node npm python3 curl jq gh java adb ffmpeg pandoc; do
+  command -v "$cmd" >/dev/null 2>&1 || need_bootstrap=1
+done
+if ! command -v chromium >/dev/null 2>&1 && ! command -v chromium-browser >/dev/null 2>&1; then
+  need_bootstrap=1
+fi
+if [[ ! -x "$TOOLS/npm/bin/opencode" || ! -x "$TOOLS/npm/bin/pnpm" || ! -x "$TOOLS/bin/runpodctl" ]]; then
+  need_bootstrap=1
+fi
+if [[ ! -f "$STATE/bootstrap-versions.txt" || ! -f "$RUNTIME_ENV" ]]; then
+  need_bootstrap=1
+fi
+if [[ "${AI_BUILDER_FORCE_BOOTSTRAP:-0}" == "1" ]]; then
+  need_bootstrap=1
+fi
+
+if (( need_bootstrap == 1 )); then
+  log "Running idempotent AI Builder bootstrap for this container"
   bash ai-builder/scripts/bootstrap.sh
 fi
 

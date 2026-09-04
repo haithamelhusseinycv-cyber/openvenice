@@ -58,15 +58,16 @@ if command -v opencode >/dev/null 2>&1; then
   fi
 fi
 
-# Verify that state/config paths resolve inside the persistent volume. OpenCode
-# keeps auth/session/log data under XDG_DATA_HOME and personal rules under
-# XDG_CONFIG_HOME, so these must never point at disposable container storage.
+# Verify that all durable application/tool state resolves inside the persistent
+# volume. OpenCode keeps auth/session/log data under XDG_DATA_HOME and personal
+# rules under XDG_CONFIG_HOME.
 for pair in \
   "XDG_CONFIG_HOME:${XDG_CONFIG_HOME:-}" \
   "XDG_DATA_HOME:${XDG_DATA_HOME:-}" \
   "XDG_CACHE_HOME:${XDG_CACHE_HOME:-}" \
   "XDG_STATE_HOME:${XDG_STATE_HOME:-}" \
-  "NPM_CONFIG_PREFIX:${NPM_CONFIG_PREFIX:-}"; do
+  "NPM_CONFIG_PREFIX:${NPM_CONFIG_PREFIX:-}" \
+  "AI_BUILDER_PYTHON_VENV:${AI_BUILDER_PYTHON_VENV:-}"; do
   name="${pair%%:*}"
   value="${pair#*:}"
   case "$value" in
@@ -74,6 +75,12 @@ for pair in \
     *) fail "$name is not rooted under $WORKSPACE" ;;
   esac
 done
+
+if [[ -n "${AI_BUILDER_PYTHON_VENV:-}" && -x "${AI_BUILDER_PYTHON_VENV}/bin/python" ]]; then
+  ok "persistent Python tool venv is executable"
+else
+  fail "persistent Python tool venv is missing or not executable"
+fi
 
 if [[ -n "${GITHUB_TOKEN:-}" ]]; then
   if GH_TOKEN="$GITHUB_TOKEN" gh api repos/haithamelhusseinycv-cyber/openvenice --jq '.full_name' >/dev/null 2>&1; then
@@ -90,6 +97,16 @@ if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
     ok "OpenRouter reachable; catalog returned $model_count models"
   else
     fail "OpenRouter authenticated model-catalog request failed"
+  fi
+
+  if command -v timeout >/dev/null 2>&1 && command -v opencode >/dev/null 2>&1; then
+    if timeout 30 opencode models openrouter 2>/dev/null | grep -q '^openrouter/'; then
+      ok "OpenCode OpenRouter provider integration lists models"
+    else
+      fail "OpenCode OpenRouter provider integration did not list models"
+    fi
+  else
+    fail "timeout/opencode unavailable for OpenRouter integration test"
   fi
 fi
 
@@ -112,10 +129,17 @@ fi
 
 if [[ -n "${OPENCODE_SERVER_PASSWORD:-}" ]]; then
   user="${OPENCODE_SERVER_USERNAME:-opencode}"
+
+  unauth_code="$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:4096/ 2>/dev/null || echo 000)"
+  case "$unauth_code" in
+    401|403) ok "OpenCode Web rejects unauthenticated local requests ($unauth_code)" ;;
+    *) fail "OpenCode Web did not reject unauthenticated local request (HTTP $unauth_code)" ;;
+  esac
+
   if curl -fsS -u "$user:$OPENCODE_SERVER_PASSWORD" http://127.0.0.1:4096/ >/dev/null 2>&1; then
-    ok "OpenCode Web responds locally on port 4096"
+    ok "OpenCode Web accepts authenticated local request on port 4096"
   else
-    fail "OpenCode Web is not responding locally on port 4096"
+    fail "OpenCode Web authenticated request failed on port 4096"
   fi
 fi
 

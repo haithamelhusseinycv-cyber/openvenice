@@ -7,6 +7,7 @@ WORKSPACE="${WORKSPACE_ROOT:-/workspace}"
 STATE="$WORKSPACE/state"
 TOOLS="$WORKSPACE/tools"
 NPM_PREFIX="$TOOLS/npm"
+PY_VENV="$TOOLS/python"
 XDG_ROOT="$STATE/xdg"
 CONFIG_HOME="$XDG_ROOT/config"
 DATA_HOME="$XDG_ROOT/data"
@@ -33,15 +34,12 @@ for d in "$WORKSPACE" "$WORKSPACE/projects" "$STATE" "$TOOLS"; do
   test -d "$d" && test -w "$d" || { echo "$d is not writable" >&2; exit 1; }
 done
 
-# OpenCode honors XDG_CONFIG_HOME and XDG_DATA_HOME. Keep all application
-# configuration, credentials, session DBs, logs, caches, and installed npm
-# binaries on the RunPod persistent volume rather than the disposable container.
 export XDG_CONFIG_HOME="$CONFIG_HOME"
 export XDG_DATA_HOME="$DATA_HOME"
 export XDG_CACHE_HOME="$CACHE_HOME"
 export XDG_STATE_HOME="$STATE_HOME"
 export NPM_CONFIG_PREFIX="$NPM_PREFIX"
-export PATH="$NPM_PREFIX/bin:$TOOLS/bin:$PATH"
+export PATH="$NPM_PREFIX/bin:$PY_VENV/bin:$TOOLS/bin:$PATH"
 export OPENCODE_CONFIG="$OPENCODE_DIR/opencode.json"
 export OPENCODE_CONFIG_DIR="$OPENCODE_DIR"
 export HF_HOME="$WORKSPACE/models/huggingface"
@@ -75,25 +73,40 @@ if (( NODE_MAJOR < 20 )); then
   DEBIAN_FRONTEND=noninteractive $SUDO apt-get install -y nodejs
 fi
 
-log "Installing current stable OpenCode into persistent tool storage"
-npm install -g --prefix "$NPM_PREFIX" opencode-ai@latest
-
-log "Installing common developer CLIs into persistent tool storage"
-npm install -g --prefix "$NPM_PREFIX" pnpm@latest || true
-python3 -m pip install --user --upgrade pip uv huggingface_hub >/dev/null 2>&1 || \
-  python3 -m pip install --break-system-packages --upgrade pip uv huggingface_hub >/dev/null 2>&1 || true
-
-# The RunPod installer location can vary. After installation copy/link the
-# resolved binary into persistent storage so a fresh container can reuse it.
-if ! command -v runpodctl >/dev/null 2>&1 && [[ ! -x "$TOOLS/bin/runpodctl" ]]; then
-  log "Installing RunPod CLI"
-  curl -sSL https://cli.runpod.net | $SUDO bash
+# Keep OpenCode stable across ordinary container restarts. Upgrade only when
+# explicitly requested, then record the resulting version for rollback/audit.
+if [[ ! -x "$NPM_PREFIX/bin/opencode" || "${AI_BUILDER_UPGRADE_OPENCODE:-0}" == "1" ]]; then
+  log "Installing current stable OpenCode into persistent tool storage"
+  npm install -g --prefix "$NPM_PREFIX" opencode-ai@latest
+else
+  log "Reusing persistent OpenCode $("$NPM_PREFIX/bin/opencode" --version 2>/dev/null || echo unknown)"
 fi
-if command -v runpodctl >/dev/null 2>&1; then
-  runpodctl_path="$(command -v runpodctl)"
-  if [[ "$runpodctl_path" != "$TOOLS/bin/runpodctl" ]]; then
-    cp "$runpodctl_path" "$TOOLS/bin/runpodctl" 2>/dev/null || true
-    chmod 755 "$TOOLS/bin/runpodctl" 2>/dev/null || true
+
+if [[ ! -x "$NPM_PREFIX/bin/pnpm" || "${AI_BUILDER_UPGRADE_TOOLCHAIN:-0}" == "1" ]]; then
+  log "Installing pnpm into persistent tool storage"
+  npm install -g --prefix "$NPM_PREFIX" pnpm@latest
+fi
+
+# Keep Python helper packages in a persistent venv instead of ~/.local on the
+# disposable container filesystem.
+if [[ ! -x "$PY_VENV/bin/python" ]]; then
+  log "Creating persistent Python tool venv"
+  python3 -m venv "$PY_VENV"
+fi
+"$PY_VENV/bin/python" -m pip install --upgrade pip >/dev/null
+"$PY_VENV/bin/python" -m pip install --upgrade \
+  uv huggingface_hub requests httpx pyyaml >/dev/null
+
+# The RunPod installer location can vary. Persist a copy of the binary so the
+# next fresh container does not depend on where the installer placed it.
+if [[ ! -x "$TOOLS/bin/runpodctl" ]]; then
+  if ! command -v runpodctl >/dev/null 2>&1; then
+    log "Installing RunPod CLI"
+    curl -sSL https://cli.runpod.net | $SUDO bash
+  fi
+  if command -v runpodctl >/dev/null 2>&1; then
+    cp "$(command -v runpodctl)" "$TOOLS/bin/runpodctl"
+    chmod 755 "$TOOLS/bin/runpodctl"
   fi
 fi
 
@@ -118,7 +131,8 @@ export XDG_DATA_HOME="$DATA_HOME"
 export XDG_CACHE_HOME="$CACHE_HOME"
 export XDG_STATE_HOME="$STATE_HOME"
 export NPM_CONFIG_PREFIX="$NPM_PREFIX"
-export PATH="$NPM_PREFIX/bin:$TOOLS/bin:\$PATH"
+export AI_BUILDER_PYTHON_VENV="$PY_VENV"
+export PATH="$NPM_PREFIX/bin:$PY_VENV/bin:$TOOLS/bin:\$PATH"
 export OPENCODE_CONFIG="$OPENCODE_DIR/opencode.json"
 export OPENCODE_CONFIG_DIR="$OPENCODE_DIR"
 export HF_HOME="$WORKSPACE/models/huggingface"
@@ -132,9 +146,11 @@ chmod 600 "$STATE/runtime-paths.env"
   printf 'opencode=%s\n' "$(opencode --version 2>/dev/null || echo unknown)"
   printf 'node=%s\n' "$(node --version 2>/dev/null || echo unknown)"
   printf 'npm=%s\n' "$(npm --version 2>/dev/null || echo unknown)"
+  printf 'pnpm=%s\n' "$(pnpm --version 2>/dev/null || echo unknown)"
   printf 'python=%s\n' "$(python3 --version 2>/dev/null || echo unknown)"
   printf 'git=%s\n' "$(git --version 2>/dev/null || echo unknown)"
   printf 'java=%s\n' "$(java -version 2>&1 | head -n1 || echo unknown)"
+  printf 'runpodctl=%s\n' "$(runpodctl version 2>/dev/null | head -n1 || echo unknown)"
 } > "$STATE/bootstrap-versions.txt"
 
 log "Bootstrap complete"
