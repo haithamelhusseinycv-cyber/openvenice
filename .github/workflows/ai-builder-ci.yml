@@ -25,6 +25,7 @@ jobs:
         run: |
           bash -n ai-builder/scripts/bootstrap.sh
           bash -n ai-builder/scripts/start.sh
+          bash -n ai-builder/scripts/entrypoint.sh
           bash -n ai-builder/scripts/verify.sh
 
       - name: Validate OpenCode JSON
@@ -36,6 +37,21 @@ jobs:
           test -s ai-builder/config/agents/builder-max.md
           test -s ai-builder/runpod/AI-BUILDER-SPEC.md
           test -s ai-builder/CODEX-BOOTSTRAP.md
+          test -s ai-builder/scripts/entrypoint.sh
+
+      - name: Enforce deployment source and persistence invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'git checkout master' ai-builder/runpod/AI-BUILDER-SPEC.md
+          grep -q 'mountpoint -q' ai-builder/scripts/entrypoint.sh
+          grep -q 'XDG_DATA_HOME' ai-builder/scripts/bootstrap.sh
+          grep -q 'exec opencode web' ai-builder/scripts/entrypoint.sh
+          if grep -nE 'git checkout[[:space:]]+infra/ai-builder-bootstrap|Use branch:[[:space:]]*infra/ai-builder-bootstrap' \
+              ai-builder/CODEX-BOOTSTRAP.md ai-builder/runpod/AI-BUILDER-SPEC.md; then
+            echo 'Historical bootstrap branch is still configured as a deployment source.' >&2
+            exit 1
+          fi
 
       - name: Check committed files for secret values
         shell: bash
