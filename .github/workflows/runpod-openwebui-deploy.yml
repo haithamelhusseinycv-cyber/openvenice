@@ -22,6 +22,7 @@ jobs:
       RUNPOD_API_KEY_RAW: ${{ secrets.RUNPOD_API_KEY || secrets.RUNPOD_KEY || secrets.RUNPOD_TOKEN }}
       POD_NAME: open-webui-v0-11-1-cpu-20260904
       IMAGE: ghcr.io/open-webui/open-webui:v0.11.1
+      KNOWN_TASK_POD_ID: at0lgrx9aqiypm
     steps:
       - name: Normalize and validate RunPod credential
         shell: bash
@@ -42,7 +43,6 @@ jobs:
           echo "RunPod credential normalized without exposing it."
 
       - name: Snapshot existing RunPod workloads
-        id: before
         shell: bash
         run: |
           set -euo pipefail
@@ -55,17 +55,35 @@ jobs:
             echo
             exit 12
           fi
-          echo "Existing pod count: $(jq 'if type==\"array\" then length else (.pods // [] | length) end' /tmp/pods-before.json)"
+          count=$(jq 'if type=="array" then length else (.pods // [] | length) end' /tmp/pods-before.json)
+          echo "Existing pod count: $count"
           jq -r 'if type=="array" then .[] else (.pods // [])[] end | [.id,.name,.desiredStatus,(.imageName // .image // "")] | @tsv' /tmp/pods-before.json || true
 
-      - name: Create isolated CPU Open WebUI pod if absent
-        id: create
+      - name: Select or create isolated CPU Open WebUI pod
+        id: target
         shell: bash
         run: |
           set -euo pipefail
-          existing_id=$(jq -r --arg n "$POD_NAME" 'if type=="array" then .[] else (.pods // [])[] end | select(.name==$n) | .id' /tmp/pods-before.json | head -n1)
-          if [ -n "$existing_id" ]; then
-            echo "Exact-name pod already exists; it will not be modified: $existing_id"
+          mapfile -t ids < <(jq -r --arg n "$POD_NAME" 'if type=="array" then .[] else (.pods // [])[] end | select(.name==$n) | .id' /tmp/pods-before.json)
+          if [ "${#ids[@]}" -gt 1 ]; then
+            echo "More than one exact-name pod exists; refusing to modify or create anything."
+            exit 19
+          fi
+          if [ "${#ids[@]}" -eq 1 ]; then
+            existing_id="${ids[0]}"
+            if [ "$existing_id" != "$KNOWN_TASK_POD_ID" ]; then
+              echo "An exact-name pod exists but it is not the pod created by this deployment task. Refusing to alter it: $existing_id"
+              exit 18
+            fi
+            curl -fsS --max-time 20 -H "Authorization: Bearer ${RUNPOD_API_KEY}" \
+              "https://rest.runpod.io/v1/pods/${existing_id}" > /tmp/target-before.json
+            jq -e --arg n "$POD_NAME" --arg img "$IMAGE" '
+              .id=="at0lgrx9aqiypm" and .name==$n and ((.imageName // .image)==$img) and (.cpuFlavorId != null)
+            ' /tmp/target-before.json >/dev/null || {
+              echo "Existing task pod identity/config does not match expected CPU Open WebUI target. Refusing to alter it."
+              exit 17
+            }
+            echo "Using task-owned pod: $existing_id"
             echo "pod_id=$existing_id" >> "$GITHUB_OUTPUT"
             echo "created=false" >> "$GITHUB_OUTPUT"
             exit 0
@@ -118,12 +136,78 @@ jobs:
           echo "created=true" >> "$GITHUB_OUTPUT"
           echo "Created new CPU-only pod: $pod_id"
 
+      - name: Enforce 20 GB persistent Pod volume at /app/backend/data
+        shell: bash
+        run: |
+          set -euo pipefail
+          POD_ID='${{ steps.target.outputs.pod_id }}'
+          curl -fsS --max-time 20 -H "Authorization: Bearer ${RUNPOD_API_KEY}" \
+            "https://rest.runpod.io/v1/pods/${POD_ID}" > /tmp/pod-storage-before.json
+          current_volume=$(jq -r '.volumeInGb // 0' /tmp/pod-storage-before.json)
+          current_mount=$(jq -r '.volumeMountPath // ""' /tmp/pod-storage-before.json)
+          echo "Current Pod volume: ${current_volume} GB mounted at ${current_mount:-<none>}"
+
+          if [ "$current_volume" -ge 20 ] && [ "$current_mount" = "/app/backend/data" ]; then
+            echo "Required persistent Pod volume is already configured."
+            exit 0
+          fi
+
+          jq --arg n "$POD_NAME" --arg img "$IMAGE" '
+            {
+              containerDiskInGb:(.containerDiskInGb // 20),
+              imageName:$img,
+              name:$n,
+              ports:["8080/http"],
+              volumeInGb:20,
+              volumeMountPath:"/app/backend/data",
+              env:((.env // {}) + {
+                PORT:"8080",
+                HOST:"0.0.0.0",
+                WEBUI_AUTH:"True",
+                WEBUI_SECRET_KEY_FILE:"/app/backend/data/.webui_secret_key",
+                WEBUI_SECRET_KEY_LENGTH:"48",
+                SCARF_NO_ANALYTICS:"true",
+                DO_NOT_TRACK:"true",
+                ANONYMIZED_TELEMETRY:"false",
+                PYTHONUNBUFFERED:"1"
+              })
+            }
+            + (if (.containerRegistryAuthId // "") != "" then {containerRegistryAuthId:.containerRegistryAuthId} else {} end)
+          ' /tmp/pod-storage-before.json > /tmp/update-pod.json
+
+          http=$(curl -sS --max-time 40 -o /tmp/update-response.json -w '%{http_code}' \
+            -X POST "https://rest.runpod.io/v1/pods/${POD_ID}/update" \
+            -H "Authorization: Bearer ${RUNPOD_API_KEY}" \
+            -H 'Content-Type: application/json' \
+            --data-binary @/tmp/update-pod.json)
+          cat /tmp/update-response.json | jq '{id,name,imageName,desiredStatus,volumeInGb,volumeMountPath,cpuFlavorId,ports}' || cat /tmp/update-response.json
+          if [ "$http" -lt 200 ] || [ "$http" -ge 300 ]; then
+            echo "RunPod persistent-volume update failed with HTTP $http"
+            exit 24
+          fi
+
+          for i in $(seq 1 30); do
+            sleep 5
+            curl -fsS --max-time 20 -H "Authorization: Bearer ${RUNPOD_API_KEY}" \
+              "https://rest.runpod.io/v1/pods/${POD_ID}" > /tmp/pod-storage-after.json || continue
+            vol=$(jq -r '.volumeInGb // 0' /tmp/pod-storage-after.json)
+            mnt=$(jq -r '.volumeMountPath // ""' /tmp/pod-storage-after.json)
+            status=$(jq -r '.desiredStatus // "unknown"' /tmp/pod-storage-after.json)
+            echo "Storage check $i: status=$status volume=${vol}GB mount=$mnt"
+            if [ "$vol" -ge 20 ] && [ "$mnt" = "/app/backend/data" ]; then
+              echo "Persistent Pod volume confirmed."
+              exit 0
+            fi
+          done
+          echo "RunPod did not report the required persistent Pod volume after update."
+          exit 25
+
       - name: Wait for Open WebUI health through RunPod proxy
         id: verify
         shell: bash
         run: |
           set -euo pipefail
-          POD_ID='${{ steps.create.outputs.pod_id }}'
+          POD_ID='${{ steps.target.outputs.pod_id }}'
           URL="https://${POD_ID}-8080.proxy.runpod.net"
           echo "url=$URL" >> "$GITHUB_OUTPUT"
 
@@ -147,25 +231,32 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          POD_ID='${{ steps.create.outputs.pod_id }}'
+          POD_ID='${{ steps.target.outputs.pod_id }}'
           LOG_URL="https://v2-rest.runpod.io/v2/pods/${POD_ID}/logs"
           set +e
-          http=$(curl -sS --max-time 20 -o /tmp/pod-logs.txt -w '%{http_code}' \
+          http=$(curl -sS -N --max-time 15 -o /tmp/pod-logs.txt -w '%{http_code}' \
             -H "Authorization: Bearer ${RUNPOD_API_KEY}" "$LOG_URL")
           rc=$?
           set -e
-          echo "RunPod log endpoint curl_rc=$rc http=${http:-none}"
+          echo "RunPod log endpoint curl_rc=$rc http=${http:-none} bytes=$(wc -c < /tmp/pod-logs.txt 2>/dev/null || echo 0)"
           if [ -s /tmp/pod-logs.txt ]; then
             echo "--- RunPod startup log sample ---"
             tail -n 160 /tmp/pod-logs.txt | sed -E 's/(Bearer|api[_-]?key|token)[=: ]+[^ ]+/\1=[REDACTED]/Ig'
             echo "--- end startup log sample ---"
-          else
-            echo "No log payload returned."
           fi
-          if [ "$rc" -ne 0 ] || [ "${http:-0}" -lt 200 ] || [ "${http:-0}" -ge 300 ]; then
-            echo "RunPod log service was unavailable; fail because logs must be inspected before completion."
+          if [ "${http:-0}" != "200" ] || [ ! -s /tmp/pod-logs.txt ]; then
+            echo "RunPod startup logs were not retrievable."
             exit 35
           fi
+          grep -q 'v0.11.1 - building the best AI user interface' /tmp/pod-logs.txt || {
+            echo "Open WebUI v0.11.1 startup signature not found in logs."
+            exit 36
+          }
+          grep -Eq 'Started server process|Application startup complete|Scheduler worker started' /tmp/pod-logs.txt || {
+            echo "Open WebUI server-start signature not found in logs."
+            exit 37
+          }
+          echo "Startup logs inspected successfully."
 
       - name: Verify external Open WebUI authentication page
         shell: bash
@@ -180,7 +271,7 @@ jobs:
             exit 40
           fi
           "$CHROME" --headless --no-sandbox --disable-gpu --disable-dev-shm-usage \
-            --virtual-time-budget=15000 --dump-dom "$URL/" > /tmp/dom.html 2>/tmp/chrome.err || {
+            --virtual-time-budget=20000 --dump-dom "$URL/" > /tmp/dom.html 2>/tmp/chrome.err || {
               cat /tmp/chrome.err
               exit 41
             }
@@ -197,7 +288,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          POD_ID='${{ steps.create.outputs.pod_id }}'
+          POD_ID='${{ steps.target.outputs.pod_id }}'
           curl -fsS --max-time 20 -H "Authorization: Bearer ${RUNPOD_API_KEY}" \
             "https://rest.runpod.io/v1/pods/${POD_ID}" > /tmp/final-pod.json
 
@@ -207,13 +298,19 @@ jobs:
           jq -e --arg n "$POD_NAME" --arg img "$IMAGE" '
             .name==$n and
             ((.imageName // .image)==$img) and
+            (.desiredStatus=="RUNNING") and
             (.volumeMountPath=="/app/backend/data") and
             ((.volumeInGb // 0) >= 20) and
             ((.ports // []) | index("8080/http") != null) and
+            (.cpuFlavorId != null) and
             ((.gpuCount // 0) == 0) and
-            (((.gpu // null) == null) or ((.gpu.count // 0) == 0))
+            (((.gpu // null) == null) or ((.gpu.count // 0) == 0)) and
+            ((.env.WEBUI_SECRET_KEY_FILE // "")=="/app/backend/data/.webui_secret_key") and
+            ((.env.WEBUI_SECRET_KEY_LENGTH // "")=="48") and
+            ((.env.WEBUI_AUTH // "")=="True")
           ' /tmp/final-pod.json >/dev/null
 
-          echo "CPU-only, storage mount, image and proxy-port assertions passed."
+          curl -fsS --max-time 20 "${{ steps.verify.outputs.url }}/health" | jq -e '.status==true' >/dev/null
+          echo "CPU-only, persistent storage, secret-key file, image, health and proxy-port assertions passed."
           echo "External URL: ${{ steps.verify.outputs.url }}"
           echo "Deployment verification complete."
