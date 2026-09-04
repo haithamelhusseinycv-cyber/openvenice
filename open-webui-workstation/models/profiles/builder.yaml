@@ -1,0 +1,8 @@
+name: BUILDER
+model: anthropic/claude-opus-5
+use_cases:
+  - repository_work
+  - implementation
+  - debugging
+  - ci_cd
+reasoning_effort: high

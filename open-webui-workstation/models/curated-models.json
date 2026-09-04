@@ -1,0 +1,13 @@
+{
+  "visible_profiles": ["FAST", "SMART", "MAX", "BUILDER", "COUNCIL"],
+  "curated_allowlist": [
+    "openai/gpt-5.6-luna",
+    "openai/gpt-5.6-sol",
+    "openai/gpt-5.6-sol-pro",
+    "anthropic/claude-opus-5",
+    "anthropic/claude-fable-5.1",
+    "google/gemini-3.8-flash",
+    "x-ai/grok-4.6"
+  ],
+  "notes": "Verify live catalog before runtime apply; substitute strongest practical equivalent if unavailable."
+}

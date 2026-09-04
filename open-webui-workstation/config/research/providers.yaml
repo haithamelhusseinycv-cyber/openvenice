@@ -1,0 +1,13 @@
+primary_provider: exa
+fallback_providers:
+  - tavily
+  - duckduckgo
+agentic_search: true
+result_limit: 10
+tools:
+  search_web: enabled
+  fetch_url: enabled
+  javascript_page_loader: playwright
+policy:
+  auto_search_every_prompt: false
+  serious_research_min_sources: 2

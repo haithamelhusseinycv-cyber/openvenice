@@ -1,0 +1,223 @@
+statuses: [PENDING, IMPLEMENTED, CONFIGURED, TESTED, BLOCKED, PROVIDER_LIMITED, MANUAL_ACTION_REQUIRED]
+requirements:
+  - id: R001
+    module: governance
+    requirement: Repository canonical package exists under open-webui-workstation
+    artifact: README.md
+    validation: path check
+    status: IMPLEMENTED
+  - id: R002
+    module: runtime
+    requirement: Preserve healthy existing pod and avoid destructive recreation
+    artifact: runtime/preservation-policy.md
+    validation: operational policy + runtime scripts
+    status: IMPLEMENTED
+  - id: R003
+    module: architecture
+    requirement: CPU-only OWUI + cloud intelligence
+    artifact: architecture/target.md
+    validation: architecture review
+    status: IMPLEMENTED
+  - id: R004
+    module: provider
+    requirement: OpenRouter primary OpenAI-compatible gateway
+    artifact: config/providers/openrouter.yaml
+    validation: scripts/verify_models_catalog.sh
+    status: IMPLEMENTED
+  - id: R005
+    module: security
+    requirement: server-side secrets only
+    artifact: security/secrets-policy.md
+    validation: review + secret scan
+    status: IMPLEMENTED
+  - id: R006
+    module: models
+    requirement: curated visible model list
+    artifact: models/curated-models.json
+    validation: config validation
+    status: IMPLEMENTED
+  - id: R007
+    module: profiles
+    requirement: FAST profile
+    artifact: models/profiles/fast.yaml
+    validation: profile checks
+    status: IMPLEMENTED
+  - id: R008
+    module: profiles
+    requirement: SMART default profile
+    artifact: models/profiles/smart.yaml
+    validation: profile checks
+    status: IMPLEMENTED
+  - id: R009
+    module: profiles
+    requirement: MAX profile
+    artifact: models/profiles/max.yaml
+    validation: profile checks
+    status: IMPLEMENTED
+  - id: R010
+    module: profiles
+    requirement: BUILDER profile
+    artifact: models/profiles/builder.yaml
+    validation: profile checks
+    status: IMPLEMENTED
+  - id: R011
+    module: council
+    requirement: Council orchestration policy
+    artifact: routing/router-rules.yaml
+    validation: routing policy review
+    status: IMPLEMENTED
+  - id: R012
+    module: routing
+    requirement: deterministic routing with manual override
+    artifact: routing/router-rules.yaml
+    validation: rule inspection
+    status: IMPLEMENTED
+  - id: R013
+    module: routing
+    requirement: capability-aware fallback
+    artifact: routing/router-rules.yaml
+    validation: failure-mode tests
+    status: IMPLEMENTED
+  - id: R014
+    module: routing
+    requirement: refusal classification and bounded retries
+    artifact: routing/router-rules.yaml
+    validation: classifier tests
+    status: IMPLEMENTED
+  - id: R015
+    module: prompts
+    requirement: modular prompt layering
+    artifact: prompts/global + prompts/modes + prompts/models
+    validation: artifact structure check
+    status: IMPLEMENTED
+  - id: R016
+    module: research
+    requirement: Exa primary, Tavily fallback, citation workflow
+    artifact: tools/research/workflow.md
+    runtime_setting: config/research/providers.yaml
+    validation: provider connectivity tests
+    status: MANUAL_ACTION_REQUIRED
+  - id: R017
+    module: tools
+    requirement: native function calling mode
+    artifact: tools/native-tooling.yaml
+    validation: runtime setting check
+    status: MANUAL_ACTION_REQUIRED
+  - id: R018
+    module: rag
+    requirement: cloud embeddings + hybrid retrieval + rerank + kb_exec
+    artifact: rag/embeddings.yaml + rag/retrieval.yaml
+    validation: rag acceptance tests
+    status: IMPLEMENTED
+  - id: R019
+    module: media
+    requirement: STT via OpenAI gpt-transcribe
+    artifact: media/stt.yaml
+    validation: stt smoke tests
+    status: MANUAL_ACTION_REQUIRED
+  - id: R020
+    module: media
+    requirement: progressive low-latency TTS behavior
+    artifact: media/tts-streaming-spec.md
+    validation: voice acceptance tests
+    status: IMPLEMENTED
+  - id: R021
+    module: image
+    requirement: adapter-based image generation/editing/enhancement workflows
+    artifact: media/image/adapters.md
+    validation: image acceptance tests
+    status: IMPLEMENTED
+  - id: R022
+    module: image
+    requirement: contextual adult capability policy + hard boundaries
+    artifact: media/image/adult-routing-policy.md
+    validation: policy test cases
+    status: IMPLEMENTED
+  - id: R023
+    module: image
+    requirement: adult enhance mode preserving identity/composition
+    artifact: media/image/enhance-mode.md
+    validation: enhancement test cases
+    status: IMPLEMENTED
+  - id: R024
+    module: mobile
+    requirement: mobile-first pwa constraints and keyboard safety
+    artifact: mobile/requirements.md
+    validation: tests/mobile-widths.spec.md
+    status: IMPLEMENTED
+  - id: R025
+    module: builder
+    requirement: isolated builder service and toolchain
+    artifact: builder/isolated-service.md + builder/toolchain.md
+    validation: toolchain smoke checks
+    status: IMPLEMENTED
+  - id: R026
+    module: productivity
+    requirement: microsoft graph integrations
+    artifact: tools/productivity/microsoft-graph.md
+    validation: oauth test
+    status: MANUAL_ACTION_REQUIRED
+  - id: R027
+    module: productivity
+    requirement: github integration
+    artifact: tools/productivity/github.md
+    validation: api test
+    status: IMPLEMENTED
+  - id: R028
+    module: reliability
+    requirement: health monitoring matrix
+    artifact: monitoring/health-matrix.yaml
+    validation: scripts/verify_runtime.sh
+    status: IMPLEMENTED
+  - id: R029
+    module: backup
+    requirement: backup and restore runbook
+    artifact: backup/backup-restore-runbook.md
+    validation: restore drill
+    status: IMPLEMENTED
+  - id: R030
+    module: runtime_sync
+    requirement: classify setting application path
+    artifact: config/runtime-sync-matrix.yaml
+    validation: config review
+    status: IMPLEMENTED
+  - id: R031
+    module: app_customization
+    requirement: authorized mobile customization and restriction taxonomy
+    artifact: builder/mobile-customization.md + builder/restriction-classification.yaml
+    validation: policy review
+    status: IMPLEMENTED
+  - id: R032
+    module: security
+    requirement: no drm/license/account/security bypass as ordinary customization
+    artifact: security/legal-and-safety-guardrails.md
+    validation: policy review
+    status: IMPLEMENTED
+  - id: R033
+    module: acceptance
+    requirement: comprehensive acceptance suite
+    artifact: acceptance/acceptance-suite.md
+    validation: execution logs
+    status: IMPLEMENTED
+  - id: R034
+    module: evidence
+    requirement: evidence-based final reporting
+    artifact: acceptance/evidence-template.md
+    validation: completed report
+    status: IMPLEMENTED
+  - id: R035
+    module: reality_verification
+    requirement: verify OpenRouter catalog and required model ids
+    artifact: scripts/verify_models_catalog.sh
+    validation: script result
+    status: BLOCKED
+  - id: R036
+    module: reality_verification
+    requirement: verify runtime pod detail via RunPod API
+    artifact: scripts/verify_runtime.sh
+    validation: runpod api query
+    status: BLOCKED
+conflicts:
+  - id: C001
+    description: "Earlier module text requested broad restriction removal including immutable upstream bypass; cumulative final spec also requires respecting provider hard restrictions and disallowing DRM/license/account/security bypass as ordinary customization."
+    resolution_policy: "Apply restrictive/compliant interpretation: keep customization support, but do not implement bypass of provider hard restrictions, DRM, license, account entitlement, or security controls."

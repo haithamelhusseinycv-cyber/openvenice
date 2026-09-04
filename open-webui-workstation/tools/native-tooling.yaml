@@ -1,0 +1,17 @@
+function_calling_mode: native
+legacy_mode_default: false
+enabled_tools:
+  - web_search
+  - fetch_url
+  - knowledge
+  - files
+  - memory
+  - notes
+  - code_interpreter
+  - image_generation
+  - open_terminal
+  - mcp_openapi_tools
+  - subagents
+policy:
+  inject_search_every_prompt: false
+  choose_tools_by_material_benefit: true

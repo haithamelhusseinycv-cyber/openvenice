@@ -1,0 +1,10 @@
+name: FAST
+model: openai/gpt-5.6-luna
+optional_aliases:
+  - openai/gpt-5.6-luna:nitro
+use_cases:
+  - low_latency
+  - classification
+  - routing
+  - summaries
+reasoning_effort: medium
