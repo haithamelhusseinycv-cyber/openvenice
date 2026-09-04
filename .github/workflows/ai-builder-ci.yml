@@ -1,0 +1,48 @@
+name: AI Builder CI
+
+on:
+  pull_request:
+    paths:
+      - 'ai-builder/**'
+      - '.github/workflows/ai-builder-ci.yml'
+  push:
+    branches:
+      - master
+    paths:
+      - 'ai-builder/**'
+      - '.github/workflows/ai-builder-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate shell syntax
+        run: |
+          bash -n ai-builder/scripts/bootstrap.sh
+          bash -n ai-builder/scripts/start.sh
+          bash -n ai-builder/scripts/verify.sh
+
+      - name: Validate OpenCode JSON
+        run: jq empty ai-builder/config/opencode.json
+
+      - name: Verify required files
+        run: |
+          test -s ai-builder/config/AGENTS.md
+          test -s ai-builder/config/agents/builder-max.md
+          test -s ai-builder/runpod/AI-BUILDER-SPEC.md
+          test -s ai-builder/CODEX-BOOTSTRAP.md
+
+      - name: Check committed files for secret values
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -RInE '(ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|rpa_[A-Za-z0-9]{20,}|sk-or-v1-[A-Za-z0-9_-]{20,}|hf_[A-Za-z0-9]{20,})' ai-builder; then
+            echo 'Potential credential value detected in committed AI Builder files.' >&2
+            exit 1
+          fi
+          echo 'No obvious credential values found.'
