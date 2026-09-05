@@ -24,10 +24,12 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
+      - name: Install pinned OpenCode CLI
+        run: npm install --global opencode-ai@1.18.29
+
       - name: Run OpenCode
-        uses: anomalyco/opencode/github@a3b97d9090ccf4aa9ac32268486283e3131e36b4 # github-v1.2.25
+        run: opencode github run
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
-        with:
-          model: opencode/gpt-5.6-sol
-          share: false
+          MODEL: opencode/gpt-5.6-sol
+          SHARE: "false"
