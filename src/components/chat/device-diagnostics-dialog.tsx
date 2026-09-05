@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useVoiceStore } from '../../stores/voice-store'
 import { listenForVoice, speakVoice, voiceLocaleShortLabel } from '../../lib/voice-chat'
 import { runDeviceDiagnostics, type DiagnosticResult } from '../../lib/device-diagnostics'
+import { voiceTutBlob } from '../../lib/venice-client'
 
 interface DeviceDiagnosticsDialogProps {
   open: boolean
@@ -83,6 +84,39 @@ export function DeviceDiagnosticsDialog({ open, onClose }: DeviceDiagnosticsDial
     }
   }
 
+  const testStudio = async () => {
+    setVoiceBusy(true)
+    setVoiceResult(`Synthesizing Omnia · ${voiceLocaleShortLabel(locale)}`)
+    try {
+      const isArabic = locale === 'ar-EG'
+      const blob = await voiceTutBlob({
+        model: 'voicetut',
+        voice: 'Omnia',
+        input: isArabic
+          ? 'أهلاً، أنا نور. صوت أومنيا شغال بنجاح.'
+          : 'Hi, I am Noor. Omnia studio voice is working successfully.',
+        language: isArabic ? 'Arabic' : 'English',
+        response_format: 'wav',
+      })
+      const url = URL.createObjectURL(blob)
+      const audio = new Audio(url)
+      try {
+        await new Promise<void>((resolve, reject) => {
+          audio.addEventListener('ended', () => resolve(), { once: true })
+          audio.addEventListener('error', () => reject(new Error('Omnia audio playback failed')), { once: true })
+          audio.play().catch(reject)
+        })
+      } finally {
+        URL.revokeObjectURL(url)
+      }
+      setVoiceResult(`Omnia synthesis completed · ${voiceLocaleShortLabel(locale)} · ${Math.max(1, Math.round(blob.size / 1024))} KB`)
+    } catch (error) {
+      setVoiceResult(error instanceof Error ? `Omnia test failed: ${error.message}` : 'Omnia test failed')
+    } finally {
+      setVoiceBusy(false)
+    }
+  }
+
   const copyReport = async () => {
     const report = [
       `OpenVenice Noor device acceptance · ${new Date().toISOString()}`,
@@ -128,10 +162,11 @@ export function DeviceDiagnosticsDialog({ open, onClose }: DeviceDiagnosticsDial
 
           <div className="mt-4 rounded-xl border border-white/[0.07] bg-white/[0.025] p-3">
             <div className="text-[12px] font-semibold uppercase tracking-[0.08em] text-white/45">Live voice test</div>
-            <div className="mt-2 grid grid-cols-3 gap-2">
+            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
               <button type="button" disabled={voiceBusy} onClick={() => void testMic('en-US')} className="min-h-10 rounded-lg border border-white/[0.08] bg-white/[0.04] px-2 text-[12px] font-medium text-white/70 disabled:opacity-40">Mic EN</button>
               <button type="button" disabled={voiceBusy} onClick={() => void testMic('ar-EG')} className="min-h-10 rounded-lg border border-white/[0.08] bg-white/[0.04] px-2 text-[12px] font-medium text-white/70 disabled:opacity-40">Mic مصري</button>
               <button type="button" disabled={voiceBusy} onClick={() => void testSpeaker()} className="min-h-10 rounded-lg border border-white/[0.08] bg-white/[0.04] px-2 text-[12px] font-medium text-white/70 disabled:opacity-40">Speaker</button>
+              <button type="button" disabled={voiceBusy} onClick={() => void testStudio()} className="min-h-10 rounded-lg border border-violet-400/20 bg-violet-400/[0.08] px-2 text-[12px] font-medium text-violet-100 disabled:opacity-40">Omnia</button>
             </div>
             {voiceResult && <div className="mt-2 break-words rounded-lg bg-black/20 px-2.5 py-2 text-[11.5px] leading-relaxed text-white/55">{voiceResult}</div>}
           </div>

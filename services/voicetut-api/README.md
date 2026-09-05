@@ -4,13 +4,15 @@ GPU-backed companion service for Noor's Egyptian-American voice. The default spe
 
 ## Required production configuration
 
-The service fails closed unless `VOICETUT_API_KEYS` is configured. For the current personal OpenVenice deployment, set it to the same Venice API key entered by the authorized user. OpenVenice forwards that key only in the VoiceTut HTTPS request; it is not compiled into the web bundle or APK.
+The service fails closed unless `VOICETUT_API_KEYS` is configured. Use a dedicated random VoiceTut token. Never reuse a Venice, RunPod, Railway, GitHub, or other provider credential.
+
+The browser calls the same-origin OpenVenice `/voicetut` proxy. Railway adds the dedicated token server-side before forwarding to RunPod, so no VoiceTut credential is present in the web bundle, browser storage, request JavaScript, or APK.
 
 For key rotation, accept both keys temporarily:
 
 ```bash
 VOICETUT_API_KEYS=old-key,new-key
-VOICETUT_CORS_ORIGINS=https://openvenice-production.up.railway.app
+VOICETUT_CORS_ORIGINS=
 ```
 
 Never put `VOICETUT_API_KEYS` or any private token in a `VITE_*` variable. Vite variables are public bundle configuration.
@@ -85,13 +87,13 @@ Logs intentionally exclude bearer keys and submitted speech text.
 - `VOICETUT_VOICE` — default `Omnia`
 - `VOICETUT_STEPS` — default `32`
 - `VOICETUT_GUIDANCE` — default `2.5`
-- `VOICETUT_CORS_ORIGINS` — required comma-separated production origins
+- `VOICETUT_CORS_ORIGINS` — optional comma-separated origins; leave empty when only the Railway proxy calls RunPod
 - `LOG_LEVEL` — default `INFO`
 
-Configure the OpenVenice build with the public service URL only:
+Configure web builds with the same-origin proxy path. Native builds should use the absolute Railway proxy URL:
 
 ```bash
-VITE_VOICETUT_BASE_URL=https://your-voicetut-service.example
+VITE_VOICETUT_BASE_URL=/voicetut
 ```
 
 If VoiceTut is unavailable, OpenVenice falls back to Venice Serena TTS.

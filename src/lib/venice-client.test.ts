@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { formatVeniceError, validateVeniceApiKey, VeniceAPIError, venice, veniceBlob } from './venice-client'
+import { checkVoiceTutHealth, formatVeniceError, validateVeniceApiKey, VeniceAPIError, venice, veniceBlob, voiceTutBlob } from './venice-client'
 import { useAuthStore } from '../stores/auth-store'
 
 function response(status: number, message = `HTTP ${status}`): Response {
@@ -205,5 +205,50 @@ describe('validateVeniceApiKey', () => {
     } catch (error) {
       expect(formatVeniceError(error)).toBe('Invalid request body: scale: Expected 2 or 4 · Request request-123')
     }
+  })
+
+  it('sends VoiceTut synthesis through the proxy without the Venice bearer key', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(new Uint8Array([82, 73, 70, 70]), {
+      status: 200,
+      headers: { 'Content-Type': 'audio/wav' },
+    }))
+
+    const blob = await voiceTutBlob({
+      model: 'voicetut',
+      voice: 'Omnia',
+      input: 'Hello from Noor',
+      language: 'English',
+    })
+
+    expect(blob.type).toBe('audio/wav')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('/voicetut/v1/audio/speech')
+    expect(init.headers).toEqual({ 'Content-Type': 'application/json' })
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      voice: 'Omnia',
+      input: 'Hello from Noor',
+      language: 'en',
+      response_format: 'wav',
+    })
+  })
+
+  it('reports VoiceTut ready only when the proxy confirms the model is loaded', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, loaded: true }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }))
+
+    await expect(checkVoiceTutHealth()).resolves.toEqual({ ok: true, loaded: true })
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/voicetut/health')
+  })
+
+  it('rejects a reachable VoiceTut worker whose model is not ready', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ ok: false, loaded: false }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }))
+
+    await expect(checkVoiceTutHealth()).rejects.toThrow('model is not ready')
   })
 })

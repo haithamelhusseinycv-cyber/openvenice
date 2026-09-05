@@ -2,13 +2,13 @@ import { LocalDreamConnector } from '../connectors/localdream/localdream-connect
 import { CapacitorFaceFusionBridge, isNativeOpenVeniceAndroid } from '../connectors/facefusion/capacitor-facefusion-bridge'
 import { FaceFusionConnector } from '../connectors/facefusion/facefusion-connector'
 import { isAllowedChatModel, isAllowedImageModel } from './allowed-models'
-import { veniceWithTimeout } from './venice-client'
+import { checkVoiceTutHealth, veniceWithTimeout } from './venice-client'
 import type { ModelsResponse } from '../types/venice'
 
 export type DiagnosticStatus = 'pass' | 'warn' | 'fail'
 
 export interface DiagnosticResult {
-  id: 'platform' | 'venice' | 'localdream' | 'facefusion' | 'voice' | 'storage'
+  id: 'platform' | 'venice' | 'voicetut' | 'localdream' | 'facefusion' | 'voice' | 'storage'
   label: string
   status: DiagnosticStatus
   detail: string
@@ -175,6 +175,25 @@ export function checkVoice(): DiagnosticResult {
   }
 }
 
+export async function checkVoiceTut(): Promise<DiagnosticResult> {
+  try {
+    await withTimeout((signal) => checkVoiceTutHealth({ signal }), 8_000)
+    return {
+      id: 'voicetut',
+      label: 'Studio voice · Omnia',
+      status: 'pass',
+      detail: 'Authenticated server-side proxy connected · VoiceTut model ready',
+    }
+  } catch (error) {
+    return {
+      id: 'voicetut',
+      label: 'Studio voice · Omnia',
+      status: 'fail',
+      detail: compactError(error),
+    }
+  }
+}
+
 export function checkStorage(): DiagnosticResult {
   try {
     const key = '__openvenice_diagnostic__'
@@ -199,10 +218,11 @@ export function checkStorage(): DiagnosticResult {
 
 export async function runDeviceDiagnostics(): Promise<DiagnosticResult[]> {
   const immediate = [checkPlatform(), checkVoice(), checkStorage()]
-  const [veniceResult, localDreamResult, faceFusionResult] = await Promise.all([
+  const [veniceResult, voiceTutResult, localDreamResult, faceFusionResult] = await Promise.all([
     checkVeniceModels(),
+    checkVoiceTut(),
     checkLocalDream(),
     checkFaceFusion(),
   ])
-  return [immediate[0], veniceResult, immediate[1], immediate[2], localDreamResult, faceFusionResult]
+  return [immediate[0], veniceResult, voiceTutResult, immediate[1], immediate[2], localDreamResult, faceFusionResult]
 }

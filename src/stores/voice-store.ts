@@ -6,7 +6,7 @@ import type { VoiceLocale } from '../lib/voice-chat'
 export type NourTtsProvider = 'voicetut' | 'venice'
 export type NourPlaybackMode = 'fast' | 'studio'
 
-const DEFAULT_VOICETUT_BASE_URL = (import.meta.env.VITE_VOICETUT_BASE_URL as string | undefined)?.trim() || ''
+const DEFAULT_VOICETUT_BASE_URL = (import.meta.env.VITE_VOICETUT_BASE_URL as string | undefined)?.trim() || '/voicetut'
 
 interface VoiceState {
   locale: VoiceLocale

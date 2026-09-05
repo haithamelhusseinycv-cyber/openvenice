@@ -232,13 +232,14 @@ function dispatchTtsProvider(provider: 'voicetut' | 'venice', reason?: string) {
   window.dispatchEvent(new CustomEvent('nour-tts-provider', { detail: { provider, reason } }))
 }
 
-async function voiceTutBlob(body: VoiceTutSpeechRequest, init: { signal?: AbortSignal } = {}): Promise<Blob> {
+export async function voiceTutBlob(body: VoiceTutSpeechRequest, init: { signal?: AbortSignal } = {}): Promise<Blob> {
   const settings = useVoiceStore.getState()
   const baseUrl = settings.voiceTutBaseUrl.trim().replace(/\/$/, '')
   if (!baseUrl) throw new Error('VoiceTut service URL is not configured')
 
   const controller = new AbortController()
-  const timeout = globalThis.setTimeout(() => controller.abort(), 45_000)
+  // Allow a cold serverless worker to load the model. Nginx applies the same ceiling.
+  const timeout = globalThis.setTimeout(() => controller.abort(), 180_000)
   const abortFromCaller = () => controller.abort()
   init.signal?.addEventListener('abort', abortFromCaller, { once: true })
 
@@ -247,7 +248,6 @@ async function voiceTutBlob(body: VoiceTutSpeechRequest, init: { signal?: AbortS
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${getApiKey().trim()}`,
       },
       body: JSON.stringify({
         model: 'mohammedaly22/VoiceTut-TTS',
@@ -283,6 +283,27 @@ async function voiceTutBlob(body: VoiceTutSpeechRequest, init: { signal?: AbortS
     globalThis.clearTimeout(timeout)
     init.signal?.removeEventListener('abort', abortFromCaller)
   }
+}
+
+export interface VoiceTutHealth {
+  ok: boolean
+  loaded: boolean
+}
+
+/** Check the same-origin VoiceTut proxy without exposing either provider credential. */
+export async function checkVoiceTutHealth(init: { signal?: AbortSignal } = {}): Promise<VoiceTutHealth> {
+  const baseUrl = useVoiceStore.getState().voiceTutBaseUrl.trim().replace(/\/$/, '')
+  if (!baseUrl) throw new Error('VoiceTut service URL is not configured')
+  const response = await fetch(`${baseUrl}/health`, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+    signal: init.signal,
+    cache: 'no-store',
+  })
+  if (!response.ok) throw new Error(`VoiceTut health check failed: HTTP ${response.status}`)
+  const payload = await response.json() as VoiceTutHealth
+  if (!payload.ok || !payload.loaded) throw new Error('VoiceTut is reachable but the Omnia model is not ready')
+  return payload
 }
 
 export async function veniceBlob(path: string, body: object, init: { signal?: AbortSignal } = {}): Promise<Blob> {
