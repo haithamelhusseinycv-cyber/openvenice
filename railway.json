@@ -5,7 +5,6 @@
     "dockerfilePath": "Dockerfile"
   },
   "deploy": {
-    "startCommand": "sh -c \"test -n \\\"$VOICETUT_UPSTREAM\\\" && test -n \\\"$VOICETUT_API_KEY\\\" && envsubst '$VOICETUT_UPSTREAM $VOICETUT_API_KEY' < /etc/nginx/nginx.conf.template > /tmp/openvenice-nginx.conf && chmod 600 /tmp/openvenice-nginx.conf && exec nginx -c /tmp/openvenice-nginx.conf -g 'daemon off;'\"",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 5
   }
