@@ -34,7 +34,7 @@ http {
 
     location = /voicetut/health {
       limit_except GET { deny all; }
-      proxy_pass ${VOICETUT_UPSTREAM}/ready;
+      proxy_pass __VOICETUT_UPSTREAM__/ready;
       proxy_ssl_server_name on;
       proxy_set_header Host $proxy_host;
       proxy_set_header X-Request-ID $request_id;
@@ -45,10 +45,10 @@ http {
 
     location /voicetut/ {
       limit_except POST { deny all; }
-      proxy_pass ${VOICETUT_UPSTREAM}/;
+      proxy_pass __VOICETUT_UPSTREAM__/;
       proxy_ssl_server_name on;
       proxy_set_header Host $proxy_host;
-      proxy_set_header Authorization "Bearer ${VOICETUT_API_KEY}";
+      proxy_set_header Authorization "Bearer __VOICETUT_API_KEY__";
       proxy_set_header X-Request-ID $request_id;
       proxy_request_buffering on;
       proxy_buffering off;

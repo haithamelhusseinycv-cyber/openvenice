@@ -18,4 +18,4 @@ RUN sed -i 's#pid[[:space:]].*;#pid /tmp/nginx.pid;#' /etc/nginx/nginx.conf && \
     chown -R nginx:nginx /var/cache/nginx /var/run /usr/share/nginx/html
 EXPOSE 8080
 USER nginx
-CMD ["sh", "-c", "test -n \"$VOICETUT_UPSTREAM\" && test -n \"$VOICETUT_API_KEY\" && envsubst '$VOICETUT_UPSTREAM $VOICETUT_API_KEY' < /etc/nginx/nginx.conf.template > /tmp/openvenice-nginx.conf && chmod 600 /tmp/openvenice-nginx.conf && exec nginx -c /tmp/openvenice-nginx.conf -g 'daemon off;'"]
+CMD ["sh", "-c", "case \"$VOICETUT_API_KEY\" in ''|*[!A-Za-z0-9_-]*) echo 'VOICETUT_API_KEY must be a non-empty URL-safe token' >&2; exit 1;; esac; case \"$VOICETUT_UPSTREAM\" in https://*.api.runpod.ai) ;; *) echo 'VOICETUT_UPSTREAM must be an HTTPS RunPod API host' >&2; exit 1;; esac; sed -e \"s|__VOICETUT_UPSTREAM__|$VOICETUT_UPSTREAM|g\" -e \"s|__VOICETUT_API_KEY__|$VOICETUT_API_KEY|g\" /etc/nginx/nginx.conf.template > /tmp/openvenice-nginx.conf && chmod 600 /tmp/openvenice-nginx.conf && exec nginx -c /tmp/openvenice-nginx.conf -g 'daemon off;'"]
