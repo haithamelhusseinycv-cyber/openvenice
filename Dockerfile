@@ -32,6 +32,7 @@ RUN printf '%s\n' \
   '  add_header Referrer-Policy "no-referrer" always;' \
   '  add_header Permissions-Policy "camera=(), geolocation=(), payment=(), usb=()" always;' \
   '  add_header Cache-Control "$openvenice_cache_control" always;' \
+  '  location = /healthz { default_type text/plain; add_header Cache-Control "no-store" always; return 200 "ok"; }' \
   '  location = / { try_files /index.html =404; }' \
   '  location / { try_files $uri $uri/ /index.html; }' \
   '}' > /etc/nginx/conf.d/default.conf && \

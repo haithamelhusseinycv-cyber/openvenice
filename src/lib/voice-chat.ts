@@ -174,11 +174,15 @@ function normalizeSpeechText(text: string) {
     .trim()
 }
 
-export async function speakVoice(
-  text: string,
-  locale: VoiceLocale,
-  options: { rate?: number; pitch?: number; signal?: AbortSignal } = {},
-) {
+interface SpeakVoiceOptions {
+  rate?: number
+  pitch?: number
+  signal?: AbortSignal
+  /** When false, queues after any already-speaking/queued utterance instead of cancelling it. */
+  interrupt?: boolean
+}
+
+async function speakVoiceInternal(text: string, locale: VoiceLocale, options: SpeakVoiceOptions) {
   const clean = normalizeSpeechText(text)
   if (!clean) return
   if (options.signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError')
@@ -211,9 +215,55 @@ export async function speakVoice(
     utterance.onend = () => { cleanup(); resolve() }
     utterance.onerror = () => { cleanup(); reject(new Error('Text-to-speech failed')) }
     options.signal?.addEventListener('abort', onAbort, { once: true })
-    window.speechSynthesis.cancel()
+    if (options.interrupt !== false) window.speechSynthesis.cancel()
     window.speechSynthesis.speak(utterance)
   })
+}
+
+export async function speakVoice(
+  text: string,
+  locale: VoiceLocale,
+  options: { rate?: number; pitch?: number; signal?: AbortSignal } = {},
+) {
+  await speakVoiceInternal(text, locale, { ...options, interrupt: true })
+}
+
+/**
+ * Speaks text without cancelling any utterance already speaking/queued. Only meaningful for the
+ * browser Web Speech API, which natively queues sequential `speak()` calls; use this to read a
+ * streaming reply incrementally (sentence-by-sentence) instead of waiting for it to finish.
+ * Falls back to native Android speech (which is not queue-safe) unchanged, so callers should gate
+ * progressive use with `isBrowserSpeechAvailable()`.
+ */
+export async function queueVoiceChunk(
+  text: string,
+  locale: VoiceLocale,
+  options: { rate?: number; pitch?: number; signal?: AbortSignal } = {},
+) {
+  await speakVoiceInternal(text, locale, { ...options, interrupt: false })
+}
+
+/** True when progressive (queued) speech via the browser Web Speech API is usable. */
+export function isBrowserSpeechAvailable() {
+  return !isNativeAndroid() && typeof window !== 'undefined' && !!window.speechSynthesis
+}
+
+/**
+ * Splits the given text into complete sentences (ending in ./!/?/؟) and reports how many
+ * characters were consumed, so a caller streaming text incrementally can speak finished sentences
+ * as soon as they appear and know where to resume from for the next call.
+ */
+export function extractCompleteSentences(text: string): { chunks: string[]; consumed: number } {
+  const chunks: string[] = []
+  let consumed = 0
+  const regex = /[^.!?؟]*[.!?؟]+(?=\s|$)/g
+  let match: RegExpExecArray | null
+  while ((match = regex.exec(text))) {
+    const sentence = match[0].trim()
+    if (sentence) chunks.push(sentence)
+    consumed = match.index + match[0].length
+  }
+  return { chunks, consumed }
 }
 
 export async function stopVoiceSpeaking() {

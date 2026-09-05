@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { cn } from '../../lib/utils'
 import { formatBytes, prepareImage, type ImagePreparationStage } from '../../lib/image-input'
-import { cancelVoiceListening, listenForVoice, speakVoice, stopVoiceSpeaking, voiceLocaleLabel, voiceLocaleShortLabel } from '../../lib/voice-chat'
+import { cancelVoiceListening, extractCompleteSentences, isBrowserSpeechAvailable, listenForVoice, queueVoiceChunk, speakVoice, stopVoiceSpeaking, voiceLocaleLabel, voiceLocaleShortLabel } from '../../lib/voice-chat'
 import { useChatStore } from '../../stores/chat-store'
 import { agentToolLabel, useAgentStatusStore } from '../../stores/agent-status-store'
 import { useVoiceStore } from '../../stores/voice-store'
@@ -34,6 +34,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory
   const preparationAbortRef = useRef<AbortController | null>(null)
   const pendingVoiceReplyLocaleRef = useRef<'en-US' | 'ar-EG' | null>(null)
   const previousStreamingRef = useRef(isStreaming)
+  const spokenOffsetRef = useRef(0)
   const activeConversationId = useChatStore((state) => state.activeConversationId)
   const latestAssistantText = useChatStore((state) => {
     const id = state.activeConversationId
