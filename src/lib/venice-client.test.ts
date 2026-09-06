@@ -207,6 +207,13 @@ describe('validateVeniceApiKey', () => {
     }
   })
 
+  it('does not retry paid blob POST requests', async () => {
+    fetchMock.mockResolvedValue(response(503, 'Temporarily unavailable'))
+
+    await expect(veniceBlob('/image/upscale', { image: 'abc', scale: 2 })).rejects.toMatchObject({ status: 503 })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('sends VoiceTut synthesis through the proxy without the Venice bearer key', async () => {
     fetchMock.mockResolvedValueOnce(new Response(new Uint8Array([82, 73, 70, 70]), {
       status: 200,

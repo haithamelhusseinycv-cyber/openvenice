@@ -338,7 +338,6 @@ export async function veniceBlob(path: string, body: object, init: { signal?: Ab
     method: 'POST',
     body: JSON.stringify(effectiveBody),
     signal: init.signal,
-    retries: 1,
   })
   const contentType = res.headers.get('content-type') || ''
   if (contentType.includes('application/json')) {

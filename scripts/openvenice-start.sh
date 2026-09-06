@@ -10,6 +10,17 @@ case "$PORT_VALUE" in
 esac
 
 RAW_VOICE_KEY=${VOICETUT_API_KEY:-}
+UPSTREAM_VALUE=${VOICETUT_UPSTREAM:-}
+
+if [ -z "$RAW_VOICE_KEY" ] && [ -z "$UPSTREAM_VALUE" ]; then
+  : > /tmp/openvenice-voicetut.conf
+  echo 'VoiceTut proxy disabled; using Venice TTS fallback' >&2
+else
+  if [ -z "$RAW_VOICE_KEY" ] || [ -z "$UPSTREAM_VALUE" ]; then
+    echo 'VOICETUT_API_KEY and VOICETUT_UPSTREAM must both be set to enable VoiceTut' >&2
+    exit 1
+  fi
+
 RAW_LEN=$(printf '%s' "$RAW_VOICE_KEY" | wc -c | tr -d '[:space:]')
 HAS_WHITESPACE=false
 HAS_COLON=false
@@ -37,7 +48,6 @@ case "$VOICE_KEY" in
     ;;
 esac
 
-UPSTREAM_VALUE=${VOICETUT_UPSTREAM:-}
 UPSTREAM_LEN=$(printf '%s' "$UPSTREAM_VALUE" | wc -c | tr -d '[:space:]')
 UPSTREAM_HTTPS=false
 UPSTREAM_RUNPOD=false
@@ -53,11 +63,15 @@ case "$UPSTREAM_VALUE" in
     ;;
 esac
 
+  sed \
+    -e "s|__VOICETUT_UPSTREAM__|$UPSTREAM_VALUE|g" \
+    -e "s|__VOICETUT_API_KEY__|$VOICE_KEY|g" \
+    /etc/nginx/nginx.voicetut.conf.template > /tmp/openvenice-voicetut.conf
+fi
+
 sed \
   -e "s|__PORT__|$PORT_VALUE|g" \
-  -e "s|__VOICETUT_UPSTREAM__|$UPSTREAM_VALUE|g" \
-  -e "s|__VOICETUT_API_KEY__|$VOICE_KEY|g" \
   /etc/nginx/nginx.conf.template > /tmp/openvenice-nginx.conf
-chmod 600 /tmp/openvenice-nginx.conf
+chmod 600 /tmp/openvenice-nginx.conf /tmp/openvenice-voicetut.conf
 
 exec nginx -c /tmp/openvenice-nginx.conf -g 'daemon off;'
