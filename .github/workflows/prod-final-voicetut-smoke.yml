@@ -1,7 +1,9 @@
 name: Final Production VoiceTut Smoke
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - prod-final-smoke-20260906
 
 permissions:
   contents: read
