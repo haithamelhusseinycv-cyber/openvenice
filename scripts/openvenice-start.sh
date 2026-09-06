@@ -1,19 +1,27 @@
 #!/bin/sh
 set -eu
+umask 077
 
-PORT_VALUE=$(printf '%s' "${PORT:-8080}" | tr -d '[:space:]')
+PORT_VALUE=${PORT:-8080}
 case "$PORT_VALUE" in
   ''|*[!0-9]*)
     echo 'PORT must resolve to a numeric TCP port' >&2
     exit 1
     ;;
 esac
+if [ "$PORT_VALUE" -lt 1 ] || [ "$PORT_VALUE" -gt 65535 ]; then
+  echo 'PORT must be between 1 and 65535' >&2
+  exit 1
+fi
 
 RAW_VOICE_KEY=${VOICETUT_API_KEY:-}
 UPSTREAM_VALUE=${VOICETUT_UPSTREAM:-}
 
 if [ -z "$RAW_VOICE_KEY" ] && [ -z "$UPSTREAM_VALUE" ]; then
-  : > /tmp/openvenice-voicetut.conf
+  printf '%s\n' \
+    'location = /voicetut/health { default_type application/json; return 503 '\''{"ok":false,"loaded":false,"disabled":true}'\''; add_header Cache-Control "no-store" always; }' \
+    'location /voicetut/ { default_type application/json; return 503 '\''{"error":"VoiceTut proxy is disabled"}'\''; add_header Cache-Control "no-store" always; }' \
+    > /tmp/openvenice-voicetut.conf
   echo 'VoiceTut proxy disabled; using Venice TTS fallback' >&2
 else
   if [ -z "$RAW_VOICE_KEY" ] || [ -z "$UPSTREAM_VALUE" ]; then
@@ -62,11 +70,23 @@ case "$UPSTREAM_VALUE" in
     exit 1
     ;;
 esac
+UPSTREAM_HOST=${UPSTREAM_VALUE#https://}
+case "$UPSTREAM_HOST" in
+  ''|*[!A-Za-z0-9.-]*|.*|-*|*..*|*-.*|*.-*)
+    echo 'VOICETUT_UPSTREAM must be an origin-only RunPod API hostname' >&2
+    exit 1
+    ;;
+esac
 
-  sed \
-    -e "s|__VOICETUT_UPSTREAM__|$UPSTREAM_VALUE|g" \
-    -e "s|__VOICETUT_API_KEY__|$VOICE_KEY|g" \
-    /etc/nginx/nginx.voicetut.conf.template > /tmp/openvenice-voicetut.conf
+  sed -e "s|__VOICETUT_UPSTREAM__|$UPSTREAM_VALUE|g" /etc/nginx/nginx.voicetut.conf.template |
+    while IFS= read -r line; do
+      case "$line" in
+        '  proxy_set_header Authorization "Bearer __VOICETUT_API_KEY__";')
+          printf '  proxy_set_header Authorization "Bearer %s";\n' "$VOICE_KEY"
+          ;;
+        *) printf '%s\n' "$line" ;;
+      esac
+    done > /tmp/openvenice-voicetut.conf
 fi
 
 sed \

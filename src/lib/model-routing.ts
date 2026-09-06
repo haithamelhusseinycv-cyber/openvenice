@@ -1,4 +1,6 @@
-const FALLBACK_STATUSES = new Set([400, 403, 404, 408, 425, 429, 500, 502, 503, 504])
+// Only retry errors that definitively reject the request before inference.
+// Timeouts and server errors may have already consumed a paid generation.
+const FALLBACK_STATUSES = new Set([400, 403, 404, 425, 429])
 
 export function modelErrorStatus(error: unknown): number {
   if (!error || typeof error !== 'object' || !('status' in error)) return 0
