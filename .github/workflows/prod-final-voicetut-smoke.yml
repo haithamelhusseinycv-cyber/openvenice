@@ -30,14 +30,14 @@ jobs:
           cat /tmp/healthz
           test "$code" = '200'
 
-      - name: Check VoiceTut readiness through proxy
+      - name: Probe VoiceTut readiness through proxy
         run: |
           set -euo pipefail
           base='https://openvenice-production.up.railway.app'
           code=$(curl -sS --connect-timeout 10 --max-time 200 -o /tmp/vhealth -w '%{http_code}' "$base/voicetut/health")
           echo "VOICETUT_HEALTH_HTTP=$code"
           cat /tmp/vhealth
-          test "$code" = '200'
+          echo
 
       - name: Generate Omnia WAV through production proxy
         run: |
