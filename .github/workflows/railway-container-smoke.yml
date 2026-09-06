@@ -1,0 +1,43 @@
+name: Railway Container Runtime Smoke
+
+on:
+  push:
+    branches:
+      - railway-container-smoke-20260906
+
+permissions:
+  contents: read
+
+jobs:
+  runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Build exact production Dockerfile
+        run: docker build -t openvenice-railway-smoke .
+
+      - name: Start container on injected PORT
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run -d --name openvenice-smoke \
+            -e PORT=4321 \
+            -e VOICETUT_API_KEY=test_token_123 \
+            -e VOICETUT_UPSTREAM=https://dummy.api.runpod.ai \
+            -p 4321:4321 \
+            openvenice-railway-smoke
+          sleep 3
+          docker ps -a --filter name=openvenice-smoke
+          docker logs openvenice-smoke
+          test "$(docker inspect -f '{{.State.Running}}' openvenice-smoke)" = "true"
+
+      - name: Verify local Railway health endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS --max-time 10 http://127.0.0.1:4321/healthz
+          echo
+          curl -fsSI --max-time 10 http://127.0.0.1:4321/ | head
