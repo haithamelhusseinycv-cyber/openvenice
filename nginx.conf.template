@@ -1,3 +1,4 @@
+user nginx;
 pid /tmp/nginx.pid;
 error_log /dev/stderr warn;
 
