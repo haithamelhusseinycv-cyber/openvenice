@@ -14,8 +14,8 @@ VOICE_KEY=${VOICE_KEY#VOICETUT_API_KEYS=}
 VOICE_KEY=${VOICE_KEY#VOICETUT_API_KEY=}
 VOICE_KEY=$(printf '%s' "$VOICE_KEY" | sed 's/^"//;s/"$//')
 case "$VOICE_KEY" in
-  ''|*[!A-Za-z0-9_+/=-]*)
-    echo 'VOICETUT_API_KEY must resolve to a non-empty base64-compatible token' >&2
+  ''|*[!A-Za-z0-9._~+/=-]*)
+    echo 'VOICETUT_API_KEY must resolve to a non-empty HTTP token68-compatible credential' >&2
     exit 1
     ;;
 esac
