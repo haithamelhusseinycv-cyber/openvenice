@@ -1,0 +1,64 @@
+name: Final Production VoiceTut Smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Check OpenVenice root
+        run: |
+          set -euo pipefail
+          base='https://openvenice-production.up.railway.app'
+          code=$(curl -sS --connect-timeout 10 --max-time 30 -o /tmp/root -w '%{http_code}' "$base/")
+          echo "ROOT_HTTP=$code"
+          test "$code" = '200'
+
+      - name: Check Railway local health
+        run: |
+          set -euo pipefail
+          base='https://openvenice-production.up.railway.app'
+          code=$(curl -sS --connect-timeout 10 --max-time 30 -o /tmp/healthz -w '%{http_code}' "$base/healthz")
+          echo "HEALTHZ_HTTP=$code"
+          cat /tmp/healthz
+          test "$code" = '200'
+
+      - name: Check VoiceTut readiness through proxy
+        run: |
+          set -euo pipefail
+          base='https://openvenice-production.up.railway.app'
+          code=$(curl -sS --connect-timeout 10 --max-time 200 -o /tmp/vhealth -w '%{http_code}' "$base/voicetut/health")
+          echo "VOICETUT_HEALTH_HTTP=$code"
+          cat /tmp/vhealth
+          test "$code" = '200'
+
+      - name: Generate Omnia WAV through production proxy
+        run: |
+          set -euo pipefail
+          base='https://openvenice-production.up.railway.app'
+          code=$(curl -sS --connect-timeout 10 --max-time 220 \
+            -D /tmp/omnia.headers \
+            -o /tmp/omnia.wav \
+            -w '%{http_code}' \
+            -H 'Content-Type: application/json' \
+            --data '{"model":"mohammedaly22/VoiceTut-TTS","voice":"Omnia","input":"Hi, I am Noor. Production voice is working successfully.","language":"en","speed":0.95,"response_format":"wav"}' \
+            "$base/voicetut/v1/audio/speech")
+          echo "OMNIA_HTTP=$code"
+          grep -Ei '^(content-type|x-tts-provider|x-tts-voice|x-tts-language|x-request-id):' /tmp/omnia.headers || true
+          bytes=$(wc -c < /tmp/omnia.wav | tr -d ' ')
+          echo "OMNIA_BYTES=$bytes"
+          magic=$(head -c 4 /tmp/omnia.wav | od -An -t x1 | tr -d ' \n')
+          echo "OMNIA_MAGIC=$magic"
+          if [ "$code" != '200' ]; then
+            echo 'Non-200 body:'
+            head -c 1000 /tmp/omnia.wav || true
+            echo
+            exit 1
+          fi
+          test "$bytes" -gt 1000
+          test "$magic" = '52494646'
