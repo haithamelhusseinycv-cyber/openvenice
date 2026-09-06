@@ -1,0 +1,51 @@
+name: Railway Runtime V2 Smoke
+
+on:
+  push:
+    branches:
+      - railway-runtime-v2-20260906
+
+permissions:
+  contents: read
+
+jobs:
+  runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Build exact Docker image
+        run: docker build -t openvenice-runtime-v2 .
+
+      - name: Verify normal Railway port
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run -d --name ov-high \
+            -e PORT=4321 \
+            -e VOICETUT_API_KEY=test_token_123 \
+            -e VOICETUT_UPSTREAM=https://dummy.api.runpod.ai \
+            -p 4321:4321 openvenice-runtime-v2
+          sleep 2
+          docker logs ov-high
+          test "$(docker inspect -f '{{.State.Running}}' ov-high)" = "true"
+          test "$(curl -fsS http://127.0.0.1:4321/healthz)" = '{"ok":true}'
+
+      - name: Verify legacy low port
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run -d --name ov-low \
+            -e PORT=80 \
+            -e VOICETUT_API_KEY=test_token_123 \
+            -e VOICETUT_UPSTREAM=https://dummy.api.runpod.ai \
+            -p 4322:80 openvenice-runtime-v2
+          sleep 2
+          docker logs ov-low
+          test "$(docker inspect -f '{{.State.Running}}' ov-low)" = "true"
+          test "$(curl -fsS http://127.0.0.1:4322/healthz)" = '{"ok":true}'
+
+      - name: Verify root page
+        run: curl -fsSI http://127.0.0.1:4321/ | head
