@@ -1,0 +1,73 @@
+name: Production VoiceTut Smoke Test
+
+on:
+  push:
+    branches:
+      - prod-voicetut-smoke-20260906
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      OPENVENICE_URL: https://openvenice-production.up.railway.app
+    steps:
+      - name: Check VoiceTut health through Railway
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp=$(mktemp)
+          ok=0
+          for attempt in $(seq 1 18); do
+            code=$(curl -sS --max-time 20 -o "$tmp" -w '%{http_code}' "$OPENVENICE_URL/voicetut/health" || true)
+            if [ "$code" = "200" ]; then
+              python3 - "$tmp" <<'PY'
+          import json, sys
+          payload=json.load(open(sys.argv[1]))
+          assert payload.get('ok') is True, payload
+          assert payload.get('loaded') is True, payload
+          print('VoiceTut health OK; Omnia loaded')
+          PY
+              ok=1
+              break
+            fi
+            echo "Health attempt $attempt returned HTTP $code"
+            sleep 10
+          done
+          test "$ok" = "1"
+
+      - name: Generate Omnia WAV through production proxy
+        shell: bash
+        run: |
+          set -euo pipefail
+          headers=$(mktemp)
+          body=$(mktemp --suffix=.wav)
+          code=$(curl -sS --max-time 190 \
+            -D "$headers" \
+            -o "$body" \
+            -w '%{http_code}' \
+            -H 'Content-Type: application/json' \
+            -X POST "$OPENVENICE_URL/voicetut/v1/audio/speech" \
+            --data '{"model":"mohammedaly22/VoiceTut-TTS","voice":"Omnia","input":"OpenVenice production voice test.","language":"en","speed":0.95,"response_format":"wav"}')
+          echo "Speech HTTP $code"
+          test "$code" = "200"
+          ctype=$(awk 'BEGIN{IGNORECASE=1} /^content-type:/ {sub(/\r$/,"",$0); print substr($0,index($0,":")+2)}' "$headers" | tail -n1)
+          echo "Content-Type: $ctype"
+          case "$ctype" in
+            audio/*|application/octet-stream) ;;
+            *) echo 'Unexpected non-audio content type'; sed -n '1,20p' "$headers"; exit 1;;
+          esac
+          bytes=$(wc -c < "$body")
+          echo "Audio bytes: $bytes"
+          test "$bytes" -gt 1000
+          python3 - "$body" <<'PY'
+          import sys, wave
+          p=sys.argv[1]
+          with wave.open(p,'rb') as w:
+              print(f'WAV channels={w.getnchannels()} rate={w.getframerate()} frames={w.getnframes()}')
+              assert w.getnframes() > 0
+          PY
+          echo 'Production VoiceTut path verified end-to-end.'
