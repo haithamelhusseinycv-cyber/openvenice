@@ -1,0 +1,44 @@
+name: Production VoiceTut Fast Diagnostic
+
+on:
+  push:
+    branches:
+      - prod-voicetut-diagnose-20260906
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      HOST: openvenice-production.up.railway.app
+      URL: https://openvenice-production.up.railway.app
+    steps:
+      - name: Resolve production hostname
+        shell: bash
+        run: |
+          set -euxo pipefail
+          getent ahosts "$HOST" || true
+
+      - name: Probe app root
+        shell: bash
+        run: |
+          set -o pipefail
+          code=$(curl -sS --connect-timeout 5 --max-time 12 -o /tmp/root.out -D /tmp/root.headers -w '%{http_code}' "$URL/" || true)
+          echo "ROOT_HTTP=$code"
+          sed -n '1,20p' /tmp/root.headers || true
+          head -c 200 /tmp/root.out || true
+          echo
+
+      - name: Probe VoiceTut health
+        shell: bash
+        run: |
+          set -o pipefail
+          code=$(curl -sS --connect-timeout 5 --max-time 15 -o /tmp/health.out -D /tmp/health.headers -w '%{http_code}' "$URL/voicetut/health" || true)
+          echo "HEALTH_HTTP=$code"
+          sed -n '1,20p' /tmp/health.headers || true
+          cat /tmp/health.out || true
+          echo
+          test "$code" = "200"
