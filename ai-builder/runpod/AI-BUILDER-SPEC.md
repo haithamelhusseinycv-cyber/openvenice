@@ -20,7 +20,7 @@ Target resources:
 - Persistent storage size: start around 100 GB unless current pricing/capacity indicates a materially better tier
 - Restart behavior: the container start command must automatically relaunch OpenCode from the persistent checkout; no manual SSH step may be required after an ordinary pod restart
 
-The RunPod container filesystem is disposable across pod/container restarts. Therefore source checkout, OpenCode application state, installed persistent npm tools, agent rules, model cache, artifacts, and user projects must live under `/workspace`.
+The RunPod container filesystem is disposable across pod/container restarts. Therefore source checkout, OpenCode application state, installed persistent npm/Python/helper tools, agent rules, model cache, artifacts, and user projects must live under `/workspace`.
 
 ## Required environment secrets
 
@@ -46,7 +46,9 @@ Optional non-secret values:
 - OpenCode global config and global `AGENTS.md`
 - OpenCode session/database/auth/log data (`XDG_DATA_HOME`)
 - cache/state directories
-- npm prefix containing the OpenCode binary and pnpm
+- npm prefix containing the OpenCode binary and pnpm (`/workspace/tools/npm`)
+- Python helper virtual environment containing `uv` and helper packages (`/workspace/tools/python`)
+- persistent helper binaries such as `runpodctl` (`/workspace/tools/bin`)
 - Git global configuration (without embedding credential values)
 - Hugging Face/model cache
 
@@ -87,10 +89,11 @@ The exact API/CLI representation must follow the live RunPod tool schema. Do not
 1. refuses to run unless `/workspace` is a real mounted volume;
 2. requires the five runtime secrets without printing them;
 3. preserves an existing working tree and never hard-resets in-progress work;
-4. bootstraps persistent OpenCode/tools if missing;
-5. restores persistent runtime paths;
-6. verifies `builder-max` is discoverable;
-7. starts `opencode web --hostname 0.0.0.0 --port 4096` as PID 1/foreground process.
+4. validates the current container tool baseline, Node >=20, persistent OpenCode/pnpm/runpodctl, and the persistent Python venv before deciding bootstrap can be skipped;
+5. treats explicit OpenCode/toolchain upgrade flags as bootstrap triggers;
+6. restores persistent runtime paths;
+7. verifies `builder-max` is discoverable;
+8. starts `opencode web --hostname 0.0.0.0 --port 4096` as PID 1/foreground process.
 
 Using a foreground service is intentional: RunPod/Docker lifecycle and service health remain coupled. `scripts/start.sh` exists only for debugging/manual background startup.
 
@@ -112,9 +115,10 @@ Verify all of the following:
 10. GitHub authentication can read the repository and can perform a disposable write/push test within the token's authorized scope;
 11. Hugging Face authentication works;
 12. `runpodctl user` authenticates with the RunPod API key;
-13. Git, GitHub CLI, shell, Python, Node/npm/pnpm, Java/adb, Chromium, ffmpeg, and Pandoc are available;
-14. a trivial OpenCode task can read/write a disposable file under `/workspace/projects` and execute a shell command;
-15. OpenCode session/state data is created under `/workspace/state`, not container-local home directories.
+13. Git, Git LFS, GitHub CLI, shell, Python, Node >=20/npm/pnpm, CMake, ripgrep, rsync, SQLite, Java/adb, Chromium, ffmpeg, ImageMagick, and Pandoc are available;
+14. `/workspace/tools/python/bin/python` and `/workspace/tools/python/bin/uv` are executable;
+15. a trivial OpenCode task can read/write a disposable file under `/workspace/projects` and execute a shell command;
+16. OpenCode session/state data is created under `/workspace/state`, not container-local home directories.
 
 ## Full restart persistence test
 

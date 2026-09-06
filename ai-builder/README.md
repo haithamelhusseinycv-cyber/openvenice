@@ -44,7 +44,8 @@ The builder refuses production startup unless `/workspace` is a real mounted vol
 │   └── bootstrap-versions.txt
 ├── tools/
 │   ├── npm/                    # persistent OpenCode + pnpm
-│   └── bin/
+│   ├── python/                 # persistent Python helper venv + uv/packages
+│   └── bin/                    # persistent helper CLIs such as runpodctl
 ├── artifacts/
 ├── models/
 ├── logs/
@@ -99,6 +100,7 @@ Verification checks include:
 - required secrets are present without printing their values;
 - OpenCode and core development tools are available;
 - OpenCode XDG data/config/cache/state paths are rooted under `/workspace`;
+- persistent npm, Python, and helper-CLI tool storage is rooted under `/workspace/tools`;
 - `builder-max` is discoverable;
 - OpenCode Web responds locally with Basic Auth;
 - GitHub authentication works;

@@ -6,6 +6,7 @@ PROJECT_DIR="$WORKSPACE/projects/openvenice"
 STATE="$WORKSPACE/state"
 TOOLS="$WORKSPACE/tools"
 RUNTIME_ENV="$STATE/runtime-paths.env"
+PY_VENV="$TOOLS/python"
 
 log() { printf '[ai-builder-entrypoint] %s\n' "$*"; }
 
@@ -32,24 +33,48 @@ fi
 
 cd "$PROJECT_DIR"
 
-# RunPod documents that container-local storage may be recreated on restart.
-# Persistent OpenCode/Python/npm binaries survive under /workspace, but system
-# executables installed with apt do not. Detect the complete baseline rather
-# than assuming a previous bootstrap means the fresh container still has it.
+# RunPod container-local packages may disappear when the container is recreated.
+# Keep this command baseline aligned with bootstrap.sh COMMON_PACKAGES so a fresh
+# image cannot silently reuse stale persistent state with a partial toolchain.
 need_bootstrap=0
-for cmd in git node npm python3 curl jq gh java adb ffmpeg pandoc; do
+required_commands=(
+  git git-lfs node npm python3 curl wget jq gh
+  make cmake rg fdfind rsync sqlite3
+  java adb ffmpeg pandoc convert
+)
+for cmd in "${required_commands[@]}"; do
   command -v "$cmd" >/dev/null 2>&1 || need_bootstrap=1
 done
+
+# bootstrap.sh enforces Node >=20; startup must enforce the same invariant.
+node_major=0
+if command -v node >/dev/null 2>&1; then
+  node_major="$(node -p 'process.versions.node.split(`.`)[0]' 2>/dev/null || echo 0)"
+fi
+if ! [[ "$node_major" =~ ^[0-9]+$ ]] || (( node_major < 20 )); then
+  need_bootstrap=1
+fi
+
 if ! command -v chromium >/dev/null 2>&1 && ! command -v chromium-browser >/dev/null 2>&1; then
   need_bootstrap=1
 fi
+
+# Persistent tool state must be complete, not merely present in part.
 if [[ ! -x "$TOOLS/npm/bin/opencode" || ! -x "$TOOLS/npm/bin/pnpm" || ! -x "$TOOLS/bin/runpodctl" ]]; then
+  need_bootstrap=1
+fi
+if [[ ! -x "$PY_VENV/bin/python" || ! -x "$PY_VENV/bin/uv" ]]; then
   need_bootstrap=1
 fi
 if [[ ! -f "$STATE/bootstrap-versions.txt" || ! -f "$RUNTIME_ENV" ]]; then
   need_bootstrap=1
 fi
-if [[ "${AI_BUILDER_FORCE_BOOTSTRAP:-0}" == "1" ]]; then
+
+# Explicit maintenance requests must run bootstrap even when the current
+# installation is otherwise healthy.
+if [[ "${AI_BUILDER_FORCE_BOOTSTRAP:-0}" == "1" ||
+      "${AI_BUILDER_UPGRADE_OPENCODE:-0}" == "1" ||
+      "${AI_BUILDER_UPGRADE_TOOLCHAIN:-0}" == "1" ]]; then
   need_bootstrap=1
 fi
 
