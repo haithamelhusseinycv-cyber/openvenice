@@ -22,8 +22,6 @@ export function PlaygroundView() {
   const workflows = useWorkflowStore((s) => s.workflows)
   const createWorkflow = useWorkflowStore((s) => s.createWorkflow)
   const updateWorkflow = useWorkflowStore((s) => s.updateWorkflow)
-  const setActiveWorkflow = useWorkflowStore((s) => s.setActiveWorkflow)
-  const setActiveTab = useSettingsStore((s) => s.setActiveTab)
   const playgroundAgentModel = useSettingsStore((s) => s.playgroundAgentModel)
   const setPlaygroundAgentModel = useSettingsStore((s) => s.setPlaygroundAgentModel)
   const currentAgentModel = playgroundAgentModel || DEFAULT_AGENT_MODEL
@@ -68,7 +66,7 @@ export function PlaygroundView() {
       setSaveToast(`Updated "${linkedWorkflow.name}"`)
     } else {
       promoteToWorkflow()
-      setSaveToast('Saved to Workflows')
+      setSaveToast('Workflow saved')
     }
     setTimeout(() => setSaveToast(null), 2000)
   }
@@ -80,18 +78,6 @@ export function PlaygroundView() {
     setTimeout(() => setSaveToast(null), 2000)
     // keep editing the new copy
     loadWorkflow(id, draft.nodes, draft.edges)
-  }
-
-  const handleOpenInWorkflows = () => {
-    if (!canExport) return
-    let id = linkedWorkflow?.id
-    if (linkedWorkflow) {
-      updateWorkflow(linkedWorkflow.id, { nodes: draft.nodes, edges: draft.edges })
-    } else {
-      id = promoteToWorkflow()
-    }
-    if (id) setActiveWorkflow(id)
-    setActiveTab('workflows')
   }
 
   const handleLoadWorkflow = (id: string) => {
@@ -223,19 +209,6 @@ export function PlaygroundView() {
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="14" height="14" rx="2" /><path d="M7 21h12a2 2 0 002-2V9" /></svg>
               </button>
             )}
-            <button
-              onClick={handleOpenInWorkflows}
-              disabled={!canExport || isRunning}
-              className={cn(
-                'flex items-center gap-1.5 text-[13px] font-medium px-2.5 py-1 rounded-md transition-colors',
-                canExport && !isRunning ? 'bg-white text-black hover:bg-white/90' : 'bg-white/[0.05] text-white/30 cursor-not-allowed',
-              )}
-              title="Open in Workflows tab"
-            >
-              <span className="hidden md:inline">Open in Workflows</span>
-              <span className="md:hidden">Open</span>
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M7 17L17 7M7 7h10v10" /></svg>
-            </button>
           </div>
         </div>
         <div className="flex-1 min-h-0">
