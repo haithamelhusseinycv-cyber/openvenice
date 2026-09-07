@@ -81,8 +81,10 @@ A multi-stage Dockerfile is included; runtime is Nginx serving the built bundle 
 
 ```bash
 docker build -t openvenice .
-docker run -p 8080:80 openvenice
+docker run -p 8080:8080 openvenice
 ```
+
+VoiceTut is optional. Without runtime configuration, Noor falls back to Venice TTS. To enable the credential-isolating VoiceTut proxy, set both `VOICETUT_UPSTREAM` and `VOICETUT_API_KEY`; see `.env.example`.
 
 A `railway.json` is included for one-click Railway deploy.
 
