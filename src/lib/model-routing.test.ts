@@ -22,14 +22,12 @@ describe('preferred Qwen routing', () => {
     expect(ALLOWED_AGENT_MODELS.every((model) => ALLOWED_CHAT_MODEL_IDS.includes(model as typeof ALLOWED_CHAT_MODEL_IDS[number]))).toBe(true)
   })
 
-  it('falls back only for definitive model rejection, not ambiguous paid failures', () => {
+  it('falls back for busy/unavailable models but not auth, credit, abort, or partial output', () => {
+    expect(shouldUseModelFallback({ status: 503 })).toBe(true)
     expect(shouldUseModelFallback({ status: 429 })).toBe(true)
-    expect(shouldUseModelFallback({ status: 404 })).toBe(true)
-    expect(shouldUseModelFallback({ status: 408 })).toBe(false)
-    expect(shouldUseModelFallback({ status: 503 })).toBe(false)
     expect(shouldUseModelFallback({ status: 401 })).toBe(false)
     expect(shouldUseModelFallback({ status: 402 })).toBe(false)
-    expect(shouldUseModelFallback({ status: 429 }, { aborted: true })).toBe(false)
-    expect(shouldUseModelFallback({ status: 429 }, { hasOutput: true })).toBe(false)
+    expect(shouldUseModelFallback({ status: 503 }, { aborted: true })).toBe(false)
+    expect(shouldUseModelFallback({ status: 503 }, { hasOutput: true })).toBe(false)
   })
 })
