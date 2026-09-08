@@ -170,7 +170,9 @@ export function PlaygroundChat() {
         if (controller.signal.aborted || speechSessionRef.current !== session) return
         setVoiceStatus(`Speaking ${index + 1} of ${segments.length}`)
         await speakVoice(segments[index], locale, {
-          rate: Math.max(1, voiceRate),
+          // voice-store already clamps voiceRate to 0.5..2; honour slower rates
+          // instead of forcing fast mode to >= 1.0.
+          rate: voiceRate,
           signal: controller.signal,
         })
         completedSegments = index + 1
