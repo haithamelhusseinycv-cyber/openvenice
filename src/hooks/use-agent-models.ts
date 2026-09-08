@@ -28,7 +28,7 @@ export const ALLOWED_AGENT_MODELS = [
   'venice-uncensored-1-2',
   'venice-uncensored-role-play',
   'zai-org-glm-5-1',
-  'olafangensan-glm-4-7-flash-heretic',
+  'olafangensan-glm-4.7-flash-heretic',
 ] as const
 
 /*
