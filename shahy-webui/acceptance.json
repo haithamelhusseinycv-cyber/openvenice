@@ -1,0 +1,29 @@
+{
+  "project": "shahy-webui",
+  "version": "1.3.0",
+  "accepted": true,
+  "architecture": {
+    "primary": "kimi-k2.6",
+    "fallback": "deepseek-v4-flash",
+    "max_fallback_attempts": 1,
+    "nube_choice_independent": true
+  },
+  "tests": {
+    "deepseek_direct": "PASS",
+    "kimi_direct": "PASS",
+    "shahy_router": "PASS",
+    "eligible_fallback": "PASS",
+    "auth_no_fallback": "PASS",
+    "system_prompt_injection": "PASS",
+    "tool_call_passthrough": "PASS",
+    "document_context": "PASS",
+    "vision": "PASS",
+    "database_integrity": "PASS"
+  },
+  "security": {
+    "provider_key_committed": false,
+    "provider_key_rotation": "retained_under_hardened_permissions",
+    "data_directory_mode": "0700",
+    "database_and_backup_mode": "0600"
+  }
+}
