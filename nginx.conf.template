@@ -40,32 +40,7 @@ http {
       add_header Cache-Control "no-store" always;
     }
 
-    location = /voicetut/health {
-      limit_except GET { deny all; }
-      proxy_pass __VOICETUT_UPSTREAM__/ready;
-      proxy_ssl_server_name on;
-      proxy_set_header Host $proxy_host;
-      proxy_set_header Authorization "Bearer __RUNPOD_API_KEY__";
-      proxy_set_header X-Request-ID $request_id;
-      proxy_connect_timeout 10s;
-      proxy_read_timeout 190s;
-      add_header Cache-Control "no-store" always;
-    }
-
-    location /voicetut/ {
-      limit_except POST { deny all; }
-      proxy_pass __VOICETUT_UPSTREAM__/;
-      proxy_ssl_server_name on;
-      proxy_set_header Host $proxy_host;
-      proxy_set_header Authorization "Bearer __RUNPOD_API_KEY__";
-      proxy_set_header X-API-Key "__VOICETUT_API_KEY__";
-      proxy_set_header X-Request-ID $request_id;
-      proxy_request_buffering on;
-      proxy_buffering off;
-      proxy_connect_timeout 10s;
-      proxy_read_timeout 190s;
-      add_header Cache-Control "no-store" always;
-    }
+    include /tmp/openvenice-voicetut.conf;
 
     location = / { try_files /index.html =404; }
     location / { try_files $uri $uri/ /index.html; }

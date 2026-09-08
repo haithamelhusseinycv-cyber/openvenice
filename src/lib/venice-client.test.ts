@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { checkVoiceTutHealth, formatVeniceError, validateVeniceApiKey, VeniceAPIError, venice, veniceBlob, voiceTutBlob } from './venice-client'
 import { useAuthStore } from '../stores/auth-store'
+import { NOUR_TTS_FALLBACK_MODEL, NOUR_TTS_FALLBACK_VOICE } from './nour-character'
 
 function response(status: number, message = `HTTP ${status}`): Response {
   if (status >= 200 && status < 300) return new Response(null, { status })
@@ -207,6 +208,13 @@ describe('validateVeniceApiKey', () => {
     }
   })
 
+  it('does not retry paid blob POST requests', async () => {
+    fetchMock.mockResolvedValue(response(503, 'Temporarily unavailable'))
+
+    await expect(veniceBlob('/image/upscale', { image: 'abc', scale: 2 })).rejects.toMatchObject({ status: 503 })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('sends VoiceTut synthesis through the proxy without the Venice bearer key', async () => {
     fetchMock.mockResolvedValueOnce(new Response(new Uint8Array([82, 73, 70, 70]), {
       status: 200,
@@ -231,6 +239,109 @@ describe('validateVeniceApiKey', () => {
       language: 'en',
       response_format: 'wav',
     })
+  })
+
+  it('rejects a successful non-audio VoiceTut response', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('<!doctype html>', {
+      status: 200,
+      headers: { 'Content-Type': 'text/html' },
+    }))
+
+    await expect(voiceTutBlob({ input: 'Hello from Noor' })).rejects.toThrow('text/html instead of audio')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not dispatch VoiceTut synthesis when already aborted', async () => {
+    const controller = new AbortController()
+    controller.abort()
+
+    await expect(voiceTutBlob({ input: 'Hello from Noor' }, { signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('does not send a paid Venice fallback after VoiceTut synthesis was dispatched', async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, loaded: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }))
+      .mockRejectedValueOnce(new TypeError('Connection lost'))
+
+    await expect(veniceBlob('/audio/speech', {
+      model: 'voicetut',
+      input: 'Hello from Noor',
+    })).rejects.toThrow('Connection lost')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/voicetut/health')
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('/voicetut/v1/audio/speech')
+  })
+
+  it('uses Venice once when VoiceTut is unavailable before synthesis', async () => {
+    fetchMock
+      .mockResolvedValueOnce(response(503, 'VoiceTut disabled'))
+      .mockResolvedValueOnce(new Response(new Uint8Array([82, 73, 70, 70]), {
+        status: 200,
+        headers: { 'Content-Type': 'audio/mpeg' },
+      }))
+
+    await expect(veniceBlob('/audio/speech', {
+      model: 'voicetut',
+      input: 'Hello from Noor',
+    })).resolves.toBeInstanceOf(Blob)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/voicetut/health')
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('/venice/api/v1/audio/speech')
+    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({
+      headers: expect.any(Headers),
+    })
+    expect((fetchMock.mock.calls[1]?.[1]?.headers as Headers).get('Authorization')).toBe('Bearer sk-test')
+    expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toMatchObject({
+      model: NOUR_TTS_FALLBACK_MODEL,
+      voice: NOUR_TTS_FALLBACK_VOICE,
+    })
+  })
+
+  it('uses Venice when the safe VoiceTut health preflight times out', async () => {
+    vi.useFakeTimers()
+    fetchMock
+      .mockImplementationOnce((_input: RequestInfo | URL, init?: RequestInit) => waitForAbort(init?.signal))
+      .mockResolvedValueOnce(new Response(new Uint8Array([82, 73, 70, 70]), {
+        status: 200,
+        headers: { 'Content-Type': 'audio/mpeg' },
+      }))
+
+    const request = veniceBlob('/audio/speech', {
+      model: 'voicetut',
+      input: 'Hello from Noor',
+    })
+    await vi.advanceTimersByTimeAsync(8_000)
+
+    await expect(request).resolves.toBeInstanceOf(Blob)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('/venice/api/v1/audio/speech')
+  })
+
+  it('falls back once after a definitive VoiceTut rejection', async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, loaded: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ detail: 'Quota exceeded' }), {
+        status: 429,
+        headers: { 'Content-Type': 'application/json' },
+      }))
+      .mockResolvedValueOnce(new Response(new Uint8Array([82, 73, 70, 70]), {
+        status: 200,
+        headers: { 'Content-Type': 'audio/mpeg' },
+      }))
+
+    await expect(veniceBlob('/audio/speech', {
+      model: 'voicetut',
+      input: 'Hello from Noor',
+    })).resolves.toBeInstanceOf(Blob)
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(fetchMock.mock.calls[2]?.[0]).toBe('/venice/api/v1/audio/speech')
   })
 
   it('reports VoiceTut ready only when the proxy confirms the model is loaded', async () => {

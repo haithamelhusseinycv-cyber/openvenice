@@ -227,6 +227,18 @@ interface VoiceTutSpeechRequest {
   response_format?: string
 }
 
+class VoiceTutResponseError extends Error {
+  status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'VoiceTutResponseError'
+    this.status = status
+  }
+}
+
+const SAFE_VOICETUT_FALLBACK_STATUSES = new Set([400, 401, 403, 404, 405, 413, 415, 422, 429])
+
 function dispatchTtsProvider(provider: 'voicetut' | 'venice', reason?: string) {
   if (typeof window === 'undefined') return
   window.dispatchEvent(new CustomEvent('nour-tts-provider', { detail: { provider, reason } }))
@@ -236,6 +248,7 @@ export async function voiceTutBlob(body: VoiceTutSpeechRequest, init: { signal?:
   const settings = useVoiceStore.getState()
   const baseUrl = settings.voiceTutBaseUrl.trim().replace(/\/$/, '')
   if (!baseUrl) throw new Error('VoiceTut service URL is not configured')
+  if (init.signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError')
 
   const controller = new AbortController()
   // Allow a cold serverless worker to load the model. Nginx applies the same ceiling.
@@ -268,13 +281,12 @@ export async function voiceTutBlob(body: VoiceTutSpeechRequest, init: { signal?:
       } catch {
         /* keep HTTP status */
       }
-      throw new Error(`VoiceTut: ${detail}`)
+      throw new VoiceTutResponseError(`VoiceTut: ${detail}`, response.status)
     }
 
     const contentType = response.headers.get('content-type') || ''
-    if (contentType.includes('application/json')) {
-      const payload = await response.json() as { detail?: string; message?: string }
-      throw new Error(payload.detail || payload.message || 'VoiceTut returned JSON instead of audio')
+    if (!contentType.toLowerCase().startsWith('audio/')) {
+      throw new Error(`VoiceTut returned ${contentType || 'an unknown content type'} instead of audio`)
     }
 
     dispatchTtsProvider('voicetut')
@@ -294,16 +306,27 @@ export interface VoiceTutHealth {
 export async function checkVoiceTutHealth(init: { signal?: AbortSignal } = {}): Promise<VoiceTutHealth> {
   const baseUrl = useVoiceStore.getState().voiceTutBaseUrl.trim().replace(/\/$/, '')
   if (!baseUrl) throw new Error('VoiceTut service URL is not configured')
-  const response = await fetch(`${baseUrl}/health`, {
-    method: 'GET',
-    headers: { Accept: 'application/json' },
-    signal: init.signal,
-    cache: 'no-store',
-  })
-  if (!response.ok) throw new Error(`VoiceTut health check failed: HTTP ${response.status}`)
-  const payload = await response.json() as VoiceTutHealth
-  if (!payload.ok || !payload.loaded) throw new Error('VoiceTut is reachable but the Omnia model is not ready')
-  return payload
+  if (init.signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError')
+
+  const controller = new AbortController()
+  const timeout = globalThis.setTimeout(() => controller.abort(), 8_000)
+  const abortFromCaller = () => controller.abort()
+  init.signal?.addEventListener('abort', abortFromCaller, { once: true })
+  try {
+    const response = await fetch(`${baseUrl}/health`, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
+      cache: 'no-store',
+    })
+    if (!response.ok) throw new Error(`VoiceTut health check failed: HTTP ${response.status}`)
+    const payload = await response.json() as VoiceTutHealth
+    if (!payload.ok || !payload.loaded) throw new Error('VoiceTut is reachable but the Omnia model is not ready')
+    return payload
+  } finally {
+    globalThis.clearTimeout(timeout)
+    init.signal?.removeEventListener('abort', abortFromCaller)
+  }
 }
 
 export async function veniceBlob(path: string, body: object, init: { signal?: AbortSignal } = {}): Promise<Blob> {
@@ -312,13 +335,24 @@ export async function veniceBlob(path: string, body: object, init: { signal?: Ab
 
   if (path === '/audio/speech' && speechBody.model === 'voicetut') {
     const settings = useVoiceStore.getState()
+    let shouldUseVenice = true
     if (settings.ttsProvider === 'voicetut' && settings.voiceTutBaseUrl.trim()) {
       try {
-        return await voiceTutBlob(speechBody, init)
+        await checkVoiceTutHealth(init)
+        shouldUseVenice = false
       } catch (error) {
-        if (init.signal?.aborted || (error instanceof DOMException && error.name === 'AbortError')) throw error
+        if (init.signal?.aborted) throw error
         const reason = error instanceof Error ? error.message : 'VoiceTut unavailable'
         dispatchTtsProvider('venice', reason)
+      }
+
+      if (!shouldUseVenice) {
+        try {
+          return await voiceTutBlob(speechBody, init)
+        } catch (error) {
+          if (!(error instanceof VoiceTutResponseError) || !SAFE_VOICETUT_FALLBACK_STATUSES.has(error.status)) throw error
+          dispatchTtsProvider('venice', error.message)
+        }
       }
     } else {
       dispatchTtsProvider('venice', settings.ttsProvider === 'voicetut' ? 'VoiceTut service URL is not configured' : 'Venice selected')
@@ -338,7 +372,6 @@ export async function veniceBlob(path: string, body: object, init: { signal?: Ab
     method: 'POST',
     body: JSON.stringify(effectiveBody),
     signal: init.signal,
-    retries: 1,
   })
   const contentType = res.headers.get('content-type') || ''
   if (contentType.includes('application/json')) {
