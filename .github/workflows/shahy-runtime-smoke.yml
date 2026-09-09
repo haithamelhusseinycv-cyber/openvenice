@@ -1,0 +1,24 @@
+name: Shahy Runtime Smoke
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 5 * * *"
+
+concurrency:
+  group: shahy-runtime-smoke
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Verify Shahy public runtime
+        run: bash open-webui-workstation/scripts/verify_runtime.sh
