@@ -1,5 +1,5 @@
-provider: openai
-model: text-embedding-3-small
+provider: local_sentence_transformers
+model: sentence-transformers/all-MiniLM-L6-v2
 policy:
-  local_cpu_embedding_inference: discouraged
+  local_cpu_embedding_inference: enabled_for_single_user
   reindex_required_on_model_change: true

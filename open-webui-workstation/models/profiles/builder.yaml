@@ -1,8 +1,9 @@
 name: BUILDER
-model: anthropic/claude-opus-5
+model: zen.gpt-5.6-sol
 use_cases:
   - repository_work
   - implementation
   - debugging
   - ci_cd
 reasoning_effort: high
+tool_backend: open_terminal

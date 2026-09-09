@@ -5,10 +5,10 @@ sync_classes:
   - PROVIDER_DASHBOARD_MANUAL
   - SECRET_REQUIRED
 items:
-  - key: providers.openrouter.base_url
+  - key: providers.opencode_zen.base_url
     class: REPO_APPLIED_AUTOMATICALLY
-    source: config/providers/openrouter.yaml
-  - key: providers.openrouter.api_key
+    source: config/providers/opencode-zen.yaml
+  - key: providers.opencode_zen.api_key
     class: SECRET_REQUIRED
     source: server_environment
   - key: open_webui.global_system_prompt
@@ -35,9 +35,13 @@ items:
     class: OPEN_WEBUI_ADMIN_MANUAL
     source: security/control-matrix.md
     admin_ui_path: Admin > Users/Auth
-  - key: openai.api_key
+  - key: open_terminal.api_key
     class: SECRET_REQUIRED
-    source: server_environment
+    source: runpod_secret_and_open_webui_admin_connection
+  - key: open_terminal.url
+    class: OPEN_WEBUI_ADMIN_MANUAL
+    source: runtime/open-terminal/runpod.yaml
+    admin_ui_path: Admin > Integrations > Open Terminal
   - key: exa.api_key
     class: SECRET_REQUIRED
     source: server_environment

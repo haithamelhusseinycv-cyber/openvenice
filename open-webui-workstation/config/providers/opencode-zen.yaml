@@ -1,0 +1,22 @@
+provider: opencode_zen
+api_type: responses
+base_url: https://opencode.ai/zen/v1
+streaming: true
+native_function_calling: true
+prefix: zen
+security:
+  browser_key_exposure: forbidden
+  secrets_location: server_side_only
+  expose_full_catalog: false
+catalog_verification:
+  method: scripts/verify_models_catalog.sh
+  required_model_roles:
+    economy: gpt-5.6-luna
+    default: gpt-5.6-sol
+    maximum_reasoning: gpt-6-astra
+    verifier: grok-4.6
+known_compatibility:
+  plain_responses_generation: tested
+  open_webui_builtin_tool_loop: blocked
+  durable_tool_path: open_terminal
+

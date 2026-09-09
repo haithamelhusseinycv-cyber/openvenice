@@ -2,6 +2,10 @@
 
 This directory is the canonical, reproducible package for configuring and operating the Open WebUI workstation.
 
+`runtime/live-state.yaml` is the authority for what has actually been verified
+in production. Other files may describe a target or planned configuration and
+must not be interpreted as deployment evidence.
+
 ## Scope
 - Repository-first workstation configuration and operational policy.
 - Modular prompt layers (global core, behavior, mode, model overlay).
@@ -22,3 +26,11 @@ The existing healthy Open WebUI runtime must be preserved. Configuration is appl
 
 ## Implementation Phases
 See `acceptance/requirements-matrix.yaml` and `acceptance/acceptance-suite.md`.
+
+## Current deployment priority
+
+Deploy the isolated Open Terminal service specified in
+`runtime/open-terminal/runpod.yaml`, connect it through Open WebUI's admin-side
+Open Terminal integration, and complete the restart/persistence acceptance
+test. This replaces the failing built-in Zen Responses tool loop without
+weakening the Open WebUI container boundary.

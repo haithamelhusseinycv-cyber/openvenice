@@ -1,5 +1,6 @@
 name: MULTIMODAL
-model: google/gemini-3.8-flash
+model: null
+status: PENDING_PROVIDER_WITH_VERIFIED_VISION
 use_cases:
   - image_audio_video
   - large_multimodal_files

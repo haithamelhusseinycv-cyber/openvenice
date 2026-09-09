@@ -1,0 +1,85 @@
+observed_at: "2026-09-09T01:05:00+03:00"
+environment: production
+
+products:
+  openvenice:
+    identity: Noor
+    relationship: separate_product
+    deployment: Railway
+  open_webui:
+    identity: Shahy
+    relationship: separate_product
+    deployment: RunPod
+
+open_webui:
+  version: 0.11.3
+  public_url: https://8rhrqskupcsqvq-8080.proxy.runpod.net
+  health: verified
+  onboarding_complete: true
+  public_signup_enabled: false
+  persistence:
+    mount: /app/backend/data
+    network_volume: open-webui-v0113-data
+
+model_gateway:
+  provider: OpenCode Zen
+  api_type: responses
+  base_url: https://opencode.ai/zen/v1
+  auth: bearer
+  prefix: zen
+  server_connection_verified: true
+  models:
+    default: zen.gpt-5.6-sol
+    economy: zen.gpt-5.6-luna
+    maximum_reasoning: zen.gpt-6-astra
+    independent_verifier: zen.grok-4.6
+  live_generation_tests:
+    zen.gpt-5.6-luna: passed
+    shahy_on_zen.gpt-5.6-sol: passed
+
+shahy_profile:
+  id: shahy
+  base_model: zen.gpt-5.6-sol
+  function_calling: native
+  external_task_model: zen.gpt-5.6-luna
+  context_compaction_model: zen.gpt-5.6-luna
+
+research:
+  backend: ddgs
+  enabled: true
+  confirmation_required: false
+  languages: [en, ar]
+  ssl_verification: true
+  result_count: 5
+  timeout_seconds: 30
+
+rag:
+  splitter: token_tiktoken
+  chunk_size: 2000
+  chunk_overlap: 200
+  chunk_min_size_target: 1000
+  top_k: 15
+  hybrid_search: true
+  embedding_model: sentence-transformers/all-MiniLM-L6-v2
+
+verified_limitations:
+  - id: zen_responses_builtin_tool_loop
+    status: blocked
+    evidence: >-
+      Enabling Open WebUI Code Interpreter or Web Search in chat causes a blank
+      assistant message after the tool call with the current OpenCode Zen
+      Responses connection. Plain model generation remains healthy.
+    resolution: deploy_and_connect_open_terminal
+  - id: default_feature_activation
+    status: blocked
+    evidence: >-
+      Web Search and Code Interpreter are selected as model defaults but new
+      chats still present both integrations as disabled.
+    resolution: verify_after_open_webui_upgrade
+
+runtime_services:
+  open_terminal:
+    status: not_deployed
+    deployment_spec: runtime/open-terminal/runpod.yaml
+    blocker: runpod_funding_and_live_resource_creation
+
