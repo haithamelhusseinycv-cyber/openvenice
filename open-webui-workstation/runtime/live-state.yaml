@@ -83,3 +83,26 @@ runtime_services:
     deployment_spec: runtime/open-terminal/runpod.yaml
     blocker: runpod_funding_and_live_resource_creation
 
+runpod_resources:
+  active_pods:
+    - name: open-webui-v0-11-3-cpu-20260909
+      id: 8rhrqskupcsqvq
+      compute: cpu3g
+      displayed_cost_per_hour_usd: 0.08
+  reusable_volumes:
+    - name: ai-builder-workspace
+      id: 5imqvn62f9
+      capacity_gb: 100
+      monthly_cost_usd: 7.00
+      intended_use: open_terminal_workspace
+  protected_volumes:
+    - name: open-webui-v0113-data
+      id: i6b6qi97gx
+      capacity_gb: 20
+      monthly_cost_usd: 1.40
+      intended_use: open_webui_database_and_state
+  serverless_endpoints:
+    - name: noor-omnia-tts
+      id: lqmsj9b6yk6app
+      relationship: openvenice_not_shahy
+      preserve: true

@@ -7,7 +7,12 @@ image: ghcr.io/open-webui/open-terminal@sha256:8d3a93d382c922c37352984302ebb8ee7
 container:
   http_ports: [8000]
   volume_mount: /home/user
-  minimum_volume_gb: 20
+  network_volume:
+    name: ai-builder-workspace
+    id: 5imqvn62f9
+    capacity_gb: 100
+    location: US-KS-2
+    reuse_existing: true
   restart_policy: always
 
 environment:
@@ -45,4 +50,3 @@ acceptance:
   - shahy_executes_harmless_command
   - shahy_creates_and_reads_workspace_file
   - terminal_is_not_available_to_unapproved_users
-

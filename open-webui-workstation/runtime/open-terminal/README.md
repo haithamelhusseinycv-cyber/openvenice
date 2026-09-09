@@ -8,7 +8,9 @@ WebUI container and must not share Open WebUI's data volume.
 
 - Create a separate CPU RunPod named `shahy-open-terminal`.
 - Use the digest-pinned image in `runpod.yaml`.
-- Attach a persistent volume at `/home/user`.
+- Attach the existing `ai-builder-workspace` network volume (`5imqvn62f9`) at
+  `/home/user`. Reusing it avoids another storage charge and activates the
+  workspace that was already provisioned for this purpose.
 - expose only HTTP port `8000` through RunPod's authenticated HTTPS proxy.
 - create a high-entropy `OPEN_TERMINAL_API_KEY` as a RunPod secret; never commit
   it, put it in a chat, or store it in a browser-side personal connection.
@@ -47,4 +49,3 @@ Then select the System terminal in a saved Shahy chat and ask it to:
 
 The first three checks prove the model/tool loop. The restart check proves
 persistence. Do not treat the service as operational until all four pass.
-
