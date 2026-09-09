@@ -36,6 +36,9 @@ jobs:
       - name: Test web application
         run: npm run test:run
 
+      - name: Test Shahy routing and security behavior
+        run: python3 -m unittest shahy-webui/test_shahy_pipe.py
+
       - name: Test VoiceTut security layer
         run: python3 -m unittest discover -s services/voicetut-api -p 'test_*.py'
 
