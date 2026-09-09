@@ -1,13 +1,17 @@
 {
-  "visible_profiles": ["FAST", "SMART", "MAX", "BUILDER", "COUNCIL"],
+  "gateway": "OpenCode Zen",
+  "api_type": "responses",
+  "visible_profiles": ["Shahy"],
   "curated_allowlist": [
-    "openai/gpt-5.6-luna",
-    "openai/gpt-5.6-sol",
-    "openai/gpt-5.6-sol-pro",
-    "anthropic/claude-opus-5",
-    "anthropic/claude-fable-5.1",
-    "google/gemini-3.8-flash",
-    "x-ai/grok-4.6"
+    "zen.gpt-5.6-luna",
+    "zen.gpt-5.6-sol",
+    "zen.gpt-6-astra",
+    "zen.grok-4.6"
   ],
-  "notes": "Verify live catalog before runtime apply; substitute strongest practical equivalent if unavailable."
+  "default_profile": {
+    "id": "shahy",
+    "base_model": "zen.gpt-5.6-sol"
+  },
+  "verified_at": "2026-09-09T01:05:00+03:00",
+  "notes": "Only models verified in the live Zen catalog are exposed. Astra is reserved for justified maximum-reasoning work because of its materially higher cost."
 }

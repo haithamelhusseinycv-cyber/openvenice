@@ -1,0 +1,52 @@
+name: shahy-open-terminal
+purpose: isolated_execution_service
+
+# Official Open Terminal 0.12.5 multi-architecture image, pinned by OCI digest.
+image: ghcr.io/open-webui/open-terminal@sha256:8d3a93d382c922c37352984302ebb8ee729cb01efd4ae8b221d9f881efb4b5c6
+
+container:
+  http_ports: [8000]
+  volume_mount: /home/user
+  network_volume:
+    name: ai-builder-workspace
+    id: 5imqvn62f9
+    capacity_gb: 100
+    location: US-KS-2
+    reuse_existing: true
+  restart_policy: always
+
+environment:
+  OPEN_TERMINAL_API_KEY:
+    source: runpod_secret
+    required: true
+  OPEN_TERMINAL_CORS_ALLOWED_ORIGINS:
+    value: https://8rhrqskupcsqvq-8080.proxy.runpod.net
+  OPEN_TERMINAL_FILE_BROWSER_ROOT:
+    value: home
+  OPEN_TERMINAL_EXECUTE_TIMEOUT:
+    value: "60"
+  OPEN_TERMINAL_LOG_FLUSH_INTERVAL:
+    value: "1"
+
+security:
+  api_key_required: true
+  expose_only_ports: [8000]
+  public_shell_without_auth: false
+  docker_socket_mount: false
+  share_open_webui_data_volume: false
+  open_webui_connection_scope: admin_server_side
+  chat_uploads: filesystem
+
+health:
+  path: /health
+  expected_status: 200
+  smoke_script: scripts/verify_open_terminal.sh
+
+acceptance:
+  - health_endpoint_returns_ok
+  - unauthorized_request_is_rejected
+  - openapi_schema_is_available_with_bearer_key
+  - workspace_file_survives_restart
+  - shahy_executes_harmless_command
+  - shahy_creates_and_reads_workspace_file
+  - terminal_is_not_available_to_unapproved_users

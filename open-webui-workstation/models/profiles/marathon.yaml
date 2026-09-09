@@ -1,7 +1,8 @@
 name: MARATHON
-model: anthropic/claude-fable-5.1
+model: zen.gpt-6-astra
 use_cases:
   - long_horizon_autonomy
   - major_refactors
   - extensive_research
 reasoning_effort: high
+budget_gate: required

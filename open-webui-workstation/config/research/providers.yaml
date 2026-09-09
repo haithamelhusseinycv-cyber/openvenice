@@ -1,13 +1,20 @@
-primary_provider: exa
-fallback_providers:
-  - tavily
-  - duckduckgo
+primary_provider: ddgs
+fallback_providers: []
 agentic_search: true
-result_limit: 10
+confirmation_required: false
+languages: [en, ar]
+result_limit: 5
+loading_timeout_seconds: 30
+ssl_verification: true
 tools:
   search_web: enabled
   fetch_url: enabled
-  javascript_page_loader: playwright
+  javascript_page_loader: pending
 policy:
   auto_search_every_prompt: false
   serious_research_min_sources: 2
+known_limitations:
+  - OpenCode Zen Responses currently returns a blank assistant message after
+    Open WebUI's built-in web-search tool call.
+  - Route durable research and browser-assisted work through Open Terminal until
+    the native tool loop passes acceptance.
