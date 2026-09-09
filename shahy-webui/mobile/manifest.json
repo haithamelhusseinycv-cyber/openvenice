@@ -1,25 +1,16 @@
 {
-  "id": "https://c7togjwbwnqjqi-8080.proxy.runpod.net/",
+  "id": "https://8rhrqskupcsqvq-8080.proxy.runpod.net/",
   "name": "Shahy",
   "short_name": "Shahy",
   "description": "Shahy — your private institutional AI workstation.",
-  "start_url": "https://c7togjwbwnqjqi-8080.proxy.runpod.net/",
-  "scope": "https://c7togjwbwnqjqi-8080.proxy.runpod.net/",
+  "start_url": "https://8rhrqskupcsqvq-8080.proxy.runpod.net/",
+  "scope": "https://8rhrqskupcsqvq-8080.proxy.runpod.net/",
   "display": "standalone",
-  "display_override": [
-    "window-controls-overlay",
-    "standalone",
-    "minimal-ui"
-  ],
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "orientation": "any",
   "background_color": "#FFFFFF",
   "theme_color": "#1677FF",
-  "categories": [
-    "productivity",
-    "business",
-    "finance",
-    "utilities"
-  ],
+  "categories": ["productivity", "business", "finance", "utilities"],
   "lang": "en-US",
   "dir": "auto",
   "icons": [
@@ -35,40 +26,22 @@
       "name": "New Shahy Chat",
       "short_name": "New Chat",
       "description": "Start a new conversation with Shahy",
-      "url": "https://c7togjwbwnqjqi-8080.proxy.runpod.net/",
-      "icons": [
-        {
-          "src": "https://raw.githubusercontent.com/haithamelhusseinycv-cyber/openvenice/master/shahy-webui/mobile/shahy-icon.svg?v=3",
-          "sizes": "any",
-          "type": "image/svg+xml"
-        }
-      ]
+      "url": "https://8rhrqskupcsqvq-8080.proxy.runpod.net/",
+      "icons": [{"src": "https://raw.githubusercontent.com/haithamelhusseinycv-cyber/openvenice/master/shahy-webui/mobile/shahy-icon.svg?v=3", "sizes": "any", "type": "image/svg+xml"}]
     },
     {
       "name": "Documents",
       "short_name": "Documents",
       "description": "Open the Shahy workspace for files and knowledge",
-      "url": "https://c7togjwbwnqjqi-8080.proxy.runpod.net/workspace",
-      "icons": [
-        {
-          "src": "https://raw.githubusercontent.com/haithamelhusseinycv-cyber/openvenice/master/shahy-webui/mobile/shahy-icon.svg?v=3",
-          "sizes": "any",
-          "type": "image/svg+xml"
-        }
-      ]
+      "url": "https://8rhrqskupcsqvq-8080.proxy.runpod.net/workspace",
+      "icons": [{"src": "https://raw.githubusercontent.com/haithamelhusseinycv-cyber/openvenice/master/shahy-webui/mobile/shahy-icon.svg?v=3", "sizes": "any", "type": "image/svg+xml"}]
     },
     {
       "name": "Voice Chat",
       "short_name": "Voice",
       "description": "Open Shahy for a voice conversation",
-      "url": "https://c7togjwbwnqjqi-8080.proxy.runpod.net/",
-      "icons": [
-        {
-          "src": "https://raw.githubusercontent.com/haithamelhusseinycv-cyber/openvenice/master/shahy-webui/mobile/shahy-icon.svg?v=3",
-          "sizes": "any",
-          "type": "image/svg+xml"
-        }
-      ]
+      "url": "https://8rhrqskupcsqvq-8080.proxy.runpod.net/",
+      "icons": [{"src": "https://raw.githubusercontent.com/haithamelhusseinycv-cyber/openvenice/master/shahy-webui/mobile/shahy-icon.svg?v=3", "sizes": "any", "type": "image/svg+xml"}]
     }
   ]
 }
