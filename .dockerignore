@@ -1,0 +1,19 @@
+.git
+.github
+.agents
+.codex
+.env*
+!.env.example
+node_modules
+dist
+coverage
+*.log
+
+# Separate products and deployment packages in this monorepo.
+ai-builder
+open-webui-workstation
+shahy-webui
+android-face-fusion-custom
+android-openvenice-custom
+docs
+assets
