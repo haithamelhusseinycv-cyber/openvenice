@@ -96,7 +96,8 @@ requirements:
     artifact: tools/research/workflow.md
     runtime_setting: config/research/providers.yaml
     validation: provider connectivity tests
-    status: MANUAL_ACTION_REQUIRED
+    status: IMPLEMENTED
+    notes: Connector and Tavily fallback are in-repo. Runtime still needs EXA_API_KEY and/or TAVILY_API_KEY on the host.
   - id: R017
     module: tools
     requirement: native function calling mode
@@ -156,7 +157,8 @@ requirements:
     requirement: microsoft graph integrations
     artifact: tools/productivity/microsoft-graph.md
     validation: oauth test
-    status: MANUAL_ACTION_REQUIRED
+    status: IMPLEMENTED
+    notes: Read-only Graph connector is in-repo. Runtime still needs a delegated MICROSOFT_GRAPH_TOKEN.
   - id: R027
     module: productivity
     requirement: github integration

@@ -86,6 +86,8 @@ docker run -p 8080:8080 openvenice
 
 VoiceTut is optional. Without runtime configuration, Noor falls back to Venice TTS. To enable the credential-isolating VoiceTut proxy, set both `VOICETUT_UPSTREAM` and `VOICETUT_API_KEY`; see `.env.example`.
 
+Shahy’s GitHub, Microsoft Graph, and research tools are also optional host-side proxies (`/connectors/*`). Set `GITHUB_CONNECTOR_TOKEN`, `MICROSOFT_GRAPH_TOKEN`, `EXA_API_KEY`, and/or `TAVILY_API_KEY` on the host. Tokens are never placed in `VITE_*` variables. See `docs/AGENT_CONNECTORS.md`.
+
 A `railway.json` is included for one-click Railway deploy.
 
 ### 3. Run a tiny proxy yourself

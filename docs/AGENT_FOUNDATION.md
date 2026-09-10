@@ -40,6 +40,16 @@ The HTTP transport is abstracted so the current browser `fetch` implementation c
 
 The existing custom FaceFusion code is native Android code, so this foundation defines the transport-neutral bridge contract first. The Android build will provide an implementation backed by a signature-protected service/content-URI bridge rather than UI tap automation.
 
+## GitHub / Microsoft Graph / Research connectors
+
+These are same-origin host proxies, not browser secrets:
+
+- `src/connectors/github/github-connector.ts` — GitHub REST via `/connectors/github`
+- `src/connectors/microsoft-graph/graph-connector.ts` — Graph v1.0 via `/connectors/graph`
+- `src/connectors/research/research-connector.ts` — Exa primary, Tavily fallback, public-https URL extraction only
+
+The browser calls `/connectors/status` and the per-provider prefixes. Nginx (or the Vite dev proxy) injects the server-side token and strips incoming `Authorization` / `Cookie` headers so a client cannot override the host credential.
+
 ## Next implementation stages
 
 1. Qwen OpenAI-compatible provider and provider router.
