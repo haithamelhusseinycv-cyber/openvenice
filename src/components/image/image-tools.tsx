@@ -8,7 +8,7 @@ import { Label, TextArea, PrimaryButton, ErrorText, EmptyState } from '../ui/sha
 import { TaskProgress } from '../ui/task-progress'
 import { cn } from '../../lib/utils'
 import { toast } from '../../stores/toast-store'
-import { buildSwapPrompt, UNDRESS_PROMPT, type SwapKind, type SwapPerson } from '../../lib/tool-prompts'
+import { buildDualSwapPrompt, buildSwapPrompt, buildUndressPrompt, type SwapKind, type SwapPerson } from '../../lib/tool-prompts'
 import { prepareImage, formatBytes, type ImagePreparationStage, type PreparedImage } from '../../lib/image-input'
 import { useModels } from '../../hooks/use-models'
 import { formatVeniceError } from '../../lib/venice-client'
@@ -166,9 +166,6 @@ export function ImageTools() {
     }
   }
 
-  const dualSwapPrompt = (maleKind: SwapKind, femaleKind: SwapKind) =>
-    `Reference 1 is the target scene and composition. Reference 2 maps only to the male subject and requires a ${maleKind} swap. Reference 3 maps only to the female subject and requires a ${femaleKind} swap. Preserve the target pose, framing, camera angle, lighting, background, interaction and all non-identity details. Keep both identities separate; never blend, exchange or cross-map them.`
-
   const aspectRatio = sceneSize || 'auto'
 
   const handleProcess = () => {
@@ -196,7 +193,7 @@ export function ImageTools() {
       swapMutation.mutate(
         {
           images: dualSwap && secondIdImage ? [imageData, idImage, secondIdImage] : [imageData, idImage],
-          prompt: dualSwap ? dualSwapPrompt(swapKind, secondSwapKind) : buildSwapPrompt(swapKind, swapPerson),
+          prompt: dualSwap ? buildDualSwapPrompt(swapKind, secondSwapKind) : buildSwapPrompt(swapKind, swapPerson),
           modelId: editModel,
           aspect_ratio: aspectRatio,
           safe_mode: false,
@@ -210,7 +207,7 @@ export function ImageTools() {
       undressMutation.mutate(
         {
           images: [imageData],
-          prompt: UNDRESS_PROMPT,
+          prompt: buildUndressPrompt(swapPerson),
           modelId: editModel,
           aspect_ratio: aspectRatio,
           safe_mode: false,

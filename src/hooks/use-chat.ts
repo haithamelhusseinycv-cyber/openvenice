@@ -2,7 +2,8 @@ import { useCallback, useRef } from 'react'
 import { venice } from '../lib/venice-client'
 import { parseSSEStream } from '../lib/stream'
 import { useChatStore } from '../stores/chat-store'
-import { useProviderStore } from '../stores/provider-store'
+import { resolveChatProvider, useProviderStore } from '../stores/provider-store'
+import { gatewayBaseUrl } from '../lib/ai-gateway'
 import { useAgentStatusStore } from '../stores/agent-status-store'
 import { useVoiceStore } from '../stores/voice-store'
 import { lockChatSystemPrompt } from '../lib/defaults'
@@ -56,9 +57,9 @@ export function useChat() {
       }
 
       const provider = useProviderStore.getState()
-      if (provider.chatProvider === 'qwen') {
+      if (resolveChatProvider(provider) === 'qwen') {
         await runQwenAgent({
-          config: { baseUrl: provider.qwenBaseUrl, apiKey: provider.qwenApiKey },
+          config: { baseUrl: gatewayBaseUrl(provider.qwenBaseUrl), apiKey: provider.qwenApiKey },
           model,
           messages,
           temperature,
