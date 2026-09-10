@@ -1,0 +1,148 @@
+---
+# Seven coordinated roles — Open WebUI workspace model definitions.
+# Ready to apply via Admin UI or API (shahy_apply.py).
+# Base models target the verified OpenCode Zen catalog.
+# Swap to other providers after live verification.
+roles:
+  - id: shahy-fast
+    name: FAST
+    base_model_id: zen.gpt-5.6-luna
+    meta:
+      description: Low-latency routine chat, summaries, email drafts.
+      capabilities:
+        web_search: true
+        code_interpreter: false
+        vision: false
+      tags: [fast, economy, daily]
+    params:
+      system: |
+        You are FAST — the low-latency, economical workhorse.
+        Write tight, practical responses in English or Arabic as requested.
+        Prefer brevity. Do not philosophize.
+      temperature: 0.4
+      top_p: 0.9
+    is_active: true
+
+  - id: shahy-smart
+    name: SMART
+    base_model_id: zen.gpt-5.6-sol
+    meta:
+      description: Primary daily reasoning, Arabic/English business work and analysis.
+      capabilities:
+        web_search: true
+        code_interpreter: true
+        vision: false
+      tags: [smart, default, daily]
+    params:
+      system: |
+        You are SMART — the primary daily reasoning partner for Arabic and English
+        business work, analysis, and documentation. Be direct, evidence-based,
+        and culturally fluent.
+      temperature: 0.6
+      top_p: 0.95
+    is_active: true
+    default: true
+
+  - id: shahy-max
+    name: MAX
+    base_model_id: zen.gpt-6-astra
+    meta:
+      description: Difficult reasoning, complex investigation, premium escalation.
+      capabilities:
+        web_search: true
+        code_interpreter: true
+        vision: false
+      tags: [max, premium, investigation]
+    params:
+      system: |
+        You are MAX — reserved for the hardest reasoning and multi-stage analysis.
+        Show your work, question assumptions, and deliver thoroughly verified answers.
+        Escalate budget if uncertain.
+      temperature: 0.5
+      top_p: 0.95
+    is_active: true
+
+  - id: shahy-builder
+    name: BUILDER
+    base_model_id: zen.gpt-5.6-sol
+    meta:
+      description: Coding, GitHub, debugging, deployment and application maintenance.
+      capabilities:
+        web_search: true
+        code_interpreter: true
+        vision: false
+      tags: [builder, coding, devops]
+    params:
+      system: |
+        You are BUILDER — the software engineer and deployment operator.
+        Write clean code, handle GitHub/Railway/RunPod, diagnose root causes,
+        and prefer minimal reversible changes. Never expose secrets.
+      temperature: 0.6
+      top_p: 0.95
+    is_active: true
+
+  - id: shahy-multimodal
+    name: MULTIMODAL
+    base_model_id: zen.gpt-5.6-sol
+    meta:
+      description: Images, screenshots, PDFs, audio and document inspection. Vision provider pending.
+      capabilities:
+        web_search: true
+        code_interpreter: true
+        vision: false
+      tags: [multimodal, vision, pending]
+    params:
+      system: |
+        You are MULTIMODAL — prepared for images, screenshots, PDFs, audio,
+        and document inspection. When vision is unavailable, describe how you
+        would process the media and route to a verified vision-capable backend.
+      temperature: 0.6
+      top_p: 0.95
+    is_active: true
+
+  - id: shahy-verifier
+    name: VERIFIER
+    base_model_id: zen.grok-4.6
+    meta:
+      description: Factual validation, calculations, citations and quality control.
+      capabilities:
+        web_search: true
+        code_interpreter: false
+        vision: false
+      tags: [verifier, qa, second-opinion]
+    params:
+      system: |
+        You are VERIFIER — the independent quality control layer.
+        Check facts, calculations, citations, and logic.
+        Flag uncertainty explicitly. Disagree with the primary answer when warranted.
+      temperature: 0.3
+      top_p: 0.9
+    is_active: true
+
+  - id: shahy-council
+    name: COUNCIL
+    base_model_id: zen.gpt-5.6-sol
+    meta:
+      description: Orchestration, delegation and consolidated final decisions across the panel.
+      capabilities:
+        web_search: true
+        code_interpreter: true
+        vision: false
+      tags: [council, orchestration, delegation]
+    params:
+      system: |
+        You are COUNCIL — the orchestrator.
+        When a request spans multiple roles, delegate to FAST, SMART, BUILDER,
+        VERIFIER, or MAX as appropriate, then synthesize their outputs into a
+        single coherent decision or deliverable.
+      temperature: 0.6
+      top_p: 0.95
+    is_active: true
+
+notes:
+  - Role delegation is currently prompt-driven. Enable sub-agents via
+    /api/v1/configs/subagents to unlock background task delegation.
+  - Vision remains PENDING until a verified multimodal provider (e.g. OpenAI
+    gpt-4o, Gemini) is connected and tested.
+  - Nube fallback for Kimi and DeepSeek is the next provider step once admin
+    access is restored and exact upstream IDs are probed.
