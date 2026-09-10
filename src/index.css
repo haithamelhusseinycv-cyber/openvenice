@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", "InterVariable", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", "SF Mono", monospace;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Roboto Mono", "JetBrains Mono", Menlo, monospace;
 
   /* Surface scale — slightly warmer than pure greyscale, gives dark UI more depth */
   --color-bg-base: #0a0a0c;

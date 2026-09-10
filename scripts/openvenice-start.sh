@@ -88,6 +88,55 @@ else
     /etc/nginx/nginx.voicetut.conf.template > /tmp/openvenice-voicetut.conf
 fi
 
+# --- Open-model AI gateway (/ai/v1) -------------------------------------------
+# QWEN_UPSTREAM is an HTTPS OpenAI-compatible root (e.g. https://host/v1) and
+# QWEN_API_KEY is its private token. Both are injected here and never shipped to
+# the browser. When either is missing the gateway fails closed with HTTP 503 so
+# the frontend can fall back to its configured external provider.
+RAW_AI_KEY=${QWEN_API_KEY:-}
+AI_UPSTREAM_VALUE=${QWEN_UPSTREAM:-}
+
+if [ -z "$RAW_AI_KEY" ] && [ -z "$AI_UPSTREAM_VALUE" ]; then
+  printf '%s\n' \
+    'location = /ai/v1/health { limit_except GET { deny all; } default_type application/json; return 503 '\''{"ok":false,"gateway":"ai-v1","configured":false}'\''; add_header Cache-Control "no-store" always; }' \
+    'location /ai/v1/ { default_type application/json; return 503 '\''{"error":"AI gateway is disabled"}'\''; add_header Cache-Control "no-store" always; }' \
+    > /tmp/openvenice-ai.conf
+  echo 'AI gateway disabled; chat uses the configured external provider' >&2
+else
+  if [ -z "$RAW_AI_KEY" ] || [ -z "$AI_UPSTREAM_VALUE" ]; then
+    echo 'QWEN_UPSTREAM and QWEN_API_KEY must both be set to enable the AI gateway' >&2
+    exit 1
+  fi
+
+  AI_KEY=$(normalize_credential "$RAW_AI_KEY")
+  AI_KEY=${AI_KEY#QWEN_API_KEY=}
+  if [ -z "$AI_KEY" ] || printf '%s' "$AI_KEY" | LC_ALL=C grep -q '[^!-~]'; then
+    echo 'QWEN_API_KEY must resolve to a non-empty printable credential without whitespace or control characters' >&2
+    exit 1
+  fi
+  SED_AI_KEY=$(escape_for_nginx_and_sed "$AI_KEY")
+
+  case "$AI_UPSTREAM_VALUE" in
+    https://*) ;;
+    *)
+      echo 'QWEN_UPSTREAM must be an HTTPS OpenAI-compatible root such as https://host.example/v1' >&2
+      exit 1
+      ;;
+  esac
+  case "$AI_UPSTREAM_VALUE" in
+    *' '*|*'	'*)
+      echo 'QWEN_UPSTREAM must not contain whitespace' >&2
+      exit 1
+      ;;
+  esac
+  AI_UPSTREAM_VALUE=$(printf '%s' "$AI_UPSTREAM_VALUE" | sed 's:/*$::')
+
+  sed -e "s|__AI_UPSTREAM__|$AI_UPSTREAM_VALUE|g" \
+      -e "s|__AI_API_KEY__|$SED_AI_KEY|g" \
+    /etc/nginx/nginx.ai.conf.template > /tmp/openvenice-ai.conf
+  echo 'AI gateway enabled' >&2
+fi
+
 sed \
   -e "s|__PORT__|$PORT_VALUE|g" \
   /etc/nginx/nginx.conf.template > /tmp/openvenice-nginx.conf

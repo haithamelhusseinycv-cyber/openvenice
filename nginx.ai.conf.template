@@ -1,0 +1,57 @@
+# --- Open-model AI gateway (/ai/v1) -------------------------------------------
+# Same-origin, credential-isolating proxy to an OpenAI-compatible backend.
+# The upstream credential is injected here and never reaches the browser bundle.
+# Mirrors the VoiceTut proxy contract in nginx.voicetut.conf.template.
+
+# Configuration state for the gateway. The frontend uses /models for liveness;
+# this route only reports whether the deployment has a gateway at all.
+location = /ai/v1/health {
+  limit_except GET { deny all; }
+  default_type application/json;
+  return 200 '{"ok":true,"gateway":"ai-v1","configured":true}';
+  add_header Cache-Control "no-store" always;
+}
+
+# Liveness probe and model discovery. OpenAI-compatible backends expose /models.
+location = /ai/v1/models {
+  limit_except GET { deny all; }
+  proxy_pass __AI_UPSTREAM__/models;
+  proxy_ssl_server_name on;
+  proxy_set_header Host $proxy_host;
+  proxy_set_header Authorization "Bearer __AI_API_KEY__";
+  proxy_set_header X-API-Key "";
+  proxy_set_header Cookie "";
+  proxy_set_header Proxy-Authorization "";
+  proxy_set_header X-Request-ID $request_id;
+  proxy_connect_timeout 10s;
+  proxy_read_timeout 30s;
+  add_header Cache-Control "no-store" always;
+}
+
+# Streaming chat completion. Request buffering is on (small JSON bodies);
+# response buffering must stay off so SSE deltas reach the client immediately.
+location = /ai/v1/chat/completions {
+  limit_except POST { deny all; }
+  client_max_body_size 16m;
+  proxy_pass __AI_UPSTREAM__/chat/completions;
+  proxy_ssl_server_name on;
+  proxy_set_header Host $proxy_host;
+  proxy_set_header Authorization "Bearer __AI_API_KEY__";
+  proxy_set_header X-API-Key "";
+  proxy_set_header Cookie "";
+  proxy_set_header Proxy-Authorization "";
+  proxy_set_header X-Request-ID $request_id;
+  proxy_http_version 1.1;
+  proxy_request_buffering on;
+  proxy_buffering off;
+  proxy_connect_timeout 10s;
+  proxy_send_timeout 60s;
+  proxy_read_timeout 190s;
+  add_header Cache-Control "no-store" always;
+}
+
+location /ai/v1/ {
+  default_type application/json;
+  return 404 '{"error":"Unknown AI gateway route"}';
+  add_header Cache-Control "no-store" always;
+}
