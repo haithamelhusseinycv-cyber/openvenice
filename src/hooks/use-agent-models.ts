@@ -1,5 +1,8 @@
 import { useMemo } from 'react'
 import { useModels } from './use-models'
+import { resolveChatProvider, useProviderStore } from '../stores/provider-store'
+import { normalizeDiscoveredModels, rankDiscoveredModels } from '../lib/open-models'
+import { rankIds } from '../lib/preferred-models'
 import type {
   ModelCapabilities,
   ModelTrait,
@@ -40,8 +43,31 @@ const MODEL_ORDER = new Map<string, number>(
 
 export function useAgentModels() {
   const { data, isLoading } = useModels('text')
+  // Discovery follows the active route. When the self-hosted gateway is serving,
+  // the picker lists what that endpoint actually advertises instead of a frozen
+  // Venice catalogue — and it works with no Venice credential at all.
+  const openRoute = useProviderStore((s) => resolveChatProvider(s) === 'qwen')
+  const gatewayModels = useProviderStore((s) => s.gatewayModels)
+  const preferredOpenModel = useProviderStore((s) => s.qwenModelId)
 
   const models = useMemo<AgentModel[]>(() => {
+    if (openRoute) {
+      return rankDiscoveredModels(normalizeDiscoveredModels(rankIds(gatewayModels, 'agent')), preferredOpenModel)
+        .map<AgentModel>((m, index) => ({
+          id: m.id,
+          name: m.name,
+          capabilities: m.capabilities,
+          traits: m.traits,
+          contextTokens: undefined,
+          recommended: index === 0,
+          tier: index,
+          reasoning: m.reasoning,
+          // A self-hosted endpoint makes no alignment claims we can verify, so
+          // uncensored stays a presentation hint rather than a guarantee.
+          uncensored: true,
+        }))
+    }
+
     if (!data) return []
 
     return data
@@ -115,7 +141,7 @@ export function useAgentModels() {
 
         return orderA - orderB
       })
-  }, [data])
+  }, [data, openRoute, gatewayModels, preferredOpenModel])
 
   /*
    * React Query may report a background/loading state while it already has

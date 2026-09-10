@@ -1,13 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { venice } from '../lib/venice-client'
 import {
-  ALLOWED_CHAT_MODEL_IDS,
-  ALLOWED_EDIT_MODEL_IDS,
-  ALLOWED_IMAGE_MODEL_IDS,
   isAllowedChatModel,
   isAllowedEditModel,
   isAllowedImageModel,
 } from '../lib/allowed-models'
+import { rankIds, type CapabilityId } from '../lib/preferred-models'
 import type {
   ModelsResponse,
   VeniceModel,
@@ -15,18 +13,14 @@ import type {
 
 type VeniceType = 'text' | 'image' | 'inpaint'
 
-const PRIORITY: Record<VeniceType, string[]> = {
-  image: [...ALLOWED_IMAGE_MODEL_IDS],
-  inpaint: [...ALLOWED_EDIT_MODEL_IDS],
-  text: [...ALLOWED_CHAT_MODEL_IDS],
-}
-
-function normalize(value?: string) {
-  return (value || '').trim().toLowerCase()
-}
-
-function getModelName(model: VeniceModel) {
-  return model.model_spec?.name || model.id
+/**
+ * Preference order lives in `preferred-models.ts` (uncensored-first per
+ * capability). Discovery still decides membership; this only decides sequence.
+ */
+const CAPABILITY: Record<VeniceType, CapabilityId> = {
+  text: 'chat',
+  image: 'image',
+  inpaint: 'edit',
 }
 
 function getBucket(type?: string): VeniceType | null {
@@ -43,13 +37,6 @@ function isAllowed(model: VeniceModel, bucket: VeniceType | null) {
   return isAllowedEditModel(model.id)
 }
 
-function getRank(model: VeniceModel, bucket: VeniceType | null) {
-  if (!bucket) return 9999
-  const order = PRIORITY[bucket].map(normalize)
-  const byId = order.indexOf(normalize(model.id))
-  return byId === -1 ? 9999 : byId
-}
-
 export function useModels(type?: string, enabled = true) {
   const bucket = getBucket(type)
 
@@ -61,15 +48,17 @@ export function useModels(type?: string, enabled = true) {
     gcTime: 30 * 60 * 1000,
     refetchOnMount: true,
     refetchOnWindowFocus: false,
-    select: (data) =>
-      data.data
+    select: (data) => {
+      const allowed: VeniceModel[] = data.data
         .filter((m) => !m.model_spec?.offline)
         .filter((m) => isAllowed(m, bucket))
-        .sort((a, b) => {
-          const rankDiff = getRank(a, bucket) - getRank(b, bucket)
-          if (rankDiff !== 0) return rankDiff
-          return getModelName(a).localeCompare(getModelName(b))
-        }),
+      if (!bucket) return allowed
+
+      const byId = new Map<string, VeniceModel>(allowed.map((model) => [model.id, model]))
+      return rankIds(allowed.map((model) => model.id), CAPABILITY[bucket])
+        .map((id) => byId.get(id))
+        .filter((model): model is VeniceModel => Boolean(model))
+    },
   })
 }
 
