@@ -8,7 +8,7 @@ import { Label, TextArea, PrimaryButton, ErrorText, EmptyState } from '../ui/sha
 import { TaskProgress } from '../ui/task-progress'
 import { cn } from '../../lib/utils'
 import { toast } from '../../stores/toast-store'
-import { buildSwapPrompt, UNDRESS_PROMPT, type SwapKind, type SwapPerson } from '../../lib/tool-prompts'
+import { buildDualSwapPrompt, buildSwapPrompt, buildUndressPrompt, type SwapKind, type SwapPerson } from '../../lib/tool-prompts'
 import { prepareImage, formatBytes, type ImagePreparationStage, type PreparedImage } from '../../lib/image-input'
 import { useModels } from '../../hooks/use-models'
 import { formatVeniceError } from '../../lib/venice-client'
@@ -120,56 +120,11 @@ export function ImageTools() {
     bgRemoveMutation.reset()
   }
 
-  const readFile = async (file: File, slot: string, onDone: (data: string, name: string) => void) => {
-    preparationAbortRef.current?.abort()
-    const controller = new AbortController()
-    preparationAbortRef.current = controller
-    setUploadError(null)
-    setIsPreparing(true)
-    try {
-      const stageLabel: Record<ImagePreparationStage, string> = {
-        decoding: 'Decoding',
-        resizing: 'Resizing',
-        compressing: 'Compressing',
-        finalizing: 'Finalizing',
-      }
-      const stagePercent: Record<ImagePreparationStage, number> = {
-        decoding: 12,
-        resizing: 35,
-        compressing: 68,
-        finalizing: 92,
-      }
-      const prepared: PreparedImage = await prepareImage(file, {
-        signal: controller.signal,
-        onProgress: (stage) => {
-          setPreparationStatus(`${formatBytes(file.size)} · ${stageLabel[stage]}`)
-          setPreparationPercent(stagePercent[stage])
-        },
-      })
-      setPreparationPercent(100)
-      setUploadInfo((s) => ({
-        ...s,
-        [slot]: `${prepared.format} · ${prepared.width}×${prepared.height} · ${formatBytes(prepared.preparedBytes)}${prepared.preparedBytes < prepared.originalBytes ? ` (from ${formatBytes(prepared.originalBytes)})` : ''}`,
-      }))
-      onDone(prepared.dataUrl, prepared.name)
-    } catch (err) {
-      if (!(err instanceof DOMException && err.name === 'AbortError')) {
-        setUploadError(err instanceof Error ? err.message : 'Could not read this image.')
-      }
-    } finally {
-      if (preparationAbortRef.current === controller) {
-        preparationAbortRef.current = null
-        setIsPreparing(false)
-        setPreparationStatus('')
-        setPreparationPercent(0)
-      }
-    }
+  const resetResult = () => {
+    resetResultBlob()
   }
 
-  const dualSwapPrompt = (maleKind: SwapKind, femaleKind: SwapKind) =>
-    `Reference 1 is the target scene and composition. Reference 2 maps only to the male subject and requires a ${maleKind} swap. Reference 3 maps only to the female subject and requires a ${femaleKind} swap. Preserve the target pose, framing, camera angle, lighting, background, interaction and all non-identity details. Keep both identities separate; never blend, exchange or cross-map them.`
-
-  const aspectRatio = sceneSize || 'auto'
+  const resetResultBlob = useBlobUrl()[1]
 
   const handleProcess = () => {
     resetResult()
@@ -183,11 +138,12 @@ export function ImageTools() {
       editMutation.mutate(
         {
           images: [imageData],
-          prompt: editPrompt.trim(),
+          prompt: editPrompt || 'Keep identity. Change only what the user typed.',
           modelId: editModel,
-          aspect_ratio: aspectRatio,
+          aspect_ratio: sceneSize,
           safe_mode: false,
           enhance_prompt: false,
+          disable_prompt_optimization_thinking: true,
         },
         opts,
       )
@@ -196,7 +152,7 @@ export function ImageTools() {
       swapMutation.mutate(
         {
           images: dualSwap && secondIdImage ? [imageData, idImage, secondIdImage] : [imageData, idImage],
-          prompt: dualSwap ? dualSwapPrompt(swapKind, secondSwapKind) : buildSwapPrompt(swapKind, swapPerson),
+          prompt: dualSwap ? buildDualSwapPrompt(swapKind, secondSwapKind) : buildSwapPrompt(swapKind, swapPerson),
           modelId: editModel,
           aspect_ratio: aspectRatio,
           safe_mode: false,
@@ -210,7 +166,7 @@ export function ImageTools() {
       undressMutation.mutate(
         {
           images: [imageData],
-          prompt: UNDRESS_PROMPT,
+          prompt: buildUndressPrompt(swapPerson),
           modelId: editModel,
           aspect_ratio: aspectRatio,
           safe_mode: false,
@@ -234,318 +190,264 @@ export function ImageTools() {
     }
   }
 
-  const isLoading =
-    editMutation.isPending ||
-    swapMutation.isPending ||
-    undressMutation.isPending ||
-    upscaleMutation.isPending ||
-    bgRemoveMutation.isPending
-  const error = tool === 'edit'
-    ? editMutation.error
-    : tool === 'swap'
-      ? swapMutation.error
-      : tool === 'undress'
-        ? undressMutation.error
-        : tool === 'upscale'
-          ? upscaleMutation.error
-          : bgRemoveMutation.error
+  const aspectRatio = sceneSize || 'auto'
 
-  const downloadResult = () => {
-    if (!resultUrl) return
-    const a = document.createElement('a')
-    a.href = resultUrl
-    a.download = `venice-${tool}-result.png`
-    a.click()
-  }
+  const handleProcessOriginal = handleProcess
+  void handleProcessOriginal
 
-  const selectedEditModelReady = editModelOptions.some((option) => option.value === editModel)
-  const swapReady = !!(imageData && idImage && (!dualSwap || secondIdImage) && apiKey && !isLoading && !isPreparing && selectedEditModelReady)
-  const needsEditModel = tool === 'edit' || tool === 'swap' || tool === 'undress'
-  const otherReady = !!(
-    imageData &&
-    apiKey &&
-    !isLoading &&
-    !isPreparing &&
-    (tool !== 'edit' || editPrompt.trim()) &&
-    (!needsEditModel || selectedEditModelReady)
-  )
+  const isBusy = isPreparing || editMutation.isPending || swapMutation.isPending || undressMutation.isPending || upscaleMutation.isPending || bgRemoveMutation.isPending
+  const isLoading = isBusy
+  const swapReady = Boolean(imageData && (idImage || (dualSwap && idImage && secondIdImage)))
+  const otherReady = Boolean(imageData)
 
-  const removeSource = () => {
-    setImageData(null)
-    setImageName('')
-    resetResult()
-    clearFileInput(fileRef.current)
-  }
-
-  const removeId = () => {
-    setIdImage(null)
-    setIdName('')
-    resetResult()
-    clearFileInput(idFileRef.current)
-  }
-
-  const removeSecondId = () => {
-    setSecondIdImage(null)
-    setSecondIdName('')
-    resetResult()
-    clearFileInput(secondIdFileRef.current)
-  }
-
-  return (
-    <div className="flex h-full max-w-full min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-auto overscroll-contain touch-pan-y lg:flex-row lg:overflow-hidden">
-      <div className="flex w-full max-w-full min-w-0 shrink-0 flex-col gap-4 overflow-x-hidden border-b border-white/[0.06] p-4 sm:p-6 lg:w-[400px] lg:overflow-y-auto lg:overscroll-contain lg:touch-pan-y lg:border-b-0 lg:border-r">
-        <div className="grid grid-cols-3 gap-1 rounded-lg border border-white/[0.06] bg-white/[0.02] p-1 sm:grid-cols-5">
-          {([['edit', 'Edit'], ['swap', 'Swap'], ['undress', 'Undress'], ['upscale', 'Upscale'], ['remove-bg', 'BG']] as const).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => { setTool(id); resetResult(); resetMutations() }}
-              className={cn(
-                'min-h-11 min-w-0 rounded-md px-1 py-2 text-[12px] font-medium transition-all duration-150 sm:px-2 sm:text-[14px]',
-                tool === id ? 'bg-white text-black' : 'text-white/55 hover:text-white',
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        <div>
-          <Label>{tool === 'swap' ? '1. Target still' : tool === 'undress' ? 'Dressed photo' : 'Source image'}</Label>
+  const uploads = (
+    <>
+      <div className="flex flex-col gap-2">
+        <Label>1. Source image</Label>
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={isPreparing}
+          className="w-full border border-dashed border-white/[0.14] hover:border-white/[0.28] rounded-lg py-8 text-center min-h-24 disabled:opacity-45"
+        >
           {imageData ? (
-            <div className="relative">
-              <FitImg src={imageData} alt="Source" />
-              <button
-                type="button"
-                onClick={removeSource}
-                aria-label="Remove image"
-                className="absolute top-1.5 right-1.5 px-2 min-h-11 bg-black/70 rounded-md text-white text-[14px]"
-              >
-                Remove
-              </button>
-              <span className="text-[13px] text-white/45 mt-1 block truncate">{imageName}{uploadInfo.target ? ` · ${uploadInfo.target}` : ''}</span>
-            </div>
+            <img src={imageData} alt="Source" className="mx-auto max-h-44 rounded-lg object-contain" />
           ) : (
+            <p className="text-[15px] text-white/60">Tap to choose a photo</p>
+          )}
+        </button>
+        {imageData && imageName && (
+          <p className="text-[12px] text-white/50 break-words [overflow-wrap:anywhere]">{imageName}{uploadInfo.prepared ? ` · ${formatBytes(uploadInfo.preparedSize ?? 0)}` : ''}</p>
+        )}
+      </div>
+      {tool === 'swap' && (
+        <div className="flex flex-col gap-2">
+          <Label>2. Identity photo</Label>
+          <button
+            type="button"
+            onClick={() => idFileRef.current?.click()}
+            disabled={isPreparing}
+            className="w-full border border-dashed border-white/[0.14] hover:border-white/[0.28] rounded-lg py-8 text-center min-h-24 disabled:opacity-45"
+          >
+            {idImage ? (
+              <img src={idImage} alt="Identity" className="mx-auto max-h-44 rounded-lg object-contain" />
+            ) : (
+              <p className="text-[15px] text-white/60">Tap to choose identity photo</p>
+            )}
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (!file) return
+              void prepareImage(file, 'source', (data, name) => { setImageData(data); setImageName(name); resetResult() }, setUploadInfo, setUploadError, setIsPreparing, setPreparationStatus, setPreparationPercent, preparationAbortRef)
+              clearFileInput(e.target)
+            }}
+          />
+          <input
+            ref={idFileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (!file) return
+              void prepareImage(file, 'identity', (data, name) => { setIdImage(data); setIdName(name); resetResult() }, setUploadInfo, setUploadError, setIsPreparing, setPreparationStatus, setPreparationPercent, preparationAbortRef)
+              clearFileInput(e.target)
+            }}
+          />
+          {dualSwap && (
             <button
               type="button"
-              onClick={() => fileRef.current?.click()}
+              onClick={() => secondIdFileRef.current?.click()}
               disabled={isPreparing}
-              className="w-full border border-dashed border-white/[0.14] hover:border-white/[0.28] rounded-lg py-8 text-center min-h-24"
+              className="w-full border border-dashed border-white/[0.14] hover:border-white/[0.28] rounded-lg py-8 text-center min-h-24 disabled:opacity-45"
             >
-              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
-                const file = e.target.files?.[0]
-                if (!file) return
-                void readFile(file, 'target', (data, name) => { setImageData(data); setImageName(name); resetResult() })
-                clearFileInput(e.target)
-              }} />
-              <p className="text-[15px] text-white/60">
-                {tool === 'undress' ? 'Upload a dressed adult photo' : tool === 'swap' ? 'Lustify still / body photo' : 'Source image'}
-              </p>
+              {secondIdImage ? (
+                <img src={secondIdImage} alt="Identity 2" className="mx-auto max-h-44 rounded-lg object-contain" />
+              ) : (
+                <p className="text-[15px] text-white/60">Upload female face / head / body identity</p>
+              )}
             </button>
           )}
+          <input
+            ref={secondIdFileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (!file) return
+              void prepareImage(file, 'identity2', (data, name) => { setSecondIdImage(data); setSecondIdName(name); resetResult() })
+              clearFileInput(e.target)
+            }}
+          />
         </div>
+      )}
 
-        {tool === 'swap' && (
-          <div>
-            <div className="flex items-center justify-between gap-3 mb-2">
-              <Label>{dualSwap ? '2. Male identity' : '2. Identity photo'}</Label>
-              <button type="button" onClick={() => { setDualSwap(!dualSwap); resetResult() }} className="min-h-11 px-3 rounded-md bg-white/[0.06] text-[13px] text-white/80">
-                {dualSwap ? 'Dual-person on' : 'Dual-person off'}
-              </button>
-            </div>
-            {idImage ? (
-              <div className="relative">
-                <FitImg src={idImage} alt="ID" />
+      {tool === 'edit' && (
+        <div><Label>Edit prompt</Label><TextArea value={editPrompt} onChange={setEditPrompt} placeholder="Keep identity. Change only what I type…" rows={3} /></div>
+      )}
+
+      {(tool === 'edit' || tool === 'swap' || tool === 'undress') && (
+        <div>
+          <Label>Model</Label>
+          <Select value={editModel} onChange={setPreferredEditModel} options={editModelOptions} searchable />
+          {modelsLoading && <div className="mt-2 text-[13px] text-white/45" role="status">Loading compatible edit models…</div>}
+          {modelsError && <ErrorText>{formatVeniceError(modelsError)}</ErrorText>}
+        </div>
+      )}
+
+      {tool === 'swap' && (
+        <>
+          {!dualSwap && <div>
+            <Label>3. Who to swap</Label>
+            <div className="flex gap-1">
+              {(['woman', 'man'] as const).map((p) => (
                 <button
+                  key={p}
                   type="button"
-                  onClick={removeId}
-                  aria-label="Remove ID image"
-                  className="absolute top-1.5 right-1.5 px-2 min-h-11 bg-black/70 rounded-md text-white text-[14px]"
+                  onClick={() => setSwapPerson(p)}
+                  className={cn(
+                    'flex-1 min-h-11 py-2 text-[15px] rounded-lg capitalize',
+                    swapPerson === p ? 'bg-white text-black' : 'bg-white/[0.06] text-white/70',
+                  )}
                 >
-                  Remove
+                  {p}
                 </button>
-                <span className="text-[13px] text-white/45 mt-1 block truncate">{idName}{uploadInfo.identity1 ? ` · ${uploadInfo.identity1}` : ''}</span>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => idFileRef.current?.click()}
-                disabled={isPreparing}
-                className="w-full border border-dashed border-white/[0.14] hover:border-white/[0.28] rounded-lg py-8 text-center min-h-24"
-              >
-                <input ref={idFileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (!file) return
-                  void readFile(file, 'identity1', (data, name) => { setIdImage(data); setIdName(name); resetResult() })
-                  clearFileInput(e.target)
-                }} />
-                <p className="text-[15px] text-white/60">Front face / head / body ID</p>
-              </button>
-            )}
-          </div>
-        )}
-
-        {tool === 'swap' && dualSwap && (
+              ))}
+            </div>
+          </div>}
           <div>
-            <Label>3. Female identity</Label>
-            {secondIdImage ? (
-              <div className="relative">
-                <FitImg src={secondIdImage} alt="Female identity" />
-                <button type="button" onClick={removeSecondId} aria-label="Remove female identity" className="absolute top-1.5 right-1.5 px-2 min-h-11 bg-black/70 rounded-md text-white text-[14px]">Remove</button>
-                <span className="text-[13px] text-white/45 mt-1 block truncate">{secondIdName}{uploadInfo.identity2 ? ` · ${uploadInfo.identity2}` : ''}</span>
-              </div>
-            ) : (
-              <button type="button" onClick={() => secondIdFileRef.current?.click()} disabled={isPreparing} className="w-full border border-dashed border-white/[0.14] hover:border-white/[0.28] rounded-lg py-8 text-center min-h-24 disabled:opacity-45">
-                <input ref={secondIdFileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (!file) return
-                  void readFile(file, 'identity2', (data, name) => { setSecondIdImage(data); setSecondIdName(name); resetResult() })
-                  clearFileInput(e.target)
-                }} />
-                <p className="text-[15px] text-white/60">Upload female face / head / body identity</p>
-              </button>
-            )}
+            <Label>{dualSwap ? '4. Male swap type' : '4. Swap type'}</Label>
+            <div className="flex gap-1">
+              {(['face', 'head', 'body'] as const).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setSwapKind(k)}
+                  className={cn(
+                    'flex-1 min-h-11 py-2 text-[15px] rounded-lg capitalize',
+                    swapKind === k ? 'bg-white text-black' : 'bg-white/[0.06] text-white/70',
+                  )}
+                >
+                  {k}
+                </button>
+              ))}
+            </div>
           </div>
-        )}
-
-        {tool === 'edit' && (
-          <div><Label>Edit prompt</Label><TextArea value={editPrompt} onChange={setEditPrompt} placeholder="Keep identity. Change only what I type…" rows={3} /></div>
-        )}
-
-        {(tool === 'edit' || tool === 'swap' || tool === 'undress') && (
-          <div>
-            <Label>Model</Label>
-            <Select value={editModel} onChange={setPreferredEditModel} options={editModelOptions} searchable />
-            {modelsLoading && <div className="mt-2 text-[13px] text-white/45" role="status">Loading compatible edit models…</div>}
-            {modelsError && <ErrorText>{formatVeniceError(modelsError)}</ErrorText>}
-          </div>
-        )}
-
-        {tool === 'swap' && (
-          <>
-            {!dualSwap && <div>
-              <Label>3. Who to swap</Label>
-              <div className="flex gap-1">
-                {(['woman', 'man'] as const).map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => setSwapPerson(p)}
-                    className={cn(
-                      'flex-1 min-h-11 py-2 text-[15px] rounded-lg capitalize',
-                      swapPerson === p ? 'bg-white text-black' : 'bg-white/[0.06] text-white/70',
-                    )}
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
-            </div>}
+          {dualSwap && (
             <div>
-              <Label>{dualSwap ? '4. Male swap type' : '4. Swap type'}</Label>
+              <Label>5. Female swap type</Label>
               <div className="flex gap-1">
                 {(['face', 'head', 'body'] as const).map((k) => (
                   <button
                     key={k}
                     type="button"
-                    onClick={() => setSwapKind(k)}
+                    onClick={() => setSecondSwapKind(k)}
                     className={cn(
                       'flex-1 min-h-11 py-2 text-[15px] rounded-lg capitalize',
-                      swapKind === k ? 'bg-white text-black' : 'bg-white/[0.06] text-white/70',
+                      secondSwapKind === k ? 'bg-white text-black' : 'bg-white/[0.06] text-white/70',
                     )}
                   >
                     {k}
                   </button>
                 ))}
               </div>
-            </div>
-            {dualSwap && (
-              <div>
-                <Label>5. Female swap type</Label>
-                <div className="flex gap-1">
-                  {(['face', 'head', 'body'] as const).map((k) => (
-                    <button
-                      key={k}
-                      type="button"
-                      onClick={() => setSecondSwapKind(k)}
-                      className={cn(
-                        'flex-1 min-h-11 py-2 text-[15px] rounded-lg capitalize',
-                        secondSwapKind === k ? 'bg-white text-black' : 'bg-white/[0.06] text-white/70',
-                      )}
-                    >
-                      {k}
-                    </button>
-                  ))}
-                </div>
-                <div className="mt-2 rounded-lg border border-white/[0.08] bg-white/[0.03] p-3 text-[13px] leading-relaxed text-white/60" role="status" aria-live="polite">
-                  Reference 2 → male {swapKind} · Reference 3 → female {secondSwapKind}
-                </div>
+              <div className="mt-2 rounded-lg border border-white/[0.08] bg-white/[0.03] p-3 text-[13px] leading-relaxed text-white/60" role="status" aria-live="polite">
+                Reference 2 → male {swapKind} · Reference 3 → female {secondSwapKind}
               </div>
-            )}
-          </>
-        )}
-
-        {(tool === 'edit' || tool === 'swap' || tool === 'undress') && (
-          <div>
-            <Label>Output size</Label>
-            <div className="flex flex-wrap gap-1">
-              {SCENE_SIZES.map((s) => (
-                <button
-                  key={s.value}
-                  type="button"
-                  onClick={() => setSceneSize(s.value)}
-                  className={cn(
-                    'px-3 py-2 text-[14px] rounded-md min-h-11',
-                    sceneSize === s.value ? 'bg-white text-black' : 'bg-white/[0.06] text-white/65',
-                  )}
-                >
-                  {s.label}
-                </button>
-              ))}
             </div>
-          </div>
-        )}
+          )}
+        </>
+      )}
 
-        <PrimaryButton
-          onClick={handleProcess}
-          disabled={tool === 'swap' ? !swapReady : !otherReady}
-          loading={isLoading}
-        >
-          {tool === 'edit'
-            ? 'Edit Image'
-            : tool === 'swap'
-              ? dualSwap ? `Swap male ${swapKind} + female ${secondSwapKind}` : `Swap ${swapKind}`
-              : tool === 'undress'
-                ? 'Undress'
-                : tool === 'upscale'
-                  ? 'Upscale Image'
-                  : 'Remove Background'}
-        </PrimaryButton>
-        {isPreparing && (
-          <div className="flex items-center gap-2">
-            <TaskProgress className="min-w-0 flex-1" label="Optimizing upload" detail={preparationStatus || 'Starting'} value={preparationPercent} />
-            <button type="button" onClick={() => preparationAbortRef.current?.abort()} className="shrink-0 px-2 py-2 text-[12px] text-white/80">
-              Cancel
-            </button>
+      {(tool === 'edit' || tool === 'swap' || tool === 'undress') && (
+        <div>
+          <Label>Output size</Label>
+          <div className="flex flex-wrap gap-1">
+            {SCENE_SIZES.map((s) => (
+              <button
+                key={s.value}
+                type="button"
+                onClick={() => setSceneSize(s.value)}
+                className={cn(
+                  'px-3 py-2 text-[14px] rounded-md min-h-11',
+                  sceneSize === s.value ? 'bg-white text-black' : 'bg-white/[0.06] text-white/65',
+                )}
+              >
+                {s.label}
+              </button>
+            ))}
           </div>
-        )}
-        {isLoading && (
-          <TaskProgress
-            label={tool === 'upscale' ? 'Upscaling image' : tool === 'remove-bg' ? 'Removing background' : `Processing ${tool}`}
-            detail="Venice is processing the compressed working copy"
-            indeterminate
-            showElapsed
-          />
-        )}
-        {uploadError && <ErrorText>{uploadError}</ErrorText>}
-        {error && (
-          <>
-            <ErrorText>{formatVeniceError(error)}</ErrorText>
-            <button type="button" onClick={handleProcess} disabled={isLoading} className="min-h-11 rounded-lg border border-white/[0.14] px-3 text-[14px] text-white/80">
-              Retry with prepared images
+        </div>
+      )}
+
+      <PrimaryButton
+        onClick={handleProcess}
+        disabled={tool === 'swap' ? !swapReady : !otherReady}
+        loading={isLoading}
+      >
+        {tool === 'edit'
+          ? 'Edit Image'
+          : tool === 'swap'
+            ? dualSwap ? `Swap male ${swapKind} + female ${secondSwapKind}` : `Swap ${swapKind}`
+            : tool === 'undress'
+              ? 'Undress'
+              : tool === 'upscale'
+                ? 'Upscale Image'
+                : 'Remove Background'}
+      </PrimaryButton>
+      {isPreparing && (
+        <div className="flex items-center gap-2">
+          <TaskProgress className="min-w-0 flex-1" label="Optimizing upload" detail={preparationStatus || 'Starting'} value={preparationPercent} />
+          <button type="button" onClick={() => preparationAbortRef.current?.abort()} className="shrink-0 px-2 py-2 text-[12px] text-white/80">
+            Cancel
+          </button>
+        </div>
+      )}
+      {isLoading && (
+        <TaskProgress
+          label={tool === 'upscale' ? 'Upscaling image' : tool === 'remove-bg' ? 'Removing background' : `Processing ${tool}`}
+          detail="Venice is processing the compressed working copy"
+          indeterminate
+          showElapsed
+        />
+      )}
+      {uploadError && <ErrorText>{uploadError}</ErrorText>}
+      {error && (
+        <>
+          <ErrorText>{formatVeniceError(error)}</ErrorText>
+          <button type="button" onClick={handleProcess} disabled={isLoading} className="min-h-11 rounded-lg border border-white/[0.14] px-3 text-[14px] text-white/80">
+            Retry with prepared images
+          </button>
+        </>
+      )}
+    </div>
+  )
+
+  return (
+    <div className="flex max-w-full min-w-0 flex-col gap-3 lg:flex-row lg:items-start">
+      <div className="max-w-full min-w-0 flex-1 px-3 pb-3 sm:px-6 lg:h-[calc(100dvh-4rem)] lg:overflow-y-auto lg:overscroll-contain lg:px-7 lg:pb-6">
+        <div className="mb-3 flex flex-wrap gap-1">
+          {(['edit', 'swap', 'undress', 'upscale', 'remove-bg'] as Tool[]).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTool(t)}
+              className={cn(
+                'min-h-11 rounded-lg px-3 text-[13px] font-medium capitalize transition-colors',
+                tool === t ? 'bg-white text-black' : 'bg-white/[0.06] text-white/65 hover:text-white',
+              )}
+            >
+              {t === 'remove-bg' ? 'Remove BG' : t}
             </button>
-          </>
-        )}
+          ))}
+        </div>
+        {uploads}
       </div>
 
       <div className="flex max-w-full min-h-[30vh] min-w-0 flex-1 flex-col overflow-x-hidden p-3 sm:p-6 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:touch-pan-y">

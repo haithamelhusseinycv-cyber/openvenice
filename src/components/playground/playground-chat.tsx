@@ -2,10 +2,12 @@ import { useState, useRef, useEffect } from 'react'
 import { usePlaygroundStore, type PlaygroundActivity } from '../../stores/playground-store'
 import { useAuthStore } from '../../stores/auth-store'
 import { useSettingsStore } from '../../stores/settings-store'
+import { effectiveOpenModelId, isQwenReady, resolveChatProvider, useProviderStore } from '../../stores/provider-store'
 import { useVoiceStore } from '../../stores/voice-store'
 import { useModelCatalog } from '../../hooks/use-model-catalog'
 import { useAgentModels } from '../../hooks/use-agent-models'
 import { callAgent, DEFAULT_AGENT_MODEL, FALLBACK_AGENT_MODEL } from '../../lib/playground-agent'
+import { boundaryResponseFor, ageConfirmationNeeded, boundaryProfileFor, AGE_CONFIRMATION_LINE } from '../../lib/content-boundary'
 import { runAgentTools, type RunStep } from '../../lib/playground-agent-tools'
 import { shouldUseModelFallback } from '../../lib/model-routing'
 import { cancelVoiceListening, listenForVoice, speakVoice, stopVoiceSpeaking, voiceLocaleShortLabel, type VoiceLocale } from '../../lib/voice-chat'
@@ -71,6 +73,11 @@ function languageModeForVoice(locale: VoiceLocale): NourLanguageMode {
 export function PlaygroundChat() {
   const { messages, draft, isThinking, addMessage, updateMessage, setThinking, applyAgentPatches } = usePlaygroundStore()
   const hasKey = useAuthStore((s) => Boolean(s.apiKey?.trim()))
+  // Provider-neutral routing: the self-hosted open model serves Noor whenever the
+  // same-origin gateway answers, so an unrelated Venice key is not required.
+  const providerState = useProviderStore()
+  const openRoute = resolveChatProvider(providerState) === 'qwen' && isQwenReady(providerState)
+  const hasRoute = hasKey || openRoute
   const agentModelId = useSettingsStore((s) => s.playgroundAgentModel) || DEFAULT_AGENT_MODEL
   const languageMode = useSettingsStore((s) => s.nourLanguageMode)
   const setLanguageMode = useSettingsStore((s) => s.setNourLanguageMode)
@@ -85,6 +92,7 @@ export function PlaygroundChat() {
   const activeAgentModelId = activeAgentModel?.id || agentModelId
   const agentCaps = activeAgentModel?.capabilities
   const [input, setInput] = useState('')
+  const [ageConfirmed, setAgeConfirmed] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [speakingId, setSpeakingId] = useState<string | null>(null)
   const [voiceStatus, setVoiceStatus] = useState<string | null>(null)
@@ -267,15 +275,33 @@ export function PlaygroundChat() {
   const send = async (text: string, options: { languageMode?: NourLanguageMode; autoSpeak?: boolean } = {}) => {
     const trimmed = text.trim()
     if (!trimmed || isThinking) return
-    if (!hasKey) {
-      setError('Connect your Venice API key first.')
+    // The single application-level gate. Consent is the default and age is a
+    // legal fact: this only reacts to a stated minor age, recognisable child
+    // content, a real-world plan against a real person, or the provider's NCII
+    // ceiling on rented infrastructure. Everything else passes untouched.
+    const boundaryLine = boundaryResponseFor(trimmed, boundaryProfileFor(resolveChatProvider(providerState)))
+    if (boundaryLine) {
+      setError(boundaryLine)
+      setInput('')
       return
     }
-    if (agentModelsLoading) {
+    // Legally ambiguous wording (school settings, "teen") asks once, then stops.
+    if (!ageConfirmed && ageConfirmationNeeded(trimmed)) {
+      setError(AGE_CONFIRMATION_LINE)
+      setAgeConfirmed(true)
+      return
+    }
+    if (!hasRoute) {
+      setError(openRoute
+        ? 'The private open-model gateway is unreachable. Connect a provider key or fix the gateway.'
+        : 'Connect your Venice API key first.')
+      return
+    }
+    if (!openRoute && agentModelsLoading) {
       setError('Noor is still loading the available models. Try again in a moment.')
       return
     }
-    if (!activeAgentModel) {
+    if (!openRoute && !activeAgentModel) {
       setError('No compatible Noor model is currently available from Venice.')
       return
     }
@@ -349,6 +375,10 @@ export function PlaygroundChat() {
           capabilities,
           languageMode: effectiveLanguageMode,
           signal: controller.signal,
+          transport: openRoute ? 'open' : 'venice',
+          openBaseUrl: providerState.qwenBaseUrl,
+          openApiKey: providerState.qwenApiKey,
+          openModel: effectiveOpenModelId(providerState),
         })
 
         let response: Awaited<ReturnType<typeof callAgent>>
@@ -645,7 +675,7 @@ export function PlaygroundChat() {
           ) : (
             <button
               onClick={() => void send(input)}
-              disabled={!input.trim() || !hasKey || agentModelsLoading || !activeAgentModel || Boolean(listeningLocale)}
+              disabled={!input.trim() || !hasRoute || (!openRoute && (agentModelsLoading || !activeAgentModel)) || Boolean(listeningLocale)}
               className="shrink-0 min-h-11 px-4 py-2 text-[13px] font-medium bg-white text-black rounded-lg hover:bg-white/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             >
               Send
