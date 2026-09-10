@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
-"""
-Idempotent Shahy role bootstrap for Open WebUI 0.11.3.
+"""Idempotent Shahy P0 bootstrap for Open WebUI 0.11.3.
 
-Usage (inside the pod or any trusted host with network to the pod):
-  export OWUI_URL=http://localhost:8080   # or the public proxy URL
+Run on the pod or a trusted host:
+  export OWUI_URL=http://localhost:8080
   python3 shahy_apply.py
 
-The script prompts for admin email and password securely (no echo).
-Set DRY_RUN=1 to preview payloads without mutating.
+Prompts for admin email/password with no echo. Never print the token.
+DRY_RUN=1 previews payloads without mutating.
 """
 import getpass, json, os, sys, urllib.request, urllib.error
 
@@ -15,7 +14,7 @@ OWUI_URL = os.getenv('OWUI_URL', 'https://8rhrqskupcsqvq-8080.proxy.runpod.net')
 EMAIL = os.getenv('OWUI_EMAIL')
 PASSWORD = os.getenv('OWUI_PASSWORD')
 DRY_RUN = os.getenv('DRY_RUN', '').strip().lower() in ('1', 'true', 'yes')
-UA = 'Shahy-Apply/1.0'
+UA = 'Shahy-Apply/1.1-p0'
 
 
 def prompt_creds():
@@ -66,204 +65,168 @@ def get_models(token):
     return json.loads(body)
 
 
+# No temperature / top_p — Zen Responses rejects them.
 ROLES = [
     {
-        "id": "shahy-fast",
-        "name": "FAST",
-        "base_model_id": "zen.gpt-5.6-luna",
-        "meta": {
-            "description": "Low-latency routine chat, summaries, email drafts.",
-            "capabilities": {"web_search": True, "code_interpreter": False, "vision": False},
-            "tags": ["fast", "economy", "daily"]
+        'id': 'shahy-fast',
+        'name': 'FAST',
+        'base_model_id': 'zen.gpt-5.6-luna',
+        'meta': {
+            'description': 'Direct model answer. No live search. No terminal.',
+            'capabilities': {'web_search': False, 'code_interpreter': False, 'vision': False},
+            'tags': ['fast', 'economy', 'daily'],
         },
-        "params": {
-            "system": "You are FAST — the low-latency, economical workhorse. Write tight, practical responses in English or Arabic as requested. Prefer brevity. Do not philosophize.",
-            "temperature": 0.4,
-            "top_p": 0.9
+        'params': {
+            'system': 'You are FAST. No tools. Answer from model knowledge. Flag stale facts. Under 220 words.',
         },
-        "is_active": True,
+        'is_active': True,
     },
     {
-        "id": "shahy-smart",
-        "name": "SMART",
-        "base_model_id": "zen.gpt-5.6-sol",
-        "meta": {
-            "description": "Primary daily reasoning, Arabic/English business work and analysis.",
-            "capabilities": {"web_search": True, "code_interpreter": True, "vision": False},
-            "tags": ["smart", "default", "daily"]
+        'id': 'shahy-smart',
+        'name': 'SMART',
+        'base_model_id': 'zen.gpt-5.6-sol',
+        'meta': {
+            'description': 'Live web search, then a cited brief. No terminal.',
+            'capabilities': {'web_search': True, 'code_interpreter': False, 'vision': False},
+            'tags': ['smart', 'default', 'daily'],
         },
-        "params": {
-            "system": "You are SMART — the primary daily reasoning partner for Arabic and English business work, analysis, and documentation. Be direct, evidence-based, and culturally fluent.",
-            "temperature": 0.6,
-            "top_p": 0.95
+        'params': {
+            'system': 'You are SMART. Search the open web before answering. Cite primary sources. If search did not run, say so. Never invent URLs. No terminal.',
         },
-        "is_active": True,
+        'is_active': True,
     },
     {
-        "id": "shahy-max",
-        "name": "MAX",
-        "base_model_id": "zen.gpt-6-astra",
-        "meta": {
-            "description": "Difficult reasoning, complex investigation, premium escalation.",
-            "capabilities": {"web_search": True, "code_interpreter": True, "vision": False},
-            "tags": ["max", "premium", "investigation"]
+        'id': 'shahy-max',
+        'name': 'MAX',
+        'base_model_id': 'zen.gpt-6-astra',
+        'meta': {
+            'description': 'Deep research. No terminal.',
+            'capabilities': {'web_search': True, 'code_interpreter': False, 'vision': False},
+            'tags': ['max', 'premium', 'investigation'],
         },
-        "params": {
-            "system": "You are MAX — reserved for the hardest reasoning and multi-stage analysis. Show your work, question assumptions, and deliver thoroughly verified answers. Escalate budget if uncertain.",
-            "temperature": 0.5,
-            "top_p": 0.95
+        'params': {
+            'system': 'You are MAX. Search first. Show conflicts. No terminal. No code execution.',
         },
-        "is_active": True,
+        'is_active': True,
     },
     {
-        "id": "shahy-builder",
-        "name": "BUILDER",
-        "base_model_id": "zen.gpt-5.6-sol",
-        "meta": {
-            "description": "Coding, GitHub, debugging, deployment and application maintenance.",
-            "capabilities": {"web_search": True, "code_interpreter": True, "vision": False},
-            "tags": ["builder", "coding", "devops"]
+        'id': 'shahy-builder',
+        'name': 'BUILDER',
+        'base_model_id': 'zen.gpt-5.6-sol',
+        'meta': {
+            'description': 'Code and spreadsheets via Open Terminal. Jail to /workspace.',
+            'capabilities': {'web_search': True, 'code_interpreter': True, 'vision': False},
+            'tags': ['builder', 'coding', 'devops'],
         },
-        "params": {
-            "system": "You are BUILDER — the software engineer and deployment operator. Write clean code, handle GitHub/Railway/RunPod, diagnose root causes, and prefer minimal reversible changes. Never expose secrets.",
-            "temperature": 0.6,
-            "top_p": 0.95
+        'params': {
+            'system': 'You are BUILDER. Use Open Terminal run_command. For Excel/CSV evaluate with Python (openpyxl or pandas) and print the number. SUM(10,20,30) must print 60. Stay under /workspace. Never expose secrets.',
         },
-        "is_active": True,
+        'is_active': True,
     },
     {
-        "id": "shahy-multimodal",
-        "name": "MULTIMODAL",
-        "base_model_id": "zen.gpt-5.6-sol",
-        "meta": {
-            "description": "Images, screenshots, PDFs, audio and document inspection. Vision provider pending.",
-            "capabilities": {"web_search": True, "code_interpreter": True, "vision": False},
-            "tags": ["multimodal", "vision", "pending"]
+        'id': 'shahy-multimodal',
+        'name': 'MULTIMODAL',
+        'base_model_id': 'zen.grok-4.6',
+        'meta': {
+            'description': 'Images and documents. No terminal. No formula eval.',
+            'capabilities': {'web_search': True, 'code_interpreter': False, 'vision': True},
+            'tags': ['multimodal', 'vision'],
         },
-        "params": {
-            "system": "You are MULTIMODAL — prepared for images, screenshots, PDFs, audio, and document inspection. When vision is unavailable, describe how you would process the media and route to a verified vision-capable backend.",
-            "temperature": 0.6,
-            "top_p": 0.95
+        'params': {
+            'system': 'You are MULTIMODAL. Inspect images and documents. Do not evaluate spreadsheet formulas. Route calculation to BUILDER. No terminal.',
         },
-        "is_active": True,
+        'is_active': True,
     },
     {
-        "id": "shahy-verifier",
-        "name": "VERIFIER",
-        "base_model_id": "zen.grok-4.6",
-        "meta": {
-            "description": "Factual validation, calculations, citations and quality control.",
-            "capabilities": {"web_search": True, "code_interpreter": False, "vision": False},
-            "tags": ["verifier", "qa", "second-opinion"]
+        'id': 'shahy-verifier',
+        'name': 'VERIFIER',
+        'base_model_id': 'zen.grok-4.6',
+        'meta': {
+            'description': 'Factual validation. Search on. Terminal read-only.',
+            'capabilities': {'web_search': True, 'code_interpreter': True, 'vision': False},
+            'tags': ['verifier', 'qa', 'second-opinion'],
         },
-        "params": {
-            "system": "You are VERIFIER — the independent quality control layer. Check facts, calculations, citations, and logic. Flag uncertainty explicitly. Disagree with the primary answer when warranted.",
-            "temperature": 0.3,
-            "top_p": 0.9
+        'params': {
+            'system': 'You are VERIFIER. Check facts and citations. Read-only commands only. Never write, delete, or install. Never claim search ran unless it did.',
         },
-        "is_active": True,
+        'is_active': True,
     },
     {
-        "id": "shahy-council",
-        "name": "COUNCIL",
-        "base_model_id": "zen.gpt-5.6-sol",
-        "meta": {
-            "description": "Orchestration, delegation and consolidated final decisions across the panel.",
-            "capabilities": {"web_search": True, "code_interpreter": True, "vision": False},
-            "tags": ["council", "orchestration", "delegation"]
+        'id': 'shahy-council',
+        'name': 'COUNCIL',
+        'base_model_id': 'zen.gpt-5.6-sol',
+        'meta': {
+            'description': 'Orchestration only. Search on. Terminal OFF.',
+            'capabilities': {'web_search': True, 'code_interpreter': False, 'vision': False},
+            'tags': ['council', 'orchestration'],
         },
-        "params": {
-            "system": "You are COUNCIL — the orchestrator. When a request spans multiple roles, delegate to FAST, SMART, BUILDER, VERIFIER, or MAX as appropriate, then synthesize their outputs into a single coherent decision or deliverable.",
-            "temperature": 0.6,
-            "top_p": 0.95
+        'params': {
+            'system': 'You are COUNCIL. Three seats, then one decision. No terminal. No code execution. If calculation is required, BUILDER must run it.',
         },
-        "is_active": True,
+        'is_active': True,
     },
 ]
 
 PROMPTS = [
-    {"command": "/fast", "name": "FAST mode", "content": "Switch to FAST mode. Be brief and practical. Respond in the user's language."},
-    {"command": "/smart", "name": "SMART mode", "content": "Switch to SMART mode. Use evidence-based reasoning. Arabic/English fluent."},
-    {"command": "/max", "name": "MAX mode", "content": "Switch to MAX mode. Show full reasoning, verify assumptions, and cite sources."},
-    {"command": "/builder", "name": "BUILDER mode", "content": "Switch to BUILDER mode. Write code, inspect repos, or debug deployments."},
-    {"command": "/verify", "name": "VERIFY mode", "content": "Switch to VERIFIER mode. Independently check the previous answer for factual and logical errors."},
-    {"command": "/council", "name": "COUNCIL mode", "content": "Switch to COUNCIL mode. Delegate sub-tasks to the appropriate panel members, then synthesize a final answer."},
+    {'command': '/fast', 'name': 'FAST mode', 'content': 'Switch to FAST. No tools. Brief.'},
+    {'command': '/smart', 'name': 'SMART mode', 'content': 'Switch to SMART. Search first. Cite sources.'},
+    {'command': '/max', 'name': 'MAX mode', 'content': 'Switch to MAX. Deep search. Show conflicts.'},
+    {'command': '/builder', 'name': 'BUILDER mode', 'content': 'Switch to BUILDER. Use Open Terminal. Evaluate formulas in Python.'},
+    {'command': '/verify', 'name': 'VERIFY mode', 'content': 'Switch to VERIFIER. Independent check. Read-only terminal.'},
+    {'command': '/council', 'name': 'COUNCIL mode', 'content': 'Switch to COUNCIL. No terminal. Synthesize a decision.'},
 ]
 
 KNOWLEDGE = {
-    "name": "shahy-core",
-    "description": "Core institutional knowledge for Shahy: architecture, runbooks, model catalog, and operational procedures."
+    'name': 'shahy-core',
+    'description': 'Core institutional knowledge for Shahy.',
 }
 
 SUBAGENTS = {
-    "ENABLE_SUBAGENTS": True,
-    "SUBAGENTS_BACKGROUND_ENABLED": True,
-    "SUBAGENTS_MAX_CONCURRENT": 3,
-    "SUBAGENTS_MAX_ASYNC": 3,
-    "SUBAGENTS_MAX_ITERATIONS": 5,
-    "SUBAGENTS_MAX_OUTPUT": 4000,
-    "SUBAGENTS_SYSTEM_PROMPT": "You are the sub-agent coordinator. Route tasks to FAST, SMART, BUILDER, VERIFIER, or MAX based on capability. Return the final consolidated result."
+    'ENABLE_SUBAGENTS': True,
+    'SUBAGENTS_BACKGROUND_ENABLED': True,
+    'SUBAGENTS_MAX_CONCURRENT': 3,
+    'SUBAGENTS_MAX_ASYNC': 3,
+    'SUBAGENTS_MAX_ITERATIONS': 5,
+    'SUBAGENTS_MAX_OUTPUT': 4000,
+    'SUBAGENTS_SYSTEM_PROMPT': 'Route tasks to FAST, SMART, BUILDER, VERIFIER, or MAX. COUNCIL must not receive terminal. Return one consolidated result.',
 }
 
 TASKS = {
-    "TASK_MODEL": "zen.gpt-5.6-luna",
-    "TASK_MODEL_EXTERNAL": "zen.gpt-5.6-luna",
-    "TASK_MODEL_PARAMS": {},
-    "ENABLE_TITLE_GENERATION": True,
-    "TITLE_GENERATION_PROMPT_TEMPLATE": "Generate a concise chat title (max 6 words) in the user's language.",
-    "IMAGE_PROMPT_GENERATION_PROMPT_TEMPLATE": "",
-    "ENABLE_AUTOCOMPLETE_GENERATION": False,
-    "AUTOCOMPLETE_GENERATION_INPUT_MAX_LENGTH": 200,
-    "AUTOCOMPLETE_GENERATION_PROMPT_TEMPLATE": "",
-    "TAGS_GENERATION_PROMPT_TEMPLATE": "Suggest 3 relevant tags for this conversation in English.",
-    "FOLLOW_UP_GENERATION_PROMPT_TEMPLATE": "",
-    "ENABLE_FOLLOW_UP_GENERATION": False,
-    "ENABLE_TAGS_GENERATION": True,
-    "ENABLE_SEARCH_QUERY_GENERATION": True,
-    "ENABLE_RETRIEVAL_QUERY_GENERATION": True,
-    "QUERY_GENERATION_PROMPT_TEMPLATE": "Formulate a precise search query to retrieve the most relevant documents.",
-    "TOOLS_FUNCTION_CALLING_PROMPT_TEMPLATE": "",
-    "ENABLE_VOICE_MODE_PROMPT": False,
-    "VOICE_MODE_PROMPT_TEMPLATE": "",
+    'TASK_MODEL': 'zen.gpt-5.6-luna',
+    'TASK_MODEL_EXTERNAL': 'zen.gpt-5.6-luna',
+    'TASK_MODEL_PARAMS': {},
+    'ENABLE_TITLE_GENERATION': True,
+    'TITLE_GENERATION_PROMPT_TEMPLATE': 'Generate a concise chat title (max 6 words) in the user language.',
+    'ENABLE_AUTOCOMPLETE_GENERATION': False,
+    'ENABLE_FOLLOW_UP_GENERATION': False,
+    'ENABLE_TAGS_GENERATION': True,
+    'ENABLE_SEARCH_QUERY_GENERATION': True,
+    'ENABLE_RETRIEVAL_QUERY_GENERATION': True,
 }
 
+# Instance default. BUILDER Excel path is Open Terminal, not pyodide.
 CODE_EXECUTION = {
-    "ENABLE_CODE_EXECUTION": True,
-    "CODE_EXECUTION_ENGINE": "pyodide",
-    "CODE_EXECUTION_JUPYTER_URL": None,
-    "CODE_EXECUTION_JUPYTER_AUTH": None,
-    "CODE_EXECUTION_JUPYTER_AUTH_TOKEN": None,
-    "CODE_EXECUTION_JUPYTER_AUTH_PASSWORD": None,
-    "CODE_EXECUTION_JUPYTER_TIMEOUT": None,
-    "ENABLE_CODE_INTERPRETER": True,
-    "CODE_INTERPRETER_ENGINE": "pyodide",
-    "CODE_INTERPRETER_PROMPT_TEMPLATE": None,
-    "CODE_INTERPRETER_JUPYTER_URL": None,
-    "CODE_INTERPRETER_JUPYTER_AUTH": None,
-    "CODE_INTERPRETER_JUPYTER_AUTH_TOKEN": None,
-    "CODE_INTERPRETER_JUPYTER_AUTH_PASSWORD": None,
-    "CODE_INTERPRETER_JUPYTER_TIMEOUT": None,
+    'ENABLE_CODE_EXECUTION': True,
+    'CODE_EXECUTION_ENGINE': 'pyodide',
+    'ENABLE_CODE_INTERPRETER': True,
+    'CODE_INTERPRETER_ENGINE': 'pyodide',
 }
 
 
 def apply_models(token, existing_ids):
     for role in ROLES:
-        rid = role["id"]
+        rid = role['id']
         payload = dict(role)
         if DRY_RUN:
-            print(f'[dry-run] model {rid}: {json.dumps(payload, ensure_ascii=False)[:300]}')
+            print(f'[dry-run] model {rid}')
             continue
         if rid in existing_ids:
-            path = '/api/v1/models/model/update'
-            code, body = req('POST', path, payload, token)
-            ok = code in (200, 201)
+            code, body = req('POST', '/api/v1/models/model/update', payload, token)
             verb = 'updated'
         else:
-            path = '/api/v1/models/create'
-            code, body = req('POST', path, payload, token)
-            ok = code in (200, 201)
+            code, body = req('POST', '/api/v1/models/create', payload, token)
             verb = 'created'
-        if ok:
+        if code in (200, 201):
             print(f'[models] {rid} {verb} OK')
         else:
             print(f'[models] {rid} {verb} FAILED HTTP {code}: {body[:300]}', file=sys.stderr)
@@ -273,13 +236,13 @@ def apply_prompts(token):
     for p in PROMPTS:
         payload = {
             **p,
-            "data": None,
-            "meta": None,
-            "tags": None,
-            "access_grants": None,
-            "version_id": None,
-            "commit_message": "bootstrap",
-            "is_production": True,
+            'data': None,
+            'meta': None,
+            'tags': None,
+            'access_grants': None,
+            'version_id': None,
+            'commit_message': 'p0',
+            'is_production': True,
         }
         if DRY_RUN:
             print(f'[dry-run] prompt {p["command"]}')
@@ -294,7 +257,7 @@ def apply_prompts(token):
 
 
 def apply_knowledge(token):
-    payload = {**KNOWLEDGE, "access_grants": None}
+    payload = {**KNOWLEDGE, 'access_grants': None}
     if DRY_RUN:
         print(f'[dry-run] knowledge {KNOWLEDGE["name"]}')
         return
@@ -331,7 +294,7 @@ def main():
     apply_config(token, '/api/v1/configs/subagents', SUBAGENTS, 'subagents')
     apply_config(token, '/api/v1/tasks/config/update', TASKS, 'tasks')
     apply_config(token, '/api/v1/configs/code_execution', CODE_EXECUTION, 'code_execution')
-    print('[done] Shahy bootstrap applied. Restart persistence not tested yet.')
+    print('[done] P0 applied. Manually: disable COUNCIL Open Terminal, swap DDGS -> Brave/Tavily, hide /openapi.json.')
 
 
 if __name__ == '__main__':
