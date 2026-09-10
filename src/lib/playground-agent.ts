@@ -1,4 +1,8 @@
 import { venice } from './venice-client'
+import { qwenChatStream } from './qwen-client'
+import { gatewayBaseUrl } from './ai-gateway'
+import { parseSSEStream } from './stream'
+import { isSexSceneRequest, buildSexSceneDirective } from './sex-scene-contract'
 import { NOUR_SYSTEM_PROMPT, nourLanguagePrompt, nourRequestProfile, type NourLanguageMode } from './nour-character'
 import { NODE_SCHEMAS } from './workflow-schema'
 import type { WorkflowPatch } from './workflow-mutations'
@@ -50,34 +54,7 @@ function modelMenu(catalog: ModelCatalog | undefined): string {
 
 const SYSTEM_PROMPT_BASE = `${NOUR_SYSTEM_PROMPT}\n\nOPERATIONAL ROLE\nYou are also the workflow designer for OpenVenice. You help the user author visual workflows that chain Venice AI models.
 
-You have these node types available:
-
-${nodeCatalog()}
-
-You respond by emitting patches to mutate the current draft workflow. Each patch is one of:
-- {"op":"add_node","nodeType":"<type>","id":"optional_id","params":{...}} — add a new node
-- {"op":"set_params","id":"<node_id>","params":{...}} — update a node's params
-- {"op":"connect","source":"<node_id>","target":"<node_id>"} — connect two nodes
-- {"op":"disconnect","id":"<edge_id>"} — remove an edge
-- {"op":"remove_node","id":"<node_id>"} — remove a node
-- {"op":"clear"} — remove all nodes and edges
-
-RULES:
-1. Every response MUST be a single valid JSON object, nothing before or after. Do not wrap in markdown fences.
-2. Schema: {"say": string, "patches": Array<Patch>}.
-3. "say" is Noor's answer. Keep workflow narration short, but preserve the full requested detail for advice, analysis, settings, and copy-ready prompts.
-4. When building a new workflow from scratch, start with {"op":"clear"} then add nodes top-to-bottom and connect them.
-5. Always assign explicit ids when adding multiple nodes in one turn so you can reference them in connect patches.
-6. Workflows need at least one textInput (or a generation node with a self-contained prompt) and an output node at the end.
-7. Use {{input}} inside a node's prompt to place upstream text precisely, or leave prompt empty to append input after.
-8. Keep to the param names and enum values listed above. Omit params to accept defaults.
-9. If the user just asks a question, respond with a "say" and an empty "patches" array.
-10. Do not narrate patches you aren't emitting. Do not produce commentary outside the JSON.
-11. For multi-person edits, map every reference to its intended subject explicitly and ask one precise question when ambiguous.
-12. Never say media was generated merely because you assembled a workflow; describe it as ready to run.
-
-Example response:
-{"say":"I built a pipeline that researches a topic, summarizes it, and narrates the summary.","patches":[{"op":"clear"},{"op":"add_node","nodeType":"textInput","id":"in","params":{"inputText":"Quantum computing progress in 2025"}},{"op":"add_node","nodeType":"chat","id":"research","params":{"prompt":"Research this topic thoroughly.","webSearch":"on"}},{"op":"add_node","nodeType":"chat","id":"summary","params":{"prompt":"Summarize into 5 bullet points.","temperature":0.3}},{"op":"add_node","nodeType":"tts","id":"narrate","params":{"voice":"af_sky"}},{"op":"add_node","nodeType":"output","id":"out"},{"op":"connect","source":"in","target":"research"},{"op":"connect","source":"research","target":"summary"},{"op":"connect","source":"summary","target":"narrate"},{"op":"connect","source":"narrate","target":"out"}]}`
+You have these node types available:\n\n${nodeCatalog()}\n\nYou respond by emitting patches to mutate the current draft workflow. Each patch is one of:\n- {"op":"add_node","nodeType":"<type>","id":"optional_id","params":{...}} — add a new node\n- {"op":"set_params","id":"<node_id>","params":{...}} — update a node's params\n- {"op":"connect","source":"<node_id>","target":"<node_id>"} — connect two nodes\n- {"op":"disconnect","id":"<edge_id>"} — remove an edge\n- {"op":"remove_node","id":"<node_id>"} — remove a node\n- {"op":"clear"} — remove all nodes and edges\n\nRULES:\n1. Every response MUST be a single valid JSON object, nothing before or after. Do not wrap in markdown fences.\n2. Schema: {"say": string, "patches": Array<Patch>}.\n3. "say" is Noor's answer. Keep workflow narration short, but preserve the full requested detail for advice, analysis, settings, and copy-ready prompts.\n4. When building a new workflow from scratch, start with {"op":"clear"} then add nodes top-to-bottom and connect them.\n5. Always assign explicit ids when adding multiple nodes in one turn so you can reference them in connect patches.\n6. Workflows need at least one textInput (or a generation node with a self-contained prompt) and an output node at the end.\n7. Use {{input}} inside a node's prompt to place upstream text precisely, or leave prompt empty to append input after.\n8. Keep to the param names and enum values listed above. Omit params to accept defaults.\n9. If the user just asks a question, respond with a "say" and an empty "patches" array.\n10. Do not narrate patches you aren't emitting. Do not produce commentary outside the JSON.\n11. For multi-person edits, map every reference to its intended subject explicitly and ask one precise question when ambiguous.\n12. Never say media was generated merely because you assembled a workflow; describe it as ready to run.\n\nExample response:\n{"say":"I built a pipeline that researches a topic, summarizes it, and narrates the summary.","patches":[{"op":"clear"},{"op":"add_node","nodeType":"textInput","id":"in","params":{"inputText":"Quantum computing progress in 2025"}},{"op":"add_node","nodeType":"chat","id":"research","params":{"prompt":"Research this topic thoroughly.","webSearch":"on"}},{"op":"add_node","nodeType":"chat","id":"summary","params":{"prompt":"Summarize into 5 bullet points.","temperature":0.3}},{"op":"add_node","nodeType":"tts","id":"narrate","params":{"voice":"af_sky"}},{"op":"add_node","nodeType":"output","id":"out"},{"op":"connect","source":"in","target":"research"},{"op":"connect","source":"research","target":"summary"},{"op":"connect","source":"summary","target":"narrate"},{"op":"connect","source":"narrate","target":"out"}]}`
 
 function buildSystemPrompt(catalog: ModelCatalog | undefined, languageMode: NourLanguageMode): string {
   return `${SYSTEM_PROMPT_BASE}\n\n${nourLanguagePrompt(languageMode)}${modelMenu(catalog)}`
@@ -170,6 +147,16 @@ export function parseAgentResponse(raw: string): AgentResponse {
   return { say, patches, invalidPatches }
 }
 
+/**
+ * Provider-neutral request transport for Noor.
+ *
+ * `venice` keeps the original hosted path. `open` routes the same request
+ * through the same-origin AI gateway (/ai/v1) to a self-hosted,
+ * OpenAI-compatible model, so Noor can serve a conversation without any
+ * Venice credential.
+ */
+export type AgentTransport = 'venice' | 'open'
+
 interface CallAgentOptions {
   userMessage: string
   draft: { nodes: Node<VeniceNodeData>[]; edges: Edge[] }
@@ -180,6 +167,27 @@ interface CallAgentOptions {
   capabilities?: ModelCapabilities
   languageMode: NourLanguageMode
   signal?: AbortSignal
+  /** Which route serves this request. Defaults to the hosted provider. */
+  transport?: AgentTransport
+  /** Gateway base URL when `transport` is `open`. Defaults to /ai/v1. */
+  openBaseUrl?: string
+  /** Optional per-session gateway token. Production injects it server-side. */
+  openApiKey?: string
+  /** Model id served by the open endpoint (ignores the hosted model id). */
+  openModel?: string
+}
+
+/** Collect a streamed OpenAI-compatible completion into plain text. */
+async function collectStreamText(
+  stream: ReadableStream<Uint8Array>,
+  signal?: AbortSignal,
+): Promise<string> {
+  let text = ''
+  for await (const chunk of parseSSEStream(stream, { signal })) {
+    const delta = chunk.choices?.[0]?.delta as { content?: string } | undefined
+    if (delta?.content) text += delta.content
+  }
+  return text
 }
 
 async function singleCall(opts: {
@@ -189,7 +197,30 @@ async function singleCall(opts: {
   maxCompletionTokens: number
   useResponseFormat: boolean
   signal?: AbortSignal
+  transport: AgentTransport
+  openBaseUrl?: string
+  openApiKey?: string
 }): Promise<string> {
+  if (opts.transport === 'open') {
+    // OpenAI-compatible backends reject Venice-only parameters, so the gateway
+    // body is built separately instead of being stripped afterwards.
+    const body: Record<string, unknown> = {
+      model: opts.model,
+      messages: opts.messages,
+      temperature: opts.temperature,
+      max_tokens: opts.maxCompletionTokens,
+      stream: true,
+    }
+    if (opts.useResponseFormat) body.response_format = { type: 'json_object' }
+
+    const stream = await qwenChatStream(
+      { baseUrl: gatewayBaseUrl(opts.openBaseUrl), apiKey: opts.openApiKey },
+      body,
+      opts.signal,
+    )
+    return collectStreamText(stream, opts.signal)
+  }
+
   const body: Record<string, unknown> = {
     model: opts.model,
     messages: opts.messages,
@@ -211,16 +242,25 @@ async function singleCall(opts: {
   return resp.choices[0]?.message?.content ?? ''
 }
 
-export async function callAgent({ userMessage, draft, history, catalog, model, capabilities, languageMode, signal }: CallAgentOptions): Promise<AgentResponse> {
-  const chosenModel = model || DEFAULT_AGENT_MODEL
+export async function callAgent({ userMessage, draft, history, catalog, model, capabilities, languageMode, signal, transport: requestedTransport, openBaseUrl, openApiKey, openModel }: CallAgentOptions): Promise<AgentResponse> {
+  const transport: AgentTransport = requestedTransport ?? 'venice'
+  // The hosted model id is meaningless to a self-hosted endpoint, and vice
+  // versa, so each route resolves its own target model.
+  const chosenModel = transport === 'open'
+    ? (openModel || model || DEFAULT_AGENT_MODEL)
+    : (model || DEFAULT_AGENT_MODEL)
   const requestProfile = nourRequestProfile(userMessage)
   // Only request structured output if the model supports it. Sending response_format
   // to llama-3.3-70b returns HTTP 400; sending it to gpt-4o-mini degrades quality.
   const useRF = capabilities?.supportsResponseSchema === true
+  // When the user asks for a sex scene, the product contract (penetration as the
+  // base element) is attached to the request itself so no model can drift into
+  // implied or off-screen sex.
+  const sexDirective = isSexSceneRequest(userMessage) ? `\n\n${buildSexSceneDirective()}` : ''
   const messages = [
     { role: 'system' as const, content: buildSystemPrompt(catalog, languageMode) },
     ...history.map((m) => ({ role: m.role, content: m.content })),
-    { role: 'user' as const, content: `${describeDraft(draft)}\n\nUser: ${userMessage}\n\nReply with a single JSON object: {"say": "...", "patches": [...]}. No prose, no markdown fences.` },
+    { role: 'user' as const, content: `${describeDraft(draft)}\n\nUser: ${userMessage}${sexDirective}\n\nReply with a single JSON object: {"say": "...", "patches": [...]}. No prose, no markdown fences.` },
   ]
 
   const raw = await singleCall({
@@ -230,6 +270,9 @@ export async function callAgent({ userMessage, draft, history, catalog, model, c
     maxCompletionTokens: requestProfile.maxCompletionTokens,
     useResponseFormat: useRF,
     signal,
+    transport,
+    openBaseUrl,
+    openApiKey,
   })
   const parsed = parseAgentResponse(raw)
 
@@ -247,6 +290,9 @@ export async function callAgent({ userMessage, draft, history, catalog, model, c
         maxCompletionTokens: requestProfile.maxCompletionTokens,
         useResponseFormat: useRF,
         signal,
+        transport,
+        openBaseUrl,
+        openApiKey,
       })
       return parseAgentResponse(retryRaw)
     } catch {

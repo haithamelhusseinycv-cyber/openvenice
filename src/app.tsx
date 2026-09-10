@@ -2,6 +2,7 @@ import { lazy, Suspense, useState, useEffect } from 'react'
 import { useSettingsStore, type Tab } from './stores/settings-store'
 import { usePlaygroundStore } from './stores/playground-store'
 import { useAuthStore } from './stores/auth-store'
+import { useProviderStore } from './stores/provider-store'
 import { Sidebar } from './components/layout/sidebar'
 import { Header } from './components/layout/header'
 import { ApiKeyDialog } from './components/layout/api-key-dialog'
@@ -36,6 +37,22 @@ export function App() {
       if (restored) setApiKeyOpen(false)
     })
   }, [hydrateFromDevice])
+
+  useEffect(() => {
+    // Resolve the provider-neutral route for this session: the self-hosted open
+    // model is used only when the same-origin gateway actually answers.
+    const refreshGateway = useProviderStore.getState().refreshGateway
+    void refreshGateway()
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void useProviderStore.getState().refreshGateway()
+    }
+    const interval = window.setInterval(() => { void useProviderStore.getState().refreshGateway() }, 60_000)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.clearInterval(interval)
+    }
+  }, [])
 
   useEffect(() => {
     if (!isVisibleTab(activeTab)) setActiveTab('playground')
