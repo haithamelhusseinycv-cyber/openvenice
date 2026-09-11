@@ -6,6 +6,7 @@ import { useProviderStore } from '../stores/provider-store'
 import { useAgentStatusStore } from '../stores/agent-status-store'
 import { useVoiceStore } from '../stores/voice-store'
 import { lockChatSystemPrompt } from '../lib/defaults'
+import { withVeniceChatParams } from '../lib/venice-policy'
 import { getDefaultAgentRegistry } from '../agent/runtime'
 import { runQwenAgent } from '../agent/qwen-tool-loop'
 import { buildNourSystemPrompt } from '../agent/personas/nour'
@@ -106,7 +107,7 @@ export function useChat() {
         temperature,
         top_p: topP,
         max_tokens: maxTokens,
-        venice_parameters: veniceParams,
+        venice_parameters: withVeniceChatParams(veniceParams),
       }
 
       const stream = await venice<ReadableStream<Uint8Array>>('/chat/completions', {

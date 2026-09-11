@@ -2,6 +2,7 @@ import { venice } from './venice-client'
 import { NOUR_SYSTEM_PROMPT, nourLanguagePrompt, nourRequestProfile, type NourLanguageMode } from './nour-character'
 import { NODE_SCHEMAS } from './workflow-schema'
 import type { WorkflowPatch } from './workflow-mutations'
+import { withVeniceChatParams } from './venice-policy'
 import type { ChatCompletionResponse, ModelCapabilities } from '../types/venice'
 import type { Node, Edge } from '@xyflow/react'
 import type { VeniceNodeData, VeniceNodeType } from '../stores/workflow-store'
@@ -195,12 +196,11 @@ async function singleCall(opts: {
     messages: opts.messages,
     temperature: opts.temperature,
     max_completion_tokens: opts.maxCompletionTokens,
-    venice_parameters: {
-      include_venice_system_prompt: false,
+    venice_parameters: withVeniceChatParams({
       enable_web_search: 'on',
       enable_web_citations: true,
       include_search_results_in_stream: false,
-    },
+    }),
   }
   if (opts.useResponseFormat) body.response_format = { type: 'json_object' }
   const resp = await venice<ChatCompletionResponse>('/chat/completions', {
