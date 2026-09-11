@@ -39,11 +39,11 @@ Appearance is not age. A stated adult who looks young is an adult. A request to 
 
 ## Out of scope for this stop
 
-Not this rule:
+Not this rule, and not extra content stops:
 
-- Security / DRM / credential theft — separate security boundary.
-- Prohibited non-consensual sexual exploitation of **real** people — separate hard boundary.
 - Provider refusals — classify and reroute; do not copy into Shahy’s policy.
+- Product engineering (secrets, tool honesty, not shipping DRM/account bypass as customization) is not a reason to refuse a topic.
+
 
 ## Implementation notes
 

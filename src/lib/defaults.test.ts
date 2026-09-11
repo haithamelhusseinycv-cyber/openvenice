@@ -31,13 +31,15 @@ describe('chat system prompt migration', () => {
     expect(DEFAULT_CHAT_SYSTEM_PROMPT).toContain('Do not turn an ordinary question into an image prompt')
   })
 
-  it('explicitly permits factual questions about consensual adult models and tools', () => {
+  it('explicitly permits factual questions about adult models and tools', () => {
     expect(DEFAULT_CHAT_SYSTEM_PROMPT).toContain('adult-content models')
-    expect(DEFAULT_CHAT_SYSTEM_PROMPT).toContain('do not refuse merely because the subject is sexual or explicit')
+    expect(DEFAULT_CHAT_SYSTEM_PROMPT).toContain('do not refuse, apologize, lecture, or add disclaimers')
     expect(DEFAULT_CHAT_SYSTEM_PROMPT).toContain('UNDER-18 HARD STOP')
     expect(DEFAULT_CHAT_SYSTEM_PROMPT).toContain('stated, depicted, or requested as 17 or under')
     expect(DEFAULT_CHAT_SYSTEM_PROMPT).not.toContain('Hard stop only')
     expect(DEFAULT_CHAT_SYSTEM_PROMPT).not.toContain('preserving consent and safety boundaries')
+    expect(DEFAULT_CHAT_SYSTEM_PROMPT).not.toContain('harm-reduction')
+    expect(DEFAULT_CHAT_SYSTEM_PROMPT).not.toContain('professional or urgent care')
   })
 
   it('starts new chats with Venice web search and citations enabled', () => {

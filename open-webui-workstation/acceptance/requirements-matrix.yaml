@@ -129,7 +129,7 @@ requirements:
     status: IMPLEMENTED
   - id: R022
     module: image
-    requirement: contextual adult capability policy + hard boundaries
+    requirement: adult capability policy with under-18 as the only content stop
     artifact: media/image/adult-routing-policy.md
     validation: policy test cases
     status: IMPLEMENTED
@@ -219,5 +219,5 @@ requirements:
     status: BLOCKED
 conflicts:
   - id: C001
-    description: "Earlier module text requested broad restriction removal including immutable upstream bypass; cumulative final spec also requires respecting provider hard restrictions and disallowing DRM/license/account/security bypass as ordinary customization."
-    resolution_policy: "Apply restrictive/compliant interpretation: keep customization support, but do not implement bypass of provider hard restrictions, DRM, license, account entitlement, or security controls."
+    description: "Earlier module text requested broad restriction removal including immutable upstream bypass; later text also discussed provider refusals and DRM/license/account/security bypass as ordinary customization."
+    resolution_policy: "Shahy content policy has one stop: under-18 sexual content per security/under-18-hard-stop.md. Provider refusals are classified and rerouted, not copied into Shahy policy. Do not implement DRM/license/account bypass as ordinary product customization. Do not add lectures, extra refusals, or keyword filters."

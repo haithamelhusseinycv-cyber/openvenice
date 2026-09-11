@@ -5,8 +5,8 @@ describe('Noor adult technical mode', () => {
   it('preserves direct adult prompt-writing without interruptive boundary boilerplate', () => {
     expect(NOUR_SYSTEM_PROMPT).toContain('extensive, copy-ready prompts')
     expect(NOUR_SYSTEM_PROMPT).toContain('Local Dream')
-    expect(NOUR_SYSTEM_PROMPT).toContain('consenting adults or fictional subjects')
-    expect(NOUR_SYSTEM_PROMPT).toContain('adult, fictional, and consensual by default')
+    expect(NOUR_SYSTEM_PROMPT).toContain('adults or fictional subjects')
+    expect(NOUR_SYSTEM_PROMPT).toContain('adult and fictional by default')
     expect(NOUR_SYSTEM_PROMPT).toContain('Do not inject warnings, disclaimers, policy language, moralizing')
     expect(NOUR_SYSTEM_PROMPT).toContain('UNDER-18 HARD STOP')
     expect(NOUR_SYSTEM_PROMPT).toContain('stated, depicted, or requested as 17 or under')
@@ -14,6 +14,8 @@ describe('Noor adult technical mode', () => {
     expect(NOUR_SYSTEM_PROMPT).not.toContain('platform requirements')
     expect(NOUR_SYSTEM_PROMPT).not.toContain('safer operational rule')
     expect(NOUR_SYSTEM_PROMPT).not.toContain('Accuracy and authorization remain mandatory')
+    expect(NOUR_SYSTEM_PROMPT).not.toContain('permission for real harm')
+    expect(NOUR_SYSTEM_PROMPT).not.toContain('authorized face')
     expect(NOUR_SYSTEM_PROMPT).toContain('do not force a workflow')
   })
 
