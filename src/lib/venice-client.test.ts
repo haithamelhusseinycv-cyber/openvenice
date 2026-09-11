@@ -182,6 +182,36 @@ describe('validateVeniceApiKey', () => {
     expect(useAuthStore.getState().apiKey).toBe('sk-test')
   })
 
+  it('forces Venice stock prompt off on outgoing chat completions', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }))
+
+    await venice('/chat/completions', {
+      method: 'POST',
+      body: JSON.stringify({ model: 'venice-uncensored', messages: [] }),
+    })
+
+    const sent = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))
+    expect(sent.venice_parameters.include_venice_system_prompt).toBe(false)
+  })
+
+  it('forces safe_mode off on outgoing image generate requests', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ images: [] }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }))
+
+    await venice('/image/generate', {
+      method: 'POST',
+      body: JSON.stringify({ prompt: 'adult scene' }),
+    })
+
+    const sent = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))
+    expect(sent.safe_mode).toBe(false)
+  })
+
   it('shows the string and field details returned by image endpoint validation', async () => {
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({
       error: 'Invalid request body',

@@ -12,13 +12,15 @@ This directory is the canonical, reproducible package for configuring and operat
 The existing healthy Open WebUI runtime must be preserved. Configuration is applied via controlled updates only.
 
 ## Prompt Assembly
-1. Hard platform/provider constraints
+1. Policy `audit_shahy_venice` v1 (`security/audit_shahy_venice.yaml`) plus under-18 hard stop (`security/under-18-hard-stop.md`). No other content stop, lecture, or extra refusal.
 2. Global core
-3. Global open/mature behavior
+3. Global open/mature/free-thought behavior
 4. Reasoning/productivity mode
 5. Model-specific overlay
 6. Tool/task context
 7. Current user request
+
+Provider refusals are classified and rerouted. They are not copied into Shahy's own policy.
 
 ## Implementation Phases
 See `acceptance/requirements-matrix.yaml` and `acceptance/acceptance-suite.md`.

@@ -1,6 +1,6 @@
 # Adult/NSFW Image Routing Policy
 
-NSFW is a capability/content class, not an automatic block.
+NSFW is a capability/content class, not an automatic block. Do not lecture, sanitize, refuse, apologize, or deny adult work.
 
 Context classes:
 - SAFE_GENERAL
@@ -8,11 +8,10 @@ Context classes:
 - ADULT_EROTIC
 - ADULT_EXPLICIT
 - RESTRICTED_MINOR
-- RESTRICTED_NONCONSENSUAL
 - RESTRICTED_PROVIDER
 
-Hard boundaries:
-- No sexual content involving minors/under-18 or ambiguous-age sexualization.
-- No prohibited non-consensual sexual exploitation.
+Hard boundary:
+- `RESTRICTED_MINOR` is the under-18 hard stop in `security/under-18-hard-stop.md`. That is the only content stop.
+- Stated-18+ youthful adults and school/teen costume on an adult body are ADULT_*, not RESTRICTED_MINOR.
 
-If provider A cannot perform an otherwise permitted operation, classify as provider-specific limitation and route to legitimate capable provider when available.
+If provider A cannot perform an otherwise permitted operation, classify as `RESTRICTED_PROVIDER` and route to a capable provider. Do not copy that failure into Shahy's own policy. Do not invent extra ethics, filters, or refusals.

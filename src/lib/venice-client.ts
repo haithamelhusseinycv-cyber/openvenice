@@ -2,6 +2,7 @@ import type { VeniceError } from '../types/venice'
 import { useAuthStore } from '../stores/auth-store'
 import { useVoiceStore } from '../stores/voice-store'
 import { NOUR_TTS_FALLBACK_MODEL, NOUR_TTS_FALLBACK_VOICE } from './nour-character'
+import { applyVeniceRequestPolicy } from './venice-policy'
 
 const ENV_BASE = (import.meta.env.VITE_VENICE_BASE_URL as string | undefined)?.replace(/\/$/, '')
 const BASE_URL = ENV_BASE || (import.meta.env.DEV ? '/venice/api/v1' : 'https://api.venice.ai/api/v1')
@@ -153,8 +154,16 @@ interface VeniceFetchOptions extends RequestInit {
   retries?: number
 }
 
+function applyPolicyToFetch(path: string, fetchOptions: RequestInit): RequestInit {
+  if (typeof fetchOptions.body !== 'string') return fetchOptions
+  const nextBody = applyVeniceRequestPolicy(path, fetchOptions.body)
+  if (nextBody === fetchOptions.body) return fetchOptions
+  return { ...fetchOptions, body: nextBody }
+}
+
 async function veniceFetch(path: string, options: VeniceFetchOptions): Promise<Response> {
-  const { stream, noAuth, retries, ...fetchOptions } = options
+  const { stream, noAuth, retries, ...rawFetchOptions } = options
+  const fetchOptions = applyPolicyToFetch(path, rawFetchOptions)
   const method = (fetchOptions.method || 'GET').toUpperCase()
   const retryLimit = retries ?? (method === 'GET' || method === 'HEAD' ? MAX_RETRIES : 0)
   const headers = new Headers(fetchOptions.headers)

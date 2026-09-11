@@ -18,6 +18,7 @@ import { venice } from './venice-client'
 import { NOUR_SYSTEM_PROMPT, nourLanguagePrompt, nourRequestProfile, type NourLanguageMode } from './nour-character'
 import { generateId } from './utils'
 import { NODE_SCHEMAS } from './workflow-schema'
+import { withVeniceChatParams } from './venice-policy'
 import type { WorkflowPatch } from './workflow-mutations'
 import type { ModelCapabilities } from '../types/venice'
 import type { Node, Edge } from '@xyflow/react'
@@ -482,12 +483,11 @@ export async function runAgentTools(opts: RunOptions): Promise<RunResult> {
         max_completion_tokens: toolCallCount > 0 ? 4096 : requestProfile.maxCompletionTokens,
         tools: TOOLS,
         tool_choice: 'auto',
-        venice_parameters: {
-          include_venice_system_prompt: false,
+        venice_parameters: withVeniceChatParams({
           enable_web_search: 'on',
           enable_web_citations: true,
           include_search_results_in_stream: false,
-        },
+        }),
       }),
       signal: opts.signal,
     })
