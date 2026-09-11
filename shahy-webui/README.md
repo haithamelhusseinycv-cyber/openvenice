@@ -15,6 +15,6 @@ The provider key is read from the `NUBE_API_KEY` environment variable and is not
 - Open WebUI: `v0.11.3`
 - Function ID: `shahy_kimi_k2_6_deepseek`
 - Display name: `Shahy`
-- Pipe version: `1.6.0`
+- Pipe version: `1.7.0`
 
 Use the Pipe directly from the model selector. Do not create a Workspace Model whose `base_model_id` points to the Pipe.

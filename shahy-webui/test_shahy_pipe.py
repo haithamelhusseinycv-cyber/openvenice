@@ -98,7 +98,23 @@ class PipeTests(unittest.TestCase):
         self.run_pipe(client)
         messages = client.requests[0][2]["messages"]
         self.assertEqual(messages[0]["role"], "system")
+        self.assertIn("audit_shahy_venice", messages[0]["content"])
         self.assertEqual(sum(m.get("role") == "system" for m in messages), 1)
+
+    def test_policy_is_prepended_even_when_a_system_message_already_exists(self):
+        client = Client([Response(200, {"choices": [{"message": {"content": "ok"}}]})])
+        self.run_pipe(client, body={"messages": [{"role": "system", "content": "other instructions"}, {"role": "user", "content": "hi"}]})
+        messages = client.requests[0][2]["messages"]
+        self.assertEqual(messages[0]["role"], "system")
+        self.assertIn("audit_shahy_venice", messages[0]["content"])
+        self.assertEqual(messages[1]["content"], "other instructions")
+
+    def test_policy_is_not_duplicated_when_already_present(self):
+        client = Client([Response(200, {"choices": [{"message": {"content": "ok"}}]})])
+        existing = self.pipe.system_prompt
+        self.run_pipe(client, body={"messages": [{"role": "system", "content": existing}, {"role": "user", "content": "hi"}]})
+        messages = client.requests[0][2]["messages"]
+        self.assertEqual(sum("audit_shahy_venice" in str(m.get("content") or "") for m in messages), 1)
 
     def test_system_prompt_forbids_moralizing_and_extra_refusals(self):
         prompt = self.pipe.system_prompt

@@ -1,3 +1,5 @@
+import { applyChatPolicyToObject } from './venice-policy'
+
 export interface QwenClientConfig {
   baseUrl: string
   apiKey?: string
@@ -39,12 +41,19 @@ export async function qwenChatStream(
   }
   if (config.apiKey?.trim()) headers.Authorization = `Bearer ${config.apiKey.trim()}`
 
+  const payload = body && typeof body === 'object' && !Array.isArray(body)
+    ? { ...(body as Record<string, unknown>) }
+    : body
+  if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+    applyChatPolicyToObject(payload as Record<string, unknown>)
+  }
+
   let response: Response
   try {
     response = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers,
-      body: JSON.stringify(body),
+      body: JSON.stringify(payload),
       signal,
     })
   } catch (error) {

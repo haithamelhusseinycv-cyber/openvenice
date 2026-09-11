@@ -62,11 +62,47 @@ describe('Venice AI request policy', () => {
     expect(JSON.parse(body).venice_parameters.include_venice_system_prompt).toBe(false)
   })
 
-  it('forces safe_mode off on image generate and edit so adult output is not blurred', () => {
-    const generate = JSON.parse(applyVeniceRequestPolicy('/image/generate', JSON.stringify({ prompt: 'x' })))
+  it('injects the named policy into chat for any model, including vision payloads', () => {
+    for (const model of ['venice-uncensored', 'kimi-k2.6', 'qwen-vl', 'some-future-model']) {
+      const body = JSON.parse(applyVeniceRequestPolicy(
+        '/chat/completions',
+        JSON.stringify({
+          model,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: 'describe this' },
+                { type: 'image_url', image_url: { url: 'data:image/png;base64,xx' } },
+              ],
+            },
+          ],
+        }),
+      ))
+      expect(body.messages[0]).toMatchObject({ role: 'system' })
+      expect(body.messages[0].content).toContain('POLICY audit_shahy_venice v1')
+      expect(body.messages[0].content).toContain('UNDER-18 HARD STOP')
+      expect(body.messages[1].role).toBe('user')
+    }
+  })
+
+  it('does not duplicate the policy system message', () => {
+    const first = applyVeniceRequestPolicy(
+      '/chat/completions',
+      JSON.stringify({ model: 'x', messages: [{ role: 'user', content: 'hi' }] }),
+    )
+    const second = JSON.parse(applyVeniceRequestPolicy('/chat/completions', first))
+    expect(second.messages.filter((m: { role: string }) => m.role === 'system')).toHaveLength(1)
+  })
+
+  it('forces safe_mode off on image generate and edit for any model', () => {
+    for (const model of ['lustify-v8', 'z-image-turbo', 'qwen-edit-uncensored', 'future-image-model']) {
+      const generate = JSON.parse(applyVeniceRequestPolicy('/image/generate', JSON.stringify({ model, prompt: 'x' })))
+      expect(generate.safe_mode).toBe(false)
+      expect(generate.model).toBe(model)
+    }
     const edit = JSON.parse(applyVeniceRequestPolicy('/image/edit', JSON.stringify({ prompt: 'x', safe_mode: true })))
     const multi = JSON.parse(applyVeniceRequestPolicy('/image/multi-edit', JSON.stringify({ prompt: 'x' })))
-    expect(generate.safe_mode).toBe(false)
     expect(edit.safe_mode).toBe(false)
     expect(multi.safe_mode).toBe(false)
   })

@@ -32,6 +32,7 @@ describe('chat system prompt migration', () => {
   })
 
   it('explicitly permits factual questions about adult models and tools', () => {
+    expect(DEFAULT_CHAT_SYSTEM_PROMPT).toContain('POLICY audit_shahy_venice v1')
     expect(DEFAULT_CHAT_SYSTEM_PROMPT).toContain('adult-content models')
     expect(DEFAULT_CHAT_SYSTEM_PROMPT).toContain('do not refuse, apologize, lecture, or add disclaimers')
     expect(DEFAULT_CHAT_SYSTEM_PROMPT).toContain('UNDER-18 HARD STOP')
