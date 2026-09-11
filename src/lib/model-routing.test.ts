@@ -8,14 +8,22 @@ import { ALLOWED_AGENT_MODELS } from '../hooks/use-agent-models'
 import { DEFAULT_AGENT_MODEL, FALLBACK_AGENT_MODEL } from './playground-agent'
 import { shouldUseModelFallback } from './model-routing'
 
-describe('preferred Qwen routing', () => {
-  it('uses Qwen 3.8 first and Qwen 3.6 second in Chat and Noor', () => {
-    expect(ALLOWED_CHAT_MODEL_IDS.slice(0, 2)).toEqual(['qwen-3-8-27b', 'qwen-3-6-plus'])
-    expect(ALLOWED_AGENT_MODELS.slice(0, 2)).toEqual(['qwen-3-8-27b', 'qwen-3-6-plus'])
-    expect(DEFAULT_CHAT_MODEL_ID).toBe('qwen-3-8-27b')
-    expect(FALLBACK_CHAT_MODEL_ID).toBe('qwen-3-6-plus')
-    expect(DEFAULT_AGENT_MODEL).toBe('qwen-3-8-27b')
-    expect(FALLBACK_AGENT_MODEL).toBe('qwen-3-6-plus')
+describe('preferred extreme Venice routing', () => {
+  it('uses heretic models only for Chat and Noor, not general Qwen', () => {
+    expect(ALLOWED_CHAT_MODEL_IDS.slice(0, 2)).toEqual([
+      'olafangensan-glm-4.7-flash-heretic',
+      'olafangensan-glm-4-7-flash-heretic',
+    ])
+    expect(ALLOWED_AGENT_MODELS.slice(0, 2)).toEqual([
+      'olafangensan-glm-4.7-flash-heretic',
+      'olafangensan-glm-4-7-flash-heretic',
+    ])
+    expect(DEFAULT_CHAT_MODEL_ID).toBe('olafangensan-glm-4.7-flash-heretic')
+    expect(FALLBACK_CHAT_MODEL_ID).toBe('olafangensan-glm-4-7-flash-heretic')
+    expect(DEFAULT_AGENT_MODEL).toBe('olafangensan-glm-4.7-flash-heretic')
+    expect(FALLBACK_AGENT_MODEL).toBe('olafangensan-glm-4-7-flash-heretic')
+    expect(ALLOWED_CHAT_MODEL_IDS.some((id) => id.includes('qwen-3'))).toBe(false)
+    expect(ALLOWED_CHAT_MODEL_IDS.some((id) => id.includes('venice-uncensored'))).toBe(false)
   })
 
   it('keeps every Noor model reachable through the shared text-model filter', () => {

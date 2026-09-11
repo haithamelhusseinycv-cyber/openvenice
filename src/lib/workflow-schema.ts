@@ -56,7 +56,7 @@ export const NODE_SCHEMAS: Record<VeniceNodeType, NodeSchema> = {
     input: 'text',
     output: 'text',
     params: [
-      { name: 'model', type: 'string', description: 'Venice chat model id.', required: true, default: 'llama-3.3-70b' },
+      { name: 'model', type: 'string', description: 'Venice chat model id.', required: true, default: 'olafangensan-glm-4.7-flash-heretic' },
       { name: 'prompt', type: 'text', description: 'Instruction. Use {{input}} to position upstream text, or leave empty to append.', required: true, default: '' },
       { name: 'temperature', type: 'number', description: 'Sampling temperature.', default: 0.7, min: 0, max: 2 },
       { name: 'maxTokens', type: 'number', description: 'Max output tokens.', default: 4096, min: 64, max: 32768 },
@@ -70,7 +70,7 @@ export const NODE_SCHEMAS: Record<VeniceNodeType, NodeSchema> = {
     input: 'text',
     output: 'image',
     params: [
-      { name: 'model', type: 'string', description: 'Venice image model id.', required: true, default: 'z-image-turbo' },
+      { name: 'model', type: 'string', description: 'Venice image model id.', required: true, default: 'lustify-v8' },
       { name: 'prompt', type: 'text', description: 'Image prompt. Use {{input}} to position upstream text.', required: true, default: '' },
       { name: 'negativePrompt', type: 'string', description: 'What to avoid.', default: '' },
       { name: 'steps', type: 'number', description: 'Denoising steps.', default: 20, min: 1, max: 50 },
@@ -115,7 +115,7 @@ export const NODE_SCHEMAS: Record<VeniceNodeType, NodeSchema> = {
     input: 'text',
     output: 'video',
     params: [
-      { name: 'model', type: 'string', description: 'Video model id.', required: true, default: 'wan-2.1' },
+      { name: 'model', type: 'string', description: 'Video model id.', required: true, default: 'wan-2-7-enhanced-text-to-video' },
       { name: 'prompt', type: 'text', description: 'Video prompt.', required: true, default: '' },
       { name: 'videoAspectRatio', type: 'enum', description: 'Aspect ratio.', default: '16:9', enumValues: VIDEO_ASPECT_VALUES },
       { name: 'videoDuration', type: 'enum', description: 'Clip duration. Empty means model default.', default: '', enumValues: VIDEO_DURATION_VALUES },

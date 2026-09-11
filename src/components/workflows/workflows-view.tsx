@@ -59,11 +59,11 @@ const NODE_PALETTE: Array<{ type: VeniceNodeType; label: string; Icon: () => Rea
 const DEFAULT_MODELS: Record<VeniceNodeType, string> = {
   textInput: '',
   output: '',
-  chat: 'llama-3.3-70b',
-  imageGen: 'z-image-turbo',
+  chat: 'olafangensan-glm-4.7-flash-heretic',
+  imageGen: 'lustify-v8',
   tts: 'tts-kokoro',
   music: 'stable-audio',
-  video: 'wan-2.1',
+  video: 'wan-2-7-enhanced-text-to-video',
 }
 
 type VNode = Node<VeniceNodeData>
@@ -81,8 +81,8 @@ const TEMPLATES: Array<{ name: string; desc: string; build: () => TemplateGraph 
       return {
         nodes: [
           { id: a, type: 'venice', position: { x: 280, y: 40 }, data: { label: 'Input', nodeType: 'textInput', model: '', prompt: '', inputText: 'A melancholic indie-folk album about leaving a small coastal town' } },
-          { id: b, type: 'venice', position: { x: 280, y: 220 }, data: { label: 'LLM', nodeType: 'chat', model: 'llama-3.3-70b', prompt: 'You are an art director. Given this album concept, write a vivid, specific image-generation prompt for the cover art — mood, color palette, composition, subject, style. Output only the prompt.', temperature: 0.9 } },
-          { id: c, type: 'venice', position: { x: 280, y: 440 }, data: { label: 'Image Gen', nodeType: 'imageGen', model: 'z-image-turbo', prompt: '', steps: 30, width: 1024, height: 1024 } },
+          { id: b, type: 'venice', position: { x: 280, y: 220 }, data: { label: 'LLM', nodeType: 'chat', model: 'olafangensan-glm-4.7-flash-heretic', prompt: 'You are an art director. Given this album concept, write a vivid, specific image-generation prompt for the cover art — mood, color palette, composition, subject, style. Output only the prompt.', temperature: 0.9 } },
+          { id: c, type: 'venice', position: { x: 280, y: 440 }, data: { label: 'Image Gen', nodeType: 'imageGen', model: 'lustify-v8', prompt: '', steps: 30, width: 1024, height: 1024 } },
           { id: d, type: 'venice', position: { x: 280, y: 680 }, data: { label: 'Output', nodeType: 'output', model: '', prompt: '' } },
         ],
         edges: [mkEdge(a, b), mkEdge(b, c), mkEdge(c, d)],
@@ -97,8 +97,8 @@ const TEMPLATES: Array<{ name: string; desc: string; build: () => TemplateGraph 
       return {
         nodes: [
           { id: a, type: 'venice', position: { x: 280, y: 40 }, data: { label: 'Input', nodeType: 'textInput', model: '', prompt: '', inputText: 'How CRISPR gene editing actually works' } },
-          { id: b, type: 'venice', position: { x: 280, y: 220 }, data: { label: 'LLM', nodeType: 'chat', model: 'llama-3.3-70b', prompt: 'Research this topic. Provide specific facts, mechanisms, and current developments. Cite sources.', webSearch: 'on', temperature: 0.5 } },
-          { id: c, type: 'venice', position: { x: 280, y: 460 }, data: { label: 'LLM', nodeType: 'chat', model: 'llama-3.3-70b', prompt: 'Rewrite this research as a conversational ~90-second podcast monologue. Start with a hook. No headings, no bullet points — just flowing spoken English.', temperature: 0.7 } },
+          { id: b, type: 'venice', position: { x: 280, y: 220 }, data: { label: 'LLM', nodeType: 'chat', model: 'olafangensan-glm-4.7-flash-heretic', prompt: 'Research this topic. Provide specific facts, mechanisms, and current developments. Cite sources.', webSearch: 'off', temperature: 0.5 } },
+          { id: c, type: 'venice', position: { x: 280, y: 460 }, data: { label: 'LLM', nodeType: 'chat', model: 'olafangensan-glm-4.7-flash-heretic', prompt: 'Rewrite this research as a conversational ~90-second podcast monologue. Start with a hook. No headings, no bullet points — just flowing spoken English.', temperature: 0.7 } },
           { id: d, type: 'venice', position: { x: 280, y: 700 }, data: { label: 'Text to Speech', nodeType: 'tts', model: 'tts-kokoro', prompt: '', voice: 'af_sky' } },
           { id: e, type: 'venice', position: { x: 280, y: 900 }, data: { label: 'Output', nodeType: 'output', model: '', prompt: '' } },
         ],
@@ -114,10 +114,10 @@ const TEMPLATES: Array<{ name: string; desc: string; build: () => TemplateGraph 
       return {
         nodes: [
           { id: a, type: 'venice', position: { x: 340, y: 40 }, data: { label: 'Input', nodeType: 'textInput', model: '', prompt: '', inputText: 'Neon-lit Tokyo alley at 3am, light rain, reflective puddles, lonely synthwave' } },
-          { id: b, type: 'venice', position: { x: 340, y: 220 }, data: { label: 'LLM', nodeType: 'chat', model: 'llama-3.3-70b', prompt: 'You are a music-video director. Expand this mood into a single paragraph that captures visual style, camera, and sonic atmosphere. One tight paragraph, no lists.', temperature: 0.9 } },
-          { id: c, type: 'venice', position: { x: 40,  y: 460 }, data: { label: 'Image Gen', nodeType: 'imageGen', model: 'z-image-turbo', prompt: 'Cinematic still frame of: {{input}}', steps: 30, width: 1024, height: 1024 } },
+          { id: b, type: 'venice', position: { x: 340, y: 220 }, data: { label: 'LLM', nodeType: 'chat', model: 'olafangensan-glm-4.7-flash-heretic', prompt: 'You are a music-video director. Expand this mood into a single paragraph that captures visual style, camera, and sonic atmosphere. One tight paragraph, no lists.', temperature: 0.9 } },
+          { id: c, type: 'venice', position: { x: 40,  y: 460 }, data: { label: 'Image Gen', nodeType: 'imageGen', model: 'lustify-v8', prompt: 'Cinematic still frame of: {{input}}', steps: 30, width: 1024, height: 1024 } },
           { id: d, type: 'venice', position: { x: 340, y: 460 }, data: { label: 'Music Gen', nodeType: 'music', model: 'stable-audio', prompt: 'Atmospheric score matching: {{input}}', duration: 30, instrumental: true } },
-          { id: e, type: 'venice', position: { x: 640, y: 460 }, data: { label: 'Video Gen', nodeType: 'video', model: 'wan-2.1', prompt: '{{input}}', videoAspectRatio: '16:9' } },
+          { id: e, type: 'venice', position: { x: 640, y: 460 }, data: { label: 'Video Gen', nodeType: 'video', model: 'wan-2-7-enhanced-text-to-video', prompt: '{{input}}', videoAspectRatio: '16:9' } },
           { id: f, type: 'venice', position: { x: 40,  y: 740 }, data: { label: 'Output', nodeType: 'output', model: '', prompt: '' } },
           { id: g, type: 'venice', position: { x: 340, y: 740 }, data: { label: 'Output', nodeType: 'output', model: '', prompt: '' } },
           { id: h, type: 'venice', position: { x: 640, y: 740 }, data: { label: 'Output', nodeType: 'output', model: '', prompt: '' } },
@@ -134,7 +134,7 @@ const TEMPLATES: Array<{ name: string; desc: string; build: () => TemplateGraph 
       return {
         nodes: [
           { id: a, type: 'venice', position: { x: 280, y: 40 }, data: { label: 'Input', nodeType: 'textInput', model: '', prompt: '', inputText: 'A bittersweet goodbye between two old friends at a train station' } },
-          { id: b, type: 'venice', position: { x: 280, y: 220 }, data: { label: 'LLM', nodeType: 'chat', model: 'llama-3.3-70b', prompt: 'Write a short song (verse, chorus, verse) about this theme. Keep it under 100 words. Output only the lyrics — no headers or commentary.', temperature: 0.9 } },
+          { id: b, type: 'venice', position: { x: 280, y: 220 }, data: { label: 'LLM', nodeType: 'chat', model: 'olafangensan-glm-4.7-flash-heretic', prompt: 'Write a short song (verse, chorus, verse) about this theme. Keep it under 100 words. Output only the lyrics — no headers or commentary.', temperature: 0.9 } },
           { id: c, type: 'venice', position: { x: 280, y: 460 }, data: { label: 'Music Gen', nodeType: 'music', model: 'stable-audio', prompt: 'Melancholic indie-folk, acoustic guitar, soft male vocals, slow tempo', duration: 45, instrumental: false } },
           { id: d, type: 'venice', position: { x: 280, y: 680 }, data: { label: 'Output', nodeType: 'output', model: '', prompt: '' } },
         ],
@@ -150,8 +150,8 @@ const TEMPLATES: Array<{ name: string; desc: string; build: () => TemplateGraph 
       return {
         nodes: [
           { id: a, type: 'venice', position: { x: 280, y: 40 }, data: { label: 'Input', nodeType: 'textInput', model: '', prompt: '', inputText: 'A disillusioned space-station botanist in her 50s, caretaker of the last Earth plants' } },
-          { id: b, type: 'venice', position: { x: 280, y: 220 }, data: { label: 'LLM', nodeType: 'chat', model: 'llama-3.3-70b', prompt: 'Write a detailed character portrait brief: physical description, clothing, posture, lighting, background, art style. Aim for concrete visual detail, not personality. Output as a single dense prompt paragraph.', temperature: 0.85 } },
-          { id: c, type: 'venice', position: { x: 280, y: 460 }, data: { label: 'Image Gen', nodeType: 'imageGen', model: 'z-image-turbo', prompt: 'Portrait, 50mm lens, cinematic: {{input}}', steps: 35, width: 832, height: 1216 } },
+          { id: b, type: 'venice', position: { x: 280, y: 220 }, data: { label: 'LLM', nodeType: 'chat', model: 'olafangensan-glm-4.7-flash-heretic', prompt: 'Write a detailed character portrait brief: physical description, clothing, posture, lighting, background, art style. Aim for concrete visual detail, not personality. Output as a single dense prompt paragraph.', temperature: 0.85 } },
+          { id: c, type: 'venice', position: { x: 280, y: 460 }, data: { label: 'Image Gen', nodeType: 'imageGen', model: 'lustify-v8', prompt: 'Portrait, 50mm lens, cinematic: {{input}}', steps: 35, width: 832, height: 1216 } },
           { id: d, type: 'venice', position: { x: 280, y: 700 }, data: { label: 'Output', nodeType: 'output', model: '', prompt: '' } },
         ],
         edges: [mkEdge(a, b), mkEdge(b, c), mkEdge(c, d)],
@@ -166,8 +166,8 @@ const TEMPLATES: Array<{ name: string; desc: string; build: () => TemplateGraph 
       return {
         nodes: [
           { id: a, type: 'venice', position: { x: 280, y: 40 }, data: { label: 'Input', nodeType: 'textInput', model: '', prompt: '', inputText: 'A lighthouse keeper finds a message in a bottle from her younger self' } },
-          { id: b, type: 'venice', position: { x: 280, y: 220 }, data: { label: 'LLM', nodeType: 'chat', model: 'llama-3.3-70b', prompt: 'Expand this premise into a single cinematic scene description: setting, time of day, weather, key visual detail, subject pose, mood. 3-4 sentences, no narrative — purely visual.', temperature: 0.9 } },
-          { id: c, type: 'venice', position: { x: 280, y: 460 }, data: { label: 'Image Gen', nodeType: 'imageGen', model: 'z-image-turbo', prompt: 'Cinematic wide shot, film still, moody lighting: {{input}}', steps: 30, width: 1216, height: 832 } },
+          { id: b, type: 'venice', position: { x: 280, y: 220 }, data: { label: 'LLM', nodeType: 'chat', model: 'olafangensan-glm-4.7-flash-heretic', prompt: 'Expand this premise into a single cinematic scene description: setting, time of day, weather, key visual detail, subject pose, mood. 3-4 sentences, no narrative — purely visual.', temperature: 0.9 } },
+          { id: c, type: 'venice', position: { x: 280, y: 460 }, data: { label: 'Image Gen', nodeType: 'imageGen', model: 'lustify-v8', prompt: 'Cinematic wide shot, film still, moody lighting: {{input}}', steps: 30, width: 1216, height: 832 } },
           { id: d, type: 'venice', position: { x: 280, y: 700 }, data: { label: 'Output', nodeType: 'output', model: '', prompt: '' } },
         ],
         edges: [mkEdge(a, b), mkEdge(b, c), mkEdge(c, d)],

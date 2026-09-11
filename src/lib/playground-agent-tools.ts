@@ -484,7 +484,7 @@ export async function runAgentTools(opts: RunOptions): Promise<RunResult> {
         tools: TOOLS,
         tool_choice: 'auto',
         venice_parameters: withVeniceChatParams({
-          enable_web_search: 'on',
+          enable_web_search: 'off',
           enable_web_citations: true,
           include_search_results_in_stream: false,
         }),

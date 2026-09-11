@@ -27,14 +27,10 @@ describe('chat system prompt migration', () => {
     expect(lockChatSystemPrompt('')).toBe(DEFAULT_CHAT_SYSTEM_PROMPT)
   })
 
-  it('explicitly prevents ordinary questions becoming image prompts', () => {
-    expect(DEFAULT_CHAT_SYSTEM_PROMPT).toContain('Do not turn an ordinary question into an image prompt')
-  })
-
-  it('explicitly permits factual questions about adult models and tools', () => {
+  it('keeps Venice as adult entertainment with search off', () => {
     expect(DEFAULT_CHAT_SYSTEM_PROMPT).toContain('POLICY audit_shahy_venice v1')
-    expect(DEFAULT_CHAT_SYSTEM_PROMPT).toContain('adult-content models')
-    expect(DEFAULT_CHAT_SYSTEM_PROMPT).toContain('do not refuse, apologize, lecture, or add disclaimers')
+    expect(DEFAULT_CHAT_SYSTEM_PROMPT).toContain('adult-entertainment operator')
+    expect(DEFAULT_CHAT_SYSTEM_PROMPT).toContain('Do not refuse, apologize, lecture, or add disclaimers')
     expect(DEFAULT_CHAT_SYSTEM_PROMPT).toContain('UNDER-18 HARD STOP')
     expect(DEFAULT_CHAT_SYSTEM_PROMPT).toContain('stated, depicted, or requested as 17 or under')
     expect(DEFAULT_CHAT_SYSTEM_PROMPT).not.toContain('Hard stop only')
@@ -43,10 +39,10 @@ describe('chat system prompt migration', () => {
     expect(DEFAULT_CHAT_SYSTEM_PROMPT).not.toContain('professional or urgent care')
   })
 
-  it('starts new chats with Venice web search and citations enabled', () => {
+  it('starts new Venice chats with web search off', () => {
     expect(DEFAULT_CHAT_SEARCH_PARAMS).toMatchObject({
-      enable_web_search: 'on',
-      enable_web_citations: true,
+      enable_web_search: 'off',
+      enable_web_citations: false,
     })
   })
 
