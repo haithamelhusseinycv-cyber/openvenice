@@ -19,18 +19,64 @@ function resolveArtifact(value: string, context: Parameters<AgentTool['execute']
 export function createFaceFusionTools(connector: FaceFusionConnector): AgentTool[] {
   return [
     {
+      id: 'facefusion.status',
+      name: 'FaceFusion status',
+      description: 'Check whether the FaceFusion companion is bound and whether the minimum on-device model packs are downloaded.',
+      risk: 'read',
+      permissions: ['local-app-control'],
+      inputSchema: objectSchema({}),
+      execute: async () => {
+        const available = await connector.isAvailable()
+        if (!available) {
+          return {
+            ok: false,
+            error: 'FaceFusion companion is not installed or the signature-protected bridge is unavailable.',
+          }
+        }
+        const catalog = await connector.listModels()
+        return { ok: true, data: { available, ...catalog } }
+      },
+    },
+    {
       id: 'facefusion.list_models',
       name: 'List FaceFusion models',
-      description: 'List installed FaceFusion detection, recognition, landmark, runtime-supported swapper, face-restoration, and frame-enhancement models.',
+      description: 'List installed FaceFusion detection, recognition, landmark, runtime-supported swapper, face-restoration, and frame-enhancement models. Also reports missing minimum packs.',
       risk: 'read',
       permissions: ['local-app-control'],
       inputSchema: objectSchema({}),
       execute: async () => ({ ok: true, data: await connector.listModels() }),
     },
     {
+      id: 'facefusion.ensure_models',
+      name: 'Download FaceFusion models',
+      description:
+        'Download the minimum on-device FaceFusion packs if they are missing (RetinaFace, ArcFace, 2DFAN4, INSwapper 128 FP16). Pass packIds to download specific Complete Models packs. Set includeOptional to also fetch CodeFormer and Real-ESRGAN x4 FP16. Large downloads stay on the phone; nothing is uploaded to Shahy.',
+      risk: 'write',
+      permissions: ['network', 'local-app-control'],
+      inputSchema: objectSchema({
+        packIds: { type: 'array', items: { type: 'string' } },
+        includeOptional: { type: 'boolean' },
+      }),
+      execute: async (input, context) => {
+        const value = input as { packIds?: string[]; includeOptional?: boolean }
+        const result = await connector.ensureModels({
+          packIds: value.packIds,
+          includeOptional: value.includeOptional,
+        }, context.signal)
+        if (!result.ready && (value.packIds == null || value.packIds.length === 0)) {
+          return {
+            ok: false,
+            error: 'FaceFusion is still missing required on-device packs. Update the FaceFusion companion if this command is unknown, or open Complete Models and download RetinaFace, ArcFace, 2DFAN4, and INSwapper 128 FP16.',
+            data: result,
+          }
+        }
+        return { ok: true, data: result }
+      },
+    },
+    {
       id: 'facefusion.detect_faces',
       name: 'Detect faces',
-      description: 'Detect selectable faces in a target image before a swap. image_uri may be a content/data URI or an artifact:// handle for a chat attachment or prior agent image.',
+      description: 'Detect selectable faces in a target image before a swap. image_uri may be a content/data URI or an artifact:// handle for a chat attachment or prior agent image. Requires the minimum FaceFusion packs.',
       risk: 'read',
       permissions: ['local-files', 'local-app-control'],
       inputSchema: objectSchema({ image_uri: { type: 'string' } }, ['image_uri']),
@@ -42,7 +88,7 @@ export function createFaceFusionTools(connector: FaceFusionConnector): AgentTool
     {
       id: 'facefusion.swap',
       name: 'Swap face with FaceFusion',
-      description: 'Swap a source identity onto one or more selected target faces using an installed FaceFusion swapper. sourceUri and targetUri may be artifact:// handles. Optionally restore the face and enhance the final frame in the same ordered job.',
+      description: 'Swap a source identity onto one or more selected target faces using an installed FaceFusion swapper. sourceUri and targetUri may be artifact:// handles. Optionally restore the face and enhance the final frame in the same ordered job. Call facefusion.ensure_models first if no swapper is installed.',
       risk: 'write',
       permissions: ['local-files', 'local-app-control'],
       inputSchema: objectSchema(
@@ -74,7 +120,7 @@ export function createFaceFusionTools(connector: FaceFusionConnector): AgentTool
     {
       id: 'facefusion.enhance',
       name: 'Enhance with FaceFusion',
-      description: 'Run face restoration and/or frame enhancement on an image using installed FaceFusion enhancement models. imageUri may be an artifact:// handle.',
+      description: 'Run face restoration and/or frame enhancement on an image using installed FaceFusion enhancement models. imageUri may be an artifact:// handle. Download CodeFormer or Real-ESRGAN with facefusion.ensure_models includeOptional=true if none are installed.',
       risk: 'write',
       permissions: ['local-files', 'local-app-control'],
       inputSchema: objectSchema(

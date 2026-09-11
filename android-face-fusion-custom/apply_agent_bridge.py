@@ -11,6 +11,10 @@ custom = Path('android-face-fusion-custom')
     (custom / 'AgentBridgeService.java').read_text(encoding='utf-8'),
     encoding='utf-8',
 )
+(java_dir / 'ModelPackDownloader.java').write_text(
+    (custom / 'ModelPackDownloader.java').read_text(encoding='utf-8'),
+    encoding='utf-8',
+)
 
 # Define a signature permission and protect the exported bridge with it. Only
 # an APK signed with the same certificate (the OpenVenice Android shell) can
@@ -34,8 +38,10 @@ manifest.write_text(text, encoding='utf-8')
 # Bridge release follows Complete Models v3 and keeps the package/signing
 # identity so it can update the user's installed FaceFusion build in place.
 gradle = build_gradle.read_text(encoding='utf-8')
-gradle = gradle.replace('versionCode = 3', 'versionCode = 4')
-gradle = gradle.replace('versionName = "3.0"', 'versionName = "4.0"')
+gradle = gradle.replace('versionCode = 4', 'versionCode = 5')
+gradle = gradle.replace('versionName = "4.0"', 'versionName = "5.0"')
+gradle = gradle.replace('versionCode = 3', 'versionCode = 5')
+gradle = gradle.replace('versionName = "3.0"', 'versionName = "5.0"')
 build_gradle.write_text(gradle, encoding='utf-8')
 
 print('FaceFusion AgentBridgeService customization applied successfully.')

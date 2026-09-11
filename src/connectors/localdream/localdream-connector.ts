@@ -97,6 +97,15 @@ export interface LocalDreamUpscaleResult {
   duration_ms?: number
 }
 
+export interface LocalDreamReadyState {
+  ready: boolean
+  host?: LocalDreamHostInfo
+  status?: LocalDreamStatus | null
+  models: string[]
+  upscalers: string[]
+  nextStep?: string
+}
+
 export interface LocalDreamConnectorOptions {
   host?: string
   controlPort?: number
@@ -168,6 +177,46 @@ export class LocalDreamConnector {
 
   status(signal?: AbortSignal) {
     return this.transport.requestJson<LocalDreamStatus>(this.controlUrl('/status'), { signal })
+  }
+
+  async ensureReady(signal?: AbortSignal): Promise<LocalDreamReadyState> {
+    try {
+      const host = await this.info(signal)
+      const catalog = await this.listModels(signal)
+      const status = await this.status(signal).catch(() => null)
+      const models = (catalog.models || []).map((model) => model.id)
+      const upscalers = (catalog.upscalers || []).map((item) => item.id)
+      if (models.length === 0) {
+        return {
+          ready: false,
+          host,
+          status,
+          models,
+          upscalers,
+          nextStep:
+            'Open Local Dream on this phone, tap a built-in checkpoint (Anything V5, ChilloutMix, Absolute Reality, or an SDXL model if the chip supports it), and wait until it finishes downloading. Shahy cannot download Local Dream checkpoints over HTTP.',
+        }
+      }
+      return {
+        ready: true,
+        host,
+        status,
+        models,
+        upscalers,
+        nextStep:
+          status?.state === 'running'
+            ? undefined
+            : 'Call localdream.select_model with one of the downloaded model ids before generating.',
+      }
+    } catch {
+      return {
+        ready: false,
+        models: [],
+        upscalers: [],
+        nextStep:
+          'Install and open Local Dream on this Android device, then download at least one generation model inside the Local Dream app.',
+      }
+    }
   }
 
   stop(modelId?: string, signal?: AbortSignal) {

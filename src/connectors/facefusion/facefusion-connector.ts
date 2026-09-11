@@ -10,6 +10,26 @@ export interface FaceFusionModelCatalog {
     faceEnhancer?: string
     frameEnhancer?: string
   }
+  ready?: boolean
+  missing?: string[]
+}
+
+export interface FaceFusionEnsureModelsRequest {
+  packIds?: string[]
+  includeOptional?: boolean
+}
+
+export interface FaceFusionEnsureModelsResult {
+  ready: boolean
+  downloaded: string[]
+  skipped: string[]
+  failed: Array<{ id: string; error: string }>
+  missing: string[]
+  selected?: {
+    swapper?: string
+    faceEnhancer?: string
+    frameEnhancer?: string
+  }
 }
 
 export interface FaceFusionDetectedFace {
@@ -55,6 +75,7 @@ export interface FaceFusionJobResult {
 export interface FaceFusionBridgeTransport {
   isAvailable(): Promise<boolean>
   listModels(): Promise<FaceFusionModelCatalog>
+  ensureModels(request?: FaceFusionEnsureModelsRequest, signal?: AbortSignal): Promise<FaceFusionEnsureModelsResult>
   detectFaces(imageUri: string): Promise<FaceFusionDetectedFace[]>
   swap(request: FaceFusionSwapRequest, signal?: AbortSignal): Promise<FaceFusionJobResult>
   enhance(request: FaceFusionEnhanceRequest, signal?: AbortSignal): Promise<FaceFusionJobResult>
@@ -74,6 +95,10 @@ export class FaceFusionConnector {
 
   listModels() {
     return this.bridge.listModels()
+  }
+
+  ensureModels(request: FaceFusionEnsureModelsRequest = {}, signal?: AbortSignal) {
+    return this.bridge.ensureModels(request, signal)
   }
 
   detectFaces(imageUri: string) {

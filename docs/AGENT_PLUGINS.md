@@ -6,8 +6,8 @@ The plugin manager is the control plane for tools that Qwen can discover and ena
 
 Built-in plugins:
 
-- **Local Dream** — enabled by default; generation, img2img, inpaint, model control, and upscale.
-- **FaceFusion** — enabled by default only in native Android when the signature-protected bridge is available.
+- **Local Dream** — enabled by default; generation, img2img, inpaint, model control, and upscale. Generation models must already be downloaded inside the Local Dream app; `localdream.ensure_ready` reports that. Shahy cannot fetch Local Dream checkpoints over HTTP.
+- **FaceFusion** — enabled by default only in native Android when the signature-protected bridge is available. `facefusion.ensure_models` downloads the minimum on-device packs (RetinaFace, ArcFace, 2DFAN4, INSwapper 128 FP16) into the FaceFusion companion.
 
 Agent management tools:
 

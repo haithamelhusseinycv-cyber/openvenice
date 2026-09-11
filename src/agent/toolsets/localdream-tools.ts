@@ -43,6 +43,20 @@ export function createLocalDreamTools(connector = new LocalDreamConnector()): Ag
       execute: async (_input, context) => ({ ok: true, data: await connector.listModels(context.signal) }),
     },
     {
+      id: 'localdream.ensure_ready',
+      name: 'Check Local Dream models',
+      description:
+        'Check whether Local Dream is reachable and already has at least one generation model downloaded on this phone. Local Dream does not expose HTTP model download; if none are present, the user must tap a built-in checkpoint inside the Local Dream app.',
+      risk: 'read',
+      permissions: ['network', 'local-app-control'],
+      inputSchema: objectSchema({}),
+      execute: async (_input, context) => {
+        const state = await connector.ensureReady(context.signal)
+        if (!state.ready) return { ok: false, error: state.nextStep, data: state }
+        return { ok: true, data: state }
+      },
+    },
+    {
       id: 'localdream.select_model',
       name: 'Select Local Dream model',
       description: 'Activate a downloaded Local Dream model and start its local generation backend.',
@@ -72,7 +86,7 @@ export function createLocalDreamTools(connector = new LocalDreamConnector()): Ag
     {
       id: 'localdream.generate',
       name: 'Generate or edit with Local Dream',
-      description: 'Run Local Dream text-to-image, img2img, or inpaint. image and mask may be artifact:// handles for user attachments or prior agent outputs. Include image for img2img; image and mask for inpaint. When a 4x upscale will follow, set output_format to raw so the returned artifact can be passed directly to localdream.upscale.',
+      description: 'Run Local Dream text-to-image, img2img, or inpaint. Call localdream.ensure_ready first if no model is loaded. image and mask may be artifact:// handles for user attachments or prior agent outputs. Include image for img2img; image and mask for inpaint. When a 4x upscale will follow, set output_format to raw so the returned artifact can be passed directly to localdream.upscale.',
       risk: 'write',
       permissions: ['network', 'local-app-control', 'local-files'],
       inputSchema: objectSchema(

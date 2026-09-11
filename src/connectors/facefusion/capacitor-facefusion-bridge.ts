@@ -2,6 +2,8 @@ import type {
   FaceFusionBridgeTransport,
   FaceFusionDetectedFace,
   FaceFusionEnhanceRequest,
+  FaceFusionEnsureModelsRequest,
+  FaceFusionEnsureModelsResult,
   FaceFusionJobResult,
   FaceFusionModelCatalog,
   FaceFusionSwapRequest,
@@ -85,6 +87,13 @@ export class CapacitorFaceFusionBridge implements FaceFusionBridgeTransport {
 
   async listModels(): Promise<FaceFusionModelCatalog> {
     return await invoke<FaceFusionModelCatalog>('listModels')
+  }
+
+  async ensureModels(request: FaceFusionEnsureModelsRequest = {}, signal?: AbortSignal): Promise<FaceFusionEnsureModelsResult> {
+    return await invokeAbortable<FaceFusionEnsureModelsResult>('ensureModels', {
+      packIds: request.packIds,
+      includeOptional: request.includeOptional === true,
+    }, signal)
   }
 
   async detectFaces(imageUri: string): Promise<FaceFusionDetectedFace[]> {

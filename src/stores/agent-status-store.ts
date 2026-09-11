@@ -25,16 +25,17 @@ export function agentToolLabel(toolId: string) {
   const labels: Record<string, string> = {
     'localdream.info': 'Local Dream status',
     'localdream.list_models': 'Local Dream models',
+    'localdream.ensure_ready': 'Local Dream model check',
     'localdream.select_model': 'Select Local Dream model',
     'localdream.generate': 'Local Dream image',
     'localdream.upscale': 'Local Dream upscale',
     'localdream.stop': 'Stop Local Dream',
     'facefusion.status': 'FaceFusion status',
     'facefusion.list_models': 'FaceFusion models',
+    'facefusion.ensure_models': 'Download FaceFusion models',
     'facefusion.detect_faces': 'Detect faces',
-    'facefusion.swap_face': 'FaceFusion swap',
-    'facefusion.enhance_face': 'Face enhancement',
-    'facefusion.enhance_image': 'Image enhancement',
+    'facefusion.swap': 'FaceFusion swap',
+    'facefusion.enhance': 'FaceFusion enhance',
     'facefusion.cancel': 'Cancel FaceFusion',
   }
   return labels[toolId] || toolId.replace(/[._]/g, ' ')
