@@ -24,6 +24,7 @@ import org.json.JSONObject;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -48,6 +49,7 @@ public final class AgentBridgeService extends Service {
     public static final int MSG_ENHANCE = 4;
     public static final int MSG_CANCEL = 5;
     public static final int MSG_PING = 6;
+    public static final int MSG_ENSURE_MODELS = 7;
 
     public static final String KEY_REQUEST_ID = "requestId";
     public static final String KEY_IMAGE_URI = "imageUri";
@@ -57,6 +59,8 @@ public final class AgentBridgeService extends Service {
     public static final String KEY_SWAPPER = "swapper";
     public static final String KEY_FACE_ENHANCER = "faceEnhancer";
     public static final String KEY_FRAME_ENHANCER = "frameEnhancer";
+    public static final String KEY_PACK_IDS = "packIds";
+    public static final String KEY_INCLUDE_OPTIONAL = "includeOptional";
 
     private static final String PREFS = "model_settings";
     private static final String DEFAULT_SWAPPER = "inswapper_128.onnx";
@@ -116,7 +120,7 @@ public final class AgentBridgeService extends Service {
                 JSONObject payload = new JSONObject();
                 try {
                     payload.put("service", "FaceFusion AgentBridgeService");
-                    payload.put("protocol", 1);
+                    payload.put("protocol", 2);
                     payload.put("package", getPackageName());
                 } catch (Exception ignored) {}
                 replySuccess(replyTo, command, request, payload);
@@ -140,6 +144,9 @@ public final class AgentBridgeService extends Service {
                             break;
                         case MSG_ENHANCE:
                             result = runEnhance(request, callerUid, epoch);
+                            break;
+                        case MSG_ENSURE_MODELS:
+                            result = ensureModels(request, epoch);
                             break;
                         default:
                             throw new IllegalArgumentException("Unknown FaceFusion agent command: " + command);
@@ -186,6 +193,11 @@ public final class AgentBridgeService extends Service {
         out.put("faceEnhancers", faceEnhancers);
         out.put("frameEnhancers", frameEnhancers);
         out.put("selected", selected);
+        ModelPackDownloader downloader = new ModelPackDownloader(this);
+        JSONArray missing = new JSONArray();
+        for (String id : downloader.missingMinimumIds()) missing.put(id);
+        out.put("ready", downloader.isRuntimeReady());
+        out.put("missing", missing);
         return out;
     }
 
@@ -323,6 +335,73 @@ public final class AgentBridgeService extends Service {
             if (output != null && output != input && !output.isRecycled()) output.recycle();
             if (!input.isRecycled()) input.recycle();
         }
+    }
+
+    private JSONObject ensureModels(Bundle request, int epoch) throws Exception {
+        ModelPackDownloader downloader = new ModelPackDownloader(this);
+        List<String> requested = new ArrayList<>();
+        String[] packIds = request.getStringArray(KEY_PACK_IDS);
+        if (packIds != null) {
+            for (String id : packIds) {
+                if (id != null && !id.trim().isEmpty()) requested.add(id.trim());
+            }
+        }
+        boolean includeOptional = request.getBoolean(KEY_INCLUDE_OPTIONAL, false);
+        List<String> planned = downloader.resolveRequestedIds(requested, includeOptional);
+
+        JSONArray downloaded = new JSONArray();
+        JSONArray skipped = new JSONArray();
+        JSONArray failed = new JSONArray();
+
+        for (String id : planned) {
+            checkCancelled(epoch);
+            ModelCatalog.ModelPack pack = ModelPackDownloader.packById(id);
+            if (pack == null) {
+                JSONObject item = new JSONObject();
+                item.put("id", id);
+                item.put("error", "Unknown FaceFusion model pack");
+                failed.put(item);
+                continue;
+            }
+            if (downloader.isDownloaded(pack)) {
+                skipped.put(pack.id);
+                continue;
+            }
+            try {
+                downloader.downloadPack(pack);
+                downloaded.put(pack.id);
+            } catch (Exception error) {
+                JSONObject item = new JSONObject();
+                item.put("id", pack.id);
+                item.put("error", error.getMessage() != null ? error.getMessage() : error.getClass().getSimpleName());
+                failed.put(item);
+            }
+        }
+
+        if (downloader.runtimeSwapperDownloaded()) {
+            getSharedPreferences(PREFS, MODE_PRIVATE)
+                    .edit()
+                    .putString("swapper_model", downloader.preferredSwapperFile())
+                    .apply();
+        }
+
+        JSONArray missing = new JSONArray();
+        for (String id : downloader.missingMinimumIds()) missing.put(id);
+
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        JSONObject selected = new JSONObject();
+        selected.put("swapper", prefs.getString("swapper_model", DEFAULT_SWAPPER));
+        selected.put("faceEnhancer", prefs.getString("face_enhancer_model", "none"));
+        selected.put("frameEnhancer", prefs.getString("frame_enhancer_model", "none"));
+
+        JSONObject out = new JSONObject();
+        out.put("ready", downloader.isRuntimeReady());
+        out.put("downloaded", downloaded);
+        out.put("skipped", skipped);
+        out.put("failed", failed);
+        out.put("missing", missing);
+        out.put("selected", selected);
+        return out;
     }
 
     private void ensureAnalysisRuntime() throws Exception {

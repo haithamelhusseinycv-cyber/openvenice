@@ -5,8 +5,8 @@ This branch introduces the first implementation layer for turning OpenVenice int
 ## Responsibilities
 
 - **Qwen**: planning, reasoning, vision review, prompt/settings selection, and tool choice.
-- **Local Dream**: on-device text-to-image, img2img, inpaint, and local enhancement through its existing localhost API.
-- **FaceFusion**: on-device face detection, identity swap, face restoration, and frame enhancement through a future signature-protected Android bridge.
+- **Local Dream**: on-device text-to-image, img2img, inpaint, and local enhancement through its existing localhost API. Checkpoints are downloaded in the Local Dream app, not by Shahy.
+- **FaceFusion**: on-device face detection, identity swap, face restoration, and frame enhancement through a signature-protected Android bridge. Minimum model packs can be downloaded by `facefusion.ensure_models`.
 
 ## Tool model
 
@@ -36,9 +36,13 @@ The registry intentionally does not silently substitute one tool/provider for an
 
 The HTTP transport is abstracted so the current browser `fetch` implementation can later be replaced with a Capacitor/native Android transport. This matters because HTTPS browser builds can encounter CORS/mixed-content restrictions when talking to localhost HTTP.
 
+Local Dream checkpoints cannot be downloaded over this API. `localdream.ensure_ready` reports whether at least one generation model is already on the device.
+
 ## FaceFusion connector
 
 The existing custom FaceFusion code is native Android code, so this foundation defines the transport-neutral bridge contract first. The Android build will provide an implementation backed by a signature-protected service/content-URI bridge rather than UI tap automation.
+
+`facefusion.ensure_models` asks that companion to download the minimum Complete Models packs into app-private storage. See `docs/AGENT_ONDEVICE_MODELS.md`.
 
 ## Next implementation stages
 

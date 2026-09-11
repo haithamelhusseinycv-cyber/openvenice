@@ -51,6 +51,7 @@ public final class FaceFusionAgentPlugin extends Plugin {
     private static final int MSG_ENHANCE = 4;
     private static final int MSG_CANCEL = 5;
     private static final int MSG_PING = 6;
+    private static final int MSG_ENSURE_MODELS = 7;
 
     private final Object lock = new Object();
     private final Map<String, PluginCall> pending = new HashMap<>();
@@ -111,6 +112,21 @@ public final class FaceFusionAgentPlugin extends Plugin {
     @PluginMethod
     public void listModels(PluginCall call) {
         sendCommand(call, MSG_LIST_MODELS, new Bundle());
+    }
+
+    @PluginMethod
+    public void ensureModels(PluginCall call) {
+        Bundle data = new Bundle();
+        JSArray packIds = call.getArray("packIds");
+        if (packIds != null) {
+            JSONArray raw = packIds;
+            String[] values = new String[raw.length()];
+            for (int i = 0; i < raw.length(); i++) values[i] = raw.optString(i, "");
+            data.putStringArray("packIds", values);
+        }
+        Boolean includeOptional = call.getBoolean("includeOptional", false);
+        data.putBoolean("includeOptional", includeOptional != null && includeOptional);
+        sendCommand(call, MSG_ENSURE_MODELS, data);
     }
 
     @PluginMethod

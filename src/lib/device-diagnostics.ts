@@ -75,12 +75,22 @@ export function checkPlatform(): DiagnosticResult {
 export async function checkLocalDream(): Promise<DiagnosticResult> {
   const connector = new LocalDreamConnector()
   try {
-    const info = await withTimeout((signal) => connector.info(signal), 3000)
+    const state = await withTimeout((signal) => connector.ensureReady(signal), 4000)
+    if (!state.ready) {
+      return {
+        id: 'localdream',
+        label: 'Local Dream · optional',
+        status: 'warn',
+        detail: state.host
+          ? `Host ${state.host.version || 'up'} · no generation model downloaded yet`
+          : 'Not currently connected · install Local Dream and download a built-in checkpoint',
+      }
+    }
     return {
       id: 'localdream',
       label: 'Local Dream · optional',
       status: 'pass',
-      detail: `${info.version || 'host'} · ${info.device || 'device'} · 127.0.0.1`,
+      detail: `${state.host?.version || 'host'} · ${state.models.length} model${state.models.length === 1 ? '' : 's'} · ${state.upscalers.length} upscaler${state.upscalers.length === 1 ? '' : 's'}`,
     }
   } catch (error) {
     return {
@@ -115,11 +125,14 @@ export async function checkFaceFusion(): Promise<DiagnosticResult> {
     }
 
     const catalog = await withTimeout(() => connector.listModels(), 4000)
+    const ready = catalog.ready === true || catalog.swappers.length > 0
     return {
       id: 'facefusion',
       label: 'FaceFusion · optional',
-      status: 'pass',
-      detail: `Connected · ${catalog.swappers.length} swapper${catalog.swappers.length === 1 ? '' : 's'} · ${catalog.faceEnhancers.length} face enhancer${catalog.faceEnhancers.length === 1 ? '' : 's'}`,
+      status: ready ? 'pass' : 'warn',
+      detail: ready
+        ? `Connected · ${catalog.swappers.length} swapper${catalog.swappers.length === 1 ? '' : 's'} · ${catalog.faceEnhancers.length} face enhancer${catalog.faceEnhancers.length === 1 ? '' : 's'}`
+        : 'Companion connected, but the minimum model packs are missing. Ask Shahy to run facefusion.ensure_models or open Complete Models.',
     }
   } catch (error) {
     return {
