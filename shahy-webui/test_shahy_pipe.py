@@ -104,7 +104,10 @@ class PipeTests(unittest.TestCase):
         prompt = self.pipe.system_prompt
         self.assertIn("FREE THOUGHT", prompt)
         self.assertIn("Do not lecture, hedge, preach, add unsolicited ethics", prompt)
-        self.assertIn("Hard stop only", prompt)
+        self.assertIn("UNDER-18 HARD STOP", prompt)
+        self.assertIn("stated, depicted, or requested as 17 or under", prompt)
+        self.assertIn("DOES NOT FIRE", prompt)
+        self.assertNotIn("Hard stop only", prompt)
         self.assertNotIn("non-overridable provider constraints", prompt)
 
     def test_tool_calls_are_returned_for_open_webui(self):
