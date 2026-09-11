@@ -100,6 +100,13 @@ class PipeTests(unittest.TestCase):
         self.assertEqual(messages[0]["role"], "system")
         self.assertEqual(sum(m.get("role") == "system" for m in messages), 1)
 
+    def test_system_prompt_forbids_moralizing_and_extra_refusals(self):
+        prompt = self.pipe.system_prompt
+        self.assertIn("FREE THOUGHT", prompt)
+        self.assertIn("Do not lecture, hedge, preach, add unsolicited ethics", prompt)
+        self.assertIn("Hard stop only", prompt)
+        self.assertNotIn("non-overridable provider constraints", prompt)
+
     def test_tool_calls_are_returned_for_open_webui(self):
         payload = {"choices": [{"message": {"content": None, "tool_calls": [{"id": "call-1"}]}}]}
         client = Client([Response(200, payload)])
