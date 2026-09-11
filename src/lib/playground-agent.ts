@@ -17,8 +17,8 @@ export interface AgentResponse {
 const VALID_OPS = new Set(['add_node', 'remove_node', 'set_params', 'move_node', 'connect', 'disconnect', 'clear'])
 
 // Noor's preferred model and its high-context uncensored backup.
-export const DEFAULT_AGENT_MODEL = 'qwen-3-8-27b'
-export const FALLBACK_AGENT_MODEL = 'qwen-3-6-plus'
+export const DEFAULT_AGENT_MODEL = 'olafangensan-glm-4.7-flash-heretic'
+export const FALLBACK_AGENT_MODEL = 'olafangensan-glm-4-7-flash-heretic'
 
 function nodeCatalog(): string {
   return Object.values(NODE_SCHEMAS)
@@ -197,7 +197,7 @@ async function singleCall(opts: {
     temperature: opts.temperature,
     max_completion_tokens: opts.maxCompletionTokens,
     venice_parameters: withVeniceChatParams({
-      enable_web_search: 'on',
+      enable_web_search: 'off',
       enable_web_citations: true,
       include_search_results_in_stream: false,
     }),

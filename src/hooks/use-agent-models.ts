@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { useModels } from './use-models'
+import { isAllowedChatModel } from '../lib/allowed-models'
 import type {
   ModelCapabilities,
   ModelTrait,
@@ -22,13 +23,8 @@ export interface AgentModel {
  * anywhere in this OpenVenice build.
  */
 export const ALLOWED_AGENT_MODELS = [
-  'qwen-3-8-27b',
-  'qwen-3-6-plus',
-  'venice-uncensored',
-  'venice-uncensored-1-2',
-  'venice-uncensored-role-play',
-  'zai-org-glm-5-1',
   'olafangensan-glm-4.7-flash-heretic',
+  'olafangensan-glm-4-7-flash-heretic',
 ] as const
 
 /*
@@ -49,11 +45,7 @@ export function useAgentModels() {
       // Second defensive filter.
       // Even if another part of OpenVenice changes later,
       // nothing outside our selected models reaches the Agent picker.
-      .filter((m) =>
-        ALLOWED_AGENT_MODELS.includes(
-          m.id as (typeof ALLOWED_AGENT_MODELS)[number],
-        ),
-      )
+      .filter((m) => isAllowedChatModel(m.id))
 
       .filter((m) => !m.model_spec?.offline)
 

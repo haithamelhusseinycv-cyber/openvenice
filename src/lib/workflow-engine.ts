@@ -120,7 +120,7 @@ async function executeNode(
       const resp = await venice<ChatCompletionResponse>('/chat/completions', {
         method: 'POST',
         body: JSON.stringify({
-          model: data.model || 'llama-3.3-70b',
+          model: data.model || 'olafangensan-glm-4.7-flash-heretic',
           messages: [
             { role: 'system', content: WORKFLOW_CHAT_SYSTEM },
             { role: 'user', content: prompt },
@@ -137,7 +137,7 @@ async function executeNode(
     case 'imageGen': {
       const prompt = resolvePrompt(data.prompt, input)
       const body: Record<string, unknown> = {
-        model: data.model || 'z-image-turbo',
+        model: data.model || 'lustify-v8',
         prompt,
         negative_prompt: data.negativePrompt || undefined,
         steps: data.steps ?? 20,
@@ -202,7 +202,7 @@ async function executeNode(
     case 'video': {
       const prompt = resolvePrompt(data.prompt, input)
       const body: Record<string, unknown> = {
-        model: data.model || 'wan-2.1',
+        model: data.model || 'wan-2-7-enhanced-text-to-video',
         prompt,
         aspect_ratio: data.videoAspectRatio || '16:9',
       }

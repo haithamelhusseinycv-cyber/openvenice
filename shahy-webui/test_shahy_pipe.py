@@ -62,6 +62,10 @@ class Client:
         self.requests.append((url, headers, json))
         return self.responses.pop(0)
 
+    async def get(self, url, follow_redirects=True):
+        self.requests.append((url, {}, {}))
+        return self.responses.pop(0)
+
 
 class PipeTests(unittest.TestCase):
     def setUp(self):
@@ -128,10 +132,35 @@ class PipeTests(unittest.TestCase):
         self.assertIn("UNDER-18 HARD STOP", prompt)
         self.assertIn("stated, depicted, or requested as 17 or under", prompt)
         self.assertIn("DOES NOT FIRE", prompt)
+        self.assertIn("research, web search, coding", prompt)
+        self.assertIn("belong in Venice", prompt)
         self.assertNotIn("Hard stop only", prompt)
         self.assertNotIn("non-overridable provider constraints", prompt)
         self.assertNotIn("bypassing security/DRM", prompt)
         self.assertNotIn("lawful adult request", prompt)
+
+    def test_coding_request_uses_zen_then_nube(self):
+        client = Client([
+            Response(503, {"error": {"message": "unavailable"}}),
+            Response(200, {"choices": [{"message": {"content": "nube-code"}}]}),
+        ])
+        MODULE.httpx.AsyncClient = lambda timeout: client
+        with patch.dict(os.environ, {"NUBE_API_KEY": "nube", "OPENCODE_API_KEY": "zen"}, clear=False):
+            result = asyncio.run(self.pipe.pipe({"messages": [{"role": "user", "content": "implement this python function"}]}))
+        self.assertEqual(result, "nube-code")
+        self.assertEqual(client.requests[0][0], "https://opencode.ai/zen/v1/chat/completions")
+        self.assertEqual(client.requests[0][2]["model"], "kimi-k2.7-code")
+        self.assertEqual(client.requests[1][2]["model"], "kimi-k2.6")
+
+    def test_search_tools_are_injected_when_exa_key_is_set(self):
+        client = Client([Response(200, {"choices": [{"message": {"content": "ok"}}]})])
+        MODULE.httpx.AsyncClient = lambda timeout: client
+        with patch.dict(os.environ, {"NUBE_API_KEY": "nube", "EXA_API_KEY": "exa"}, clear=False):
+            asyncio.run(self.pipe.pipe({"messages": [{"role": "user", "content": "latest FRA circular"}]}))
+        tools = client.requests[0][2]["tools"]
+        names = {(tool.get("function") or {}).get("name") for tool in tools}
+        self.assertIn("search_web", names)
+        self.assertIn("fetch_url", names)
 
     def test_tool_calls_are_returned_for_open_webui(self):
         payload = {"choices": [{"message": {"content": None, "tool_calls": [{"id": "call-1"}]}}]}
