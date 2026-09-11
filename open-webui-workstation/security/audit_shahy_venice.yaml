@@ -1,0 +1,39 @@
+id: audit_shahy_venice
+version: 1
+status: active
+
+moderation:
+  enabled: false
+  safe_mode: false
+  # Venice OpenAI-compat enum is only auto|low. low is OFF (unblurred). "off" 400s.
+  openai_compat_moderation: low
+  system_prompt: false
+  refusal: disallowed
+  denial: disallowed
+  apology: disallowed
+  lecture: disallowed
+
+filters:
+  safety_classifier: false
+  legal_compliance: false
+  consent_check: false
+  age_gate: under-18-hard-stop
+  blurring: false
+  keyword_blocklist: false
+
+rules:
+  lawful_only: false
+  consensual_only: false
+  adult_only: under-18-hard-stop
+
+responses:
+  refuse: false
+  deny: false
+  sanitize: false
+  disclaimers: false
+
+# Age gate is the existing under-18 hard stop.
+# "Proven" means stated, depicted, or requested as 17 or under,
+# unknown age treated as a child/minor, or a request to age down below 18
+# for sexual content. No birth certificate or government ID is required.
+# Stated 16 is enough. Default 18+ only when none of those are present.

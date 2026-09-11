@@ -1,5 +1,44 @@
 import { describe, expect, it } from 'vitest'
-import { applyVeniceRequestPolicy, withVeniceChatParams } from './venice-policy'
+import { AUDIT_SHAHY_VENICE, applyVeniceRequestPolicy, withVeniceChatParams } from './venice-policy'
+
+describe('audit_shahy_venice policy', () => {
+  it('is active with moderation and extra filters off', () => {
+    expect(AUDIT_SHAHY_VENICE).toMatchObject({
+      id: 'audit_shahy_venice',
+      version: 1,
+      status: 'active',
+      moderation: {
+        enabled: false,
+        safe_mode: false,
+        openai_compat_moderation: 'low',
+        system_prompt: false,
+        refusal: 'disallowed',
+        denial: 'disallowed',
+        apology: 'disallowed',
+        lecture: 'disallowed',
+      },
+      filters: {
+        safety_classifier: false,
+        legal_compliance: false,
+        consent_check: false,
+        age_gate: 'under-18-hard-stop',
+        blurring: false,
+        keyword_blocklist: false,
+      },
+      rules: {
+        lawful_only: false,
+        consensual_only: false,
+        adult_only: 'under-18-hard-stop',
+      },
+      responses: {
+        refuse: false,
+        deny: false,
+        sanitize: false,
+        disclaimers: false,
+      },
+    })
+  })
+})
 
 describe('Venice AI request policy', () => {
   it('forces Venice stock system prompt off on chat completions', () => {
