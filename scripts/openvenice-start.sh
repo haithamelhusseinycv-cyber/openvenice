@@ -93,4 +93,61 @@ sed \
   /etc/nginx/nginx.conf.template > /tmp/openvenice-nginx.conf
 chmod 600 /tmp/openvenice-nginx.conf /tmp/openvenice-voicetut.conf
 
+CONNECTOR_CONF=/tmp/openvenice-connectors.conf
+CONNECTOR_TEMPLATE=/etc/nginx/nginx.connectors.conf.template
+if [ ! -f "$CONNECTOR_TEMPLATE" ]; then
+  CONNECTOR_TEMPLATE=/tmp/openvenice/nginx.connectors.conf.template
+fi
+: > "$CONNECTOR_CONF"
+
+append_disabled_connector() {
+  prefix=$1
+  name=$2
+  printf '%s\n' \
+    "location = ${prefix}/health { default_type application/json; return 503 '{\"ok\":false,\"configured\":false}'; add_header Cache-Control \"no-store\" always; }" \
+    "location ${prefix}/ { default_type application/json; return 503 '{\"error\":\"${name} connector is not configured\"}'; add_header Cache-Control \"no-store\" always; }" \
+    >> "$CONNECTOR_CONF"
+}
+
+emit_connector() {
+  section=$1
+  prefix=$2
+  name=$3
+  raw=$4
+  placeholder=$5
+  token=$(normalize_credential "$raw")
+  if [ -z "$token" ]; then
+    append_disabled_connector "$prefix" "$name"
+    printf 'false'
+    return 0
+  fi
+  if printf '%s' "$token" | LC_ALL=C grep -q '[^!-~]'; then
+    echo "${name} token must be printable without whitespace or control characters" >&2
+    exit 1
+  fi
+  escaped=$(escape_for_nginx_and_sed "$token")
+  awk "/# BEGIN ${section}/,/# END ${section}/" "$CONNECTOR_TEMPLATE" \
+    | sed -e "s|${placeholder}|${escaped}|g" \
+    >> "$CONNECTOR_CONF"
+  printf 'true'
+}
+
+GITHUB_RAW=${GITHUB_CONNECTOR_TOKEN:-${GITHUB_TOKEN:-}}
+GITHUB_JSON=$(emit_connector github /connectors/github GitHub "$GITHUB_RAW" '__GITHUB_TOKEN__')
+GRAPH_JSON=$(emit_connector graph /connectors/graph 'Microsoft Graph' "${MICROSOFT_GRAPH_TOKEN:-}" '__MICROSOFT_GRAPH_TOKEN__')
+EXA_JSON=$(emit_connector exa /connectors/exa Exa "${EXA_API_KEY:-}" '__EXA_API_KEY__')
+TAVILY_JSON=$(emit_connector tavily /connectors/tavily Tavily "${TAVILY_API_KEY:-}" '__TAVILY_API_KEY__')
+
+printf '%s\n' \
+  'location = /connectors/status {' \
+  '  default_type application/json;' \
+  "  return 200 '{\"github\":${GITHUB_JSON},\"graph\":${GRAPH_JSON},\"exa\":${EXA_JSON},\"tavily\":${TAVILY_JSON}}';" \
+  '  add_header Cache-Control "no-store" always;' \
+  '}' \
+  >> "$CONNECTOR_CONF"
+
+chmod 600 "$CONNECTOR_CONF"
+echo "Shahy connectors: github=${GITHUB_JSON} graph=${GRAPH_JSON} exa=${EXA_JSON} tavily=${TAVILY_JSON}" >&2
+
 exec nginx -c /tmp/openvenice-nginx.conf -g 'daemon off;'
+

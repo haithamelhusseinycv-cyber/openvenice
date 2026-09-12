@@ -1,0 +1,87 @@
+# BEGIN github
+location = /connectors/github/health {
+  default_type application/json;
+  return 200 '{"ok":true,"configured":true}';
+  add_header Cache-Control "no-store" always;
+}
+
+location /connectors/github/ {
+  limit_except GET HEAD { deny all; }
+  proxy_pass https://api.github.com/;
+  proxy_ssl_server_name on;
+  proxy_set_header Host api.github.com;
+  proxy_set_header Authorization "Bearer __GITHUB_TOKEN__";
+  proxy_set_header Accept "application/vnd.github+json";
+  proxy_set_header User-Agent "OpenVenice-Shahy";
+  proxy_set_header X-GitHub-Api-Version "2022-11-28";
+  proxy_set_header Cookie "";
+  proxy_set_header Proxy-Authorization "";
+  proxy_connect_timeout 10s;
+  proxy_read_timeout 30s;
+  add_header Cache-Control "no-store" always;
+}
+# END github
+
+# BEGIN graph
+location = /connectors/graph/health {
+  default_type application/json;
+  return 200 '{"ok":true,"configured":true}';
+  add_header Cache-Control "no-store" always;
+}
+
+location /connectors/graph/ {
+  limit_except GET HEAD { deny all; }
+  proxy_pass https://graph.microsoft.com/v1.0/;
+  proxy_ssl_server_name on;
+  proxy_set_header Host graph.microsoft.com;
+  proxy_set_header Authorization "Bearer __MICROSOFT_GRAPH_TOKEN__";
+  proxy_set_header Cookie "";
+  proxy_set_header Proxy-Authorization "";
+  proxy_connect_timeout 10s;
+  proxy_read_timeout 30s;
+  add_header Cache-Control "no-store" always;
+}
+# END graph
+
+# BEGIN exa
+location = /connectors/exa/health {
+  default_type application/json;
+  return 200 '{"ok":true,"configured":true}';
+  add_header Cache-Control "no-store" always;
+}
+
+location /connectors/exa/ {
+  limit_except POST { deny all; }
+  proxy_pass https://api.exa.ai/;
+  proxy_ssl_server_name on;
+  proxy_set_header Host api.exa.ai;
+  proxy_set_header x-api-key "__EXA_API_KEY__";
+  proxy_set_header Authorization "";
+  proxy_set_header Cookie "";
+  proxy_set_header Proxy-Authorization "";
+  proxy_connect_timeout 10s;
+  proxy_read_timeout 30s;
+  add_header Cache-Control "no-store" always;
+}
+# END exa
+
+# BEGIN tavily
+location = /connectors/tavily/health {
+  default_type application/json;
+  return 200 '{"ok":true,"configured":true}';
+  add_header Cache-Control "no-store" always;
+}
+
+location /connectors/tavily/ {
+  limit_except POST { deny all; }
+  proxy_pass https://api.tavily.com/;
+  proxy_ssl_server_name on;
+  proxy_set_header Host api.tavily.com;
+  proxy_set_header Authorization "Bearer __TAVILY_API_KEY__";
+  proxy_set_header Cookie "";
+  proxy_set_header Proxy-Authorization "";
+  proxy_connect_timeout 10s;
+  proxy_read_timeout 30s;
+  add_header Cache-Control "no-store" always;
+}
+# END tavily
