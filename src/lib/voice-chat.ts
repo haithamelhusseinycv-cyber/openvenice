@@ -221,9 +221,15 @@ export async function speakVoice(
     utterance.lang = voice?.lang || locale
     utterance.rate = options.rate ?? 1
     utterance.pitch = options.pitch ?? 1
-    let keepAlive: number | undefined
+    // Chrome on Android silently truncates long utterances unless we pulse
+    // pause/resume while speaking.
+    const keepAlive = window.setInterval(() => {
+      if (!window.speechSynthesis.speaking) return
+      window.speechSynthesis.pause()
+      window.speechSynthesis.resume()
+    }, 5000)
     const cleanup = () => {
-      if (keepAlive) window.clearInterval(keepAlive)
+      window.clearInterval(keepAlive)
       options.signal?.removeEventListener('abort', onAbort)
     }
     const onAbort = () => {
@@ -234,13 +240,6 @@ export async function speakVoice(
     utterance.onend = () => { cleanup(); resolve() }
     utterance.onerror = () => { cleanup(); reject(new Error('Text-to-speech failed')) }
     options.signal?.addEventListener('abort', onAbort, { once: true })
-    // Chrome on Android silently truncates long utterances unless we pulse
-    // pause/resume while speaking.
-    keepAlive = window.setInterval(() => {
-      if (!window.speechSynthesis.speaking) return
-      window.speechSynthesis.pause()
-      window.speechSynthesis.resume()
-    }, 5000)
     window.speechSynthesis.cancel()
     window.speechSynthesis.speak(utterance)
   })
