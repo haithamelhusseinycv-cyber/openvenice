@@ -14,8 +14,9 @@ http {
 
   map $uri $openvenice_cache_control {
     default "";
-    ~*\.(?:js|css|woff2?)$ "public, max-age=31536000, immutable";
+    # Exact paths that must never be cached (order matters: sw.js also matches .js)
     ~^(?:/|/index\.html|/sw\.js)$ "no-store, no-cache, must-revalidate";
+    ~*\.(?:js|css|woff2?)$ "public, max-age=31536000, immutable";
     /manifest.webmanifest "no-cache, must-revalidate";
   }
 
