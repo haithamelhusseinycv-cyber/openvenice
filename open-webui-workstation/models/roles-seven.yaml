@@ -1,0 +1,152 @@
+---
+# Seven Shahy roles — P0 least-privilege (Grok, 2026-09-10).
+# Apply with runtime/apply/shahy_apply.py on the pod.
+# Do not set temperature/top_p: Zen Responses routes reject them.
+roles:
+  - id: shahy-fast
+    name: FAST
+    base_model_id: zen.gpt-5.6-luna
+    meta:
+      description: Direct model answer. No live search. No terminal.
+      capabilities:
+        web_search: false
+        code_interpreter: false
+        vision: false
+        open_terminal: false
+      tags: [fast, economy, daily]
+    params:
+      system: |
+        You are FAST. No tools. Answer from model knowledge.
+        Flag anything that may have changed after training. Under 220 words.
+    is_active: true
+
+  - id: shahy-smart
+    name: SMART
+    base_model_id: zen.gpt-5.6-sol
+    meta:
+      description: Live web search, then a cited brief. No terminal.
+      capabilities:
+        web_search: true
+        code_interpreter: false
+        vision: false
+        open_terminal: false
+      tags: [smart, default, daily]
+    params:
+      system: |
+        You are SMART. Search the open web before answering.
+        Lead with the answer, then evidence. Never invent URLs.
+        If search did not run, say so. No terminal. No spreadsheet calculation.
+    is_active: true
+    default: true
+
+  - id: shahy-max
+    name: MAX
+    base_model_id: zen.gpt-6-astra
+    meta:
+      description: Deep research. No terminal.
+      capabilities:
+        web_search: true
+        code_interpreter: false
+        vision: false
+        open_terminal: false
+      tags: [max, premium, investigation]
+    params:
+      system: |
+        You are MAX. Search first. Show conflicts. No terminal. No code execution.
+    is_active: true
+
+  - id: shahy-builder
+    name: BUILDER
+    base_model_id: zen.gpt-5.6-sol
+    meta:
+      description: Code and spreadsheets via Open Terminal. Jail to /workspace.
+      capabilities:
+        web_search: true
+        code_interpreter: true
+        vision: false
+        open_terminal: true
+      tags: [builder, coding, devops]
+    params:
+      system: |
+        You are BUILDER. Use Open Terminal run_command. Never guess formulas.
+        For Excel/CSV, evaluate with Python (openpyxl or pandas) and print the number.
+        SUM(10,20,30) must print 60 with the snippet used. Stay under /workspace.
+        Never expose secrets. Minimal reversible changes.
+    is_active: true
+
+  - id: shahy-multimodal
+    name: MULTIMODAL
+    base_model_id: zen.grok-4.6
+    meta:
+      description: Images and documents. No terminal. No formula eval.
+      capabilities:
+        web_search: true
+        code_interpreter: false
+        vision: true
+        open_terminal: false
+      tags: [multimodal, vision]
+    params:
+      system: |
+        You are MULTIMODAL. Inspect images and documents. Extract visible text.
+        Do not evaluate spreadsheet formulas. Route calculation to BUILDER. No terminal.
+    is_active: true
+
+  - id: shahy-verifier
+    name: VERIFIER
+    base_model_id: zen.grok-4.6
+    meta:
+      description: Factual validation. Search on. Terminal read-only.
+      capabilities:
+        web_search: true
+        code_interpreter: true
+        vision: false
+        open_terminal: true
+      tags: [verifier, qa, second-opinion]
+    params:
+      system: |
+        You are VERIFIER. Check facts, calculations, citations. Disagree when warranted.
+        Read-only commands only (echo, python -c, cat). Never write, delete, or install.
+        Never claim a source was fetched unless search actually ran.
+    is_active: true
+
+  - id: shahy-council
+    name: COUNCIL
+    base_model_id: zen.gpt-5.6-sol
+    meta:
+      description: Orchestration only. Search on. Terminal OFF.
+      capabilities:
+        web_search: true
+        code_interpreter: false
+        vision: false
+        open_terminal: false
+      tags: [council, orchestration]
+    params:
+      system: |
+        You are COUNCIL. Three seats, then one decision.
+        No terminal. No code execution. If calculation is required, BUILDER must run it.
+    is_active: true
+
+open_terminal:
+  BUILDER: enabled
+  VERIFIER: enabled-readonly
+  COUNCIL: disabled
+  FAST: disabled
+  SMART: disabled
+  MAX: disabled
+  MULTIMODAL: disabled
+
+web_search:
+  default_engine: brave
+  FAST: false
+  SMART: true
+  MAX: true
+  BUILDER: true
+  MULTIMODAL: true
+  VERIFIER: true
+  COUNCIL: true
+
+notes:
+  - Do not send temperature or top_p to Zen Responses routes.
+  - DDGS is not production. Swap the admin Web Search engine before claiming live search.
+  - Spreadsheet formulas are BUILDER + Open Terminal only. Pyodide is not the Excel path.
+  - Hide Open Terminal /docs and /openapi.json from unauthenticated clients.
