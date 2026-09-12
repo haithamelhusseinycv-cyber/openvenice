@@ -38,9 +38,13 @@ items:
   - key: openai.api_key
     class: SECRET_REQUIRED
     source: server_environment
-  - key: exa.api_key
+  - key: github.connector_token
     class: SECRET_REQUIRED
     source: server_environment
+  - key: microsoft_graph.access_token
+    class: SECRET_REQUIRED
+    source: server_environment
+
   - key: tavily.api_key
     class: SECRET_REQUIRED
     source: server_environment

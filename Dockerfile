@@ -15,6 +15,7 @@ FROM nginx:1.29.1-alpine
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf.template /etc/nginx/nginx.conf.template
 COPY nginx.voicetut.conf.template /etc/nginx/nginx.voicetut.conf.template
+COPY nginx.connectors.conf.template /etc/nginx/nginx.connectors.conf.template
 COPY scripts/openvenice-start.sh /usr/local/bin/openvenice-start
 RUN chmod 0555 /usr/local/bin/openvenice-start && \
     chown -R nginx:nginx /var/cache/nginx /var/run /usr/share/nginx/html
