@@ -1,4 +1,4 @@
-const CACHE_NAME = 'openvenice-shell-v4'
+const CACHE_NAME = 'openvenice-shell-v5'
 const APP_SHELL = ['/manifest.webmanifest', '/favicon.svg', '/icon-192.png', '/icon-512.png']
 
 self.addEventListener('install', (event) => {
