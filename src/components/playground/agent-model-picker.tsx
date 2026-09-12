@@ -52,7 +52,7 @@ export function AgentModelPicker({ value, onChange }: Props) {
         type="button"
         onClick={() => setOpen(!open)}
         className={cn(
-          'w-full flex items-center justify-between gap-2 bg-white/[0.03] border border-white/[0.08] rounded-md px-2.5 py-1.5 text-[13px] hover:border-white/[0.18] transition-colors text-left',
+          'w-full min-h-11 flex items-center justify-between gap-2 bg-white/[0.03] border border-white/[0.08] rounded-md px-2.5 py-1.5 text-[13px] hover:border-white/[0.18] transition-colors text-left',
           open && 'border-white/[0.25]',
         )}
         aria-haspopup="listbox"
@@ -91,7 +91,7 @@ export function AgentModelPicker({ value, onChange }: Props) {
               {showAll ? 'All' : 'Capable'}
             </button>
           </div>
-          <div className="max-h-[380px] overflow-y-auto py-1">
+          <div className="max-h-[min(22rem,45dvh)] overflow-y-auto overscroll-contain py-1">
             {grouped.length === 0 && (
               <div className="px-3 py-6 text-center text-[13px] text-white/30">No matches</div>
             )}

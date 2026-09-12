@@ -6,6 +6,7 @@ import { venice, veniceBlob } from './venice-client'
 import type { ChatCompletionResponse, ImageGenerateResponse, MusicQueueResponse, MusicRetrieveResponse, VideoQueueResponse, VideoRetrieveResponse } from '../types/venice'
 import { UNDER_18_HARD_STOP } from './under-18-hard-stop'
 import { SHAHY_VENICE_POLICY_HEADER, withVeniceChatParams } from './venice-policy'
+import { DEFAULT_CHAT_MODEL_ID } from './allowed-models'
 
 const WORKFLOW_CHAT_SYSTEM = `${SHAHY_VENICE_POLICY_HEADER}
 
@@ -120,7 +121,7 @@ async function executeNode(
       const resp = await venice<ChatCompletionResponse>('/chat/completions', {
         method: 'POST',
         body: JSON.stringify({
-          model: data.model || 'olafangensan-glm-4.7-flash-heretic',
+          model: data.model || DEFAULT_CHAT_MODEL_ID,
           messages: [
             { role: 'system', content: WORKFLOW_CHAT_SYSTEM },
             { role: 'user', content: prompt },

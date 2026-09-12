@@ -444,8 +444,8 @@ export function PlaygroundChat() {
         {messages.length === 0 ? (
           <div className="flex flex-col gap-3 pt-5">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-200 via-rose-300 to-fuchsia-700 p-[1px] shadow-lg shadow-fuchsia-950/30 shrink-0">
-                <img src="/nour-portrait.png" alt="Noor" className="w-full h-full rounded-full object-cover object-[50%_18%]" />
+              <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full border border-white/[0.14]">
+                <img src="/nour-portrait.png" alt="" className="h-full w-full object-cover object-[50%_18%]" />
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
@@ -462,7 +462,7 @@ export function PlaygroundChat() {
                 <button
                   key={p}
                   onClick={() => void send(p)}
-                  className="text-left px-3 py-2.5 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:border-white/[0.16] hover:bg-white/[0.04] transition-all text-[13px] text-white/65 hover:text-white/85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2"
+                  className="min-h-11 text-left px-3 py-2.5 rounded-xl border border-white/[0.07] bg-white/[0.02] hover:border-white/[0.16] hover:bg-white/[0.04] transition-colors text-[13px] text-white/70 hover:text-white/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2"
                 >
                   {p}
                 </button>
@@ -501,9 +501,19 @@ export function PlaygroundChat() {
                     type="button"
                     onClick={() => void speak(m.id, m.content)}
                     aria-label={speakingId === m.id ? 'Stop Noor voice' : 'Play Noor voice'}
-                    className="min-h-11 px-3 rounded-lg text-[12px] text-white/55 hover:text-white/85 hover:bg-white/[0.05] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
+                    className="min-h-11 inline-flex items-center gap-1.5 px-3 rounded-lg text-[12px] font-medium text-white/55 hover:text-white/90 hover:bg-white/[0.05] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
                   >
-                    {speakingId === m.id ? `■ ${voiceStatus || 'Stop voice'}` : '▶ Play Noor voice'}
+                    {speakingId === m.id ? (
+                      <>
+                        <svg width="10" height="10" viewBox="0 0 8 8" fill="currentColor" aria-hidden="true"><rect width="8" height="8" rx="1" /></svg>
+                        {voiceStatus || 'Stop'}
+                      </>
+                    ) : (
+                      <>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3" /></svg>
+                        Play voice
+                      </>
+                    )}
                   </button>
                 )}
 
@@ -535,7 +545,7 @@ export function PlaygroundChat() {
         )}
       </div>
 
-      <div className="max-w-full min-w-0 shrink-0 overflow-x-hidden border-t border-white/[0.06] p-3">
+      <div className="max-w-full min-w-0 shrink-0 overflow-x-hidden border-t border-white/[0.06] px-3 pt-2 pb-[max(0.75rem,var(--keyboard-inset,0px))]">
         <div className="mb-2 grid max-w-full grid-cols-2 gap-2" aria-label="Noor language mode">
           {(Object.entries(NOUR_LANGUAGE_LABELS) as Array<[NourLanguageMode, string]>).map(([mode, label]) => (
             <button
@@ -549,7 +559,7 @@ export function PlaygroundChat() {
               className={cn(
                 'min-h-11 min-w-0 rounded-full border px-2 text-[12px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]',
                 languageMode === mode
-                  ? 'border-fuchsia-300/40 bg-fuchsia-400/15 text-white'
+                  ? 'border-white/[0.16] bg-white text-black'
                   : 'border-white/[0.09] bg-white/[0.03] text-white/55 hover:text-white/85',
               )}
             >
@@ -558,7 +568,7 @@ export function PlaygroundChat() {
           ))}
         </div>
 
-        <div className="mb-2 grid grid-cols-2 gap-2">
+        <div className="mb-2 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2.75rem] gap-2">
           <button
             type="button"
             onClick={() => {
@@ -570,11 +580,11 @@ export function PlaygroundChat() {
             className={cn(
               'min-h-11 min-w-0 rounded-xl border px-2 text-[12px] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]',
               speakReplies
-                ? 'border-fuchsia-300/35 bg-fuchsia-400/10 text-white'
+                ? 'border-white/[0.16] bg-white/[0.08] text-white'
                 : 'border-white/[0.09] bg-white/[0.03] text-white/55 hover:text-white/85',
             )}
           >
-            {speakReplies ? '🔊 Auto-read on' : '🔇 Auto-read off'}
+            {speakReplies ? 'Auto-read on' : 'Auto-read off'}
           </button>
           <button
             type="button"
@@ -583,41 +593,29 @@ export function PlaygroundChat() {
               setPlaybackMode(playbackMode === 'fast' ? 'studio' : 'fast')
             }}
             aria-label={`Voice mode: ${playbackMode}`}
-            className="min-h-11 min-w-0 rounded-xl border border-white/[0.09] bg-white/[0.03] px-2 text-[12px] font-semibold text-white/70 hover:border-fuchsia-300/30 hover:text-white"
+            className="min-h-11 min-w-0 rounded-xl border border-white/[0.09] bg-white/[0.03] px-2 text-[12px] font-semibold text-white/70 hover:border-white/[0.18] hover:text-white"
           >
-            {playbackMode === 'fast' ? '⚡ Fast · device' : `✦ Studio · ${NOUR_TTS_VOICE}`}
-          </button>
-        </div>
-
-        <div className="mb-2 grid grid-cols-2 gap-2" aria-label="Noor voice commands">
-          <button
-            type="button"
-            disabled={isThinking || Boolean(listeningLocale)}
-            onClick={() => void listenAndSend('en-US')}
-            className={cn(
-              'min-h-11 rounded-xl border px-3 text-[12px] font-semibold transition-colors disabled:opacity-40',
-              listeningLocale === 'en-US'
-                ? 'border-rose-300/35 bg-rose-300/10 text-rose-100'
-                : 'border-white/[0.09] bg-white/[0.035] text-white/70 hover:text-white',
-            )}
-          >
-            {listeningLocale === 'en-US' ? '● Listening EN…' : '🎙 Mic EN'}
+            {playbackMode === 'fast' ? 'Fast · device' : `Studio · ${NOUR_TTS_VOICE}`}
           </button>
           <button
             type="button"
-            disabled={isThinking || Boolean(listeningLocale)}
-            onClick={() => void listenAndSend('ar-EG')}
+            disabled={isThinking}
+            onClick={() => void listenAndSend(languageMode === 'cairo-street' ? 'ar-EG' : 'en-US')}
+            aria-label={listeningLocale ? 'Stop listening' : `Microphone · ${languageMode === 'cairo-street' ? 'Egyptian Arabic' : 'English'}`}
             className={cn(
-              'min-h-11 rounded-xl border px-3 text-[12px] font-semibold transition-colors disabled:opacity-40',
-              listeningLocale === 'ar-EG'
-                ? 'border-rose-300/35 bg-rose-300/10 text-rose-100'
-                : 'border-white/[0.09] bg-white/[0.035] text-white/70 hover:text-white',
+              'flex min-h-11 min-w-11 items-center justify-center rounded-xl border transition-colors disabled:opacity-40',
+              listeningLocale
+                ? 'border-white/[0.2] bg-white text-black'
+                : 'border-white/[0.09] bg-white/[0.03] text-white/70 hover:text-white',
             )}
           >
-            {listeningLocale === 'ar-EG' ? '● Listening مصري…' : '🎙 Mic مصري'}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="9" y="2" width="6" height="12" rx="3" />
+              <path d="M5 10a7 7 0 0014 0M12 17v5M8 22h8" />
+            </svg>
           </button>
         </div>
-        {listeningLocale && <div className="mb-2 text-center text-[11px] text-white/45">Listening · {voiceLocaleShortLabel(listeningLocale)} · speak naturally, then Noor will send and answer by voice.</div>}
+        {listeningLocale && <div className="mb-2 text-center text-[11px] text-white/45">Listening · {voiceLocaleShortLabel(listeningLocale)}</div>}
         {error && <div role="alert" className="mb-2 break-words [overflow-wrap:anywhere] text-[13px] text-red-300/95">{error}</div>}
         <div className="flex max-w-full min-w-0 items-end gap-2">
           <textarea

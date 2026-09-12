@@ -9,6 +9,7 @@ import { DeviceDiagnosticsDialog } from './components/chat/device-diagnostics-di
 import { ErrorBoundary } from './components/ui/error-boundary'
 import { Toaster } from './components/ui/toaster'
 import { isVisibleTab } from './lib/allowed-models'
+import { checkVoiceTutHealth } from './lib/venice-client'
 
 const ImagePage = lazy(() => import('./components/image/image-page').then((module) => ({ default: module.ImagePage })))
 const PlaygroundView = lazy(() => import('./components/playground/playground-view').then((module) => ({ default: module.PlaygroundView })))
@@ -19,6 +20,25 @@ const views = {
 } as const
 
 const TAB_ORDER: Tab[] = ['playground', 'image']
+
+function AgentNavIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 2v4M4.9 4.9l2.8 2.8M2 12h4M18 12h4M16.3 7.7l2.8-2.8" />
+      <rect x="5" y="9" width="14" height="11" rx="3" />
+    </svg>
+  )
+}
+
+function ImageNavIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="8.5" cy="8.5" r="1.5" />
+      <polyline points="21 15 16 10 5 21" />
+    </svg>
+  )
+}
 
 export function App() {
   const needsUnlock = useAuthStore((s) => s.hasEncrypted && !s.apiKey)
@@ -36,6 +56,33 @@ export function App() {
       if (restored) setApiKeyOpen(false)
     })
   }, [hydrateFromDevice])
+
+  useEffect(() => {
+    void checkVoiceTutHealth().catch(() => undefined)
+  }, [])
+
+  useEffect(() => {
+    const root = document.documentElement
+    const syncKeyboard = () => {
+      const viewport = window.visualViewport
+      if (!viewport) {
+        root.style.setProperty('--keyboard-inset', '0px')
+        return
+      }
+      const inset = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
+      root.style.setProperty('--keyboard-inset', `${Math.round(inset)}px`)
+    }
+    syncKeyboard()
+    window.visualViewport?.addEventListener('resize', syncKeyboard)
+    window.visualViewport?.addEventListener('scroll', syncKeyboard)
+    window.addEventListener('resize', syncKeyboard)
+    return () => {
+      window.visualViewport?.removeEventListener('resize', syncKeyboard)
+      window.visualViewport?.removeEventListener('scroll', syncKeyboard)
+      window.removeEventListener('resize', syncKeyboard)
+      root.style.removeProperty('--keyboard-inset')
+    }
+  }, [])
 
   useEffect(() => {
     if (!isVisibleTab(activeTab)) setActiveTab('playground')
@@ -128,8 +175,9 @@ export function App() {
           </Suspense>
         </main>
         <nav aria-label="Mobile navigation" className="lg:hidden shrink-0 grid grid-cols-2 border-t border-white/[0.08] bg-[#0d0d11] pb-[env(safe-area-inset-bottom)]">
-          {([['playground', 'Noor'], ['image', 'Create']] as const).map(([id, label]) => (
-            <button key={id} type="button" onClick={() => setActiveTab(id)} aria-current={safeTab === id ? 'page' : undefined} className={`min-h-14 px-2 text-[13px] font-medium ${safeTab === id ? 'text-[var(--color-accent)] bg-white/[0.04]' : 'text-white/55'}`}>
+          {([['playground', 'Noor', AgentNavIcon], ['image', 'Create', ImageNavIcon]] as const).map(([id, label, Icon]) => (
+            <button key={id} type="button" onClick={() => setActiveTab(id)} aria-current={safeTab === id ? 'page' : undefined} className={`min-h-14 px-2 text-[12px] font-medium flex flex-col items-center justify-center gap-0.5 ${safeTab === id ? 'text-[var(--color-accent)]' : 'text-white/50'}`}>
+              <Icon />
               {label}
             </button>
           ))}

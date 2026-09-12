@@ -31,6 +31,7 @@ html {
   height: 100%;
   overscroll-behavior: none;
   overflow-x: hidden;
+  --keyboard-inset: 0px;
 }
 html, body, #root { min-height: 100%; }
 button, a, input, textarea, select { -webkit-tap-highlight-color: transparent; }

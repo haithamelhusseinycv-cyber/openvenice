@@ -32,7 +32,7 @@ export function TextArea({ value, onChange, placeholder, rows = 3, ariaLabel, ma
       maxLength={maxLength}
       autoFocus={autoFocus}
       className={cn(
-        'w-full bg-[#121217] border border-white/[0.09] rounded-xl px-3 py-2.5 text-[16px] text-[#f4efe8] outline-none focus:border-[#9b5cff]/60 focus:shadow-[0_0_0_3px_rgba(155,92,255,0.08)] transition-all resize-y placeholder:text-white/30 leading-relaxed max-h-[28vh] overflow-y-auto',
+        'w-full bg-[var(--color-bg-input)] border border-white/[0.09] rounded-xl px-3 py-2.5 text-[16px] text-[var(--color-text-primary)] outline-none focus:border-[var(--color-accent)]/50 focus:shadow-[0_0_0_3px_var(--color-accent-soft)] transition-[border-color,box-shadow] resize-y placeholder:text-white/30 leading-relaxed max-h-[28vh] overflow-y-auto',
         className,
       )}
     />
@@ -56,10 +56,10 @@ export function PrimaryButton({ onClick, disabled, loading, children, ariaLabel,
       aria-label={ariaLabel}
       aria-busy={loading || undefined}
       className={cn(
-        'w-full rounded-xl font-semibold transition-all duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2',
+        'w-full rounded-xl font-semibold transition-[background-color,transform] duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2',
         sizing,
         !disabled && !loading
-          ? 'bg-[linear-gradient(135deg,#8f46ff_0%,#b447e8_48%,#d64cb0_100%)] text-white hover:brightness-110 active:scale-[0.99] shadow-[0_10px_30px_rgba(143,70,255,0.24)]'
+          ? 'bg-white text-black hover:bg-white/92 active:scale-[0.99]'
           : 'bg-white/[0.06] text-white/30 cursor-not-allowed',
       )}
     >
@@ -78,7 +78,7 @@ export function GhostButton({ onClick, children, disabled, ariaLabel }: { onClic
       disabled={disabled}
       aria-label={ariaLabel}
       className={cn(
-        'px-3 py-2 text-[14px] font-medium rounded-xl border border-white/[0.12] bg-white/[0.02] text-white/75 hover:text-white hover:border-[#9b5cff]/40 hover:bg-[#9b5cff]/[0.06] transition-colors disabled:opacity-30 disabled:cursor-not-allowed min-h-11 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2',
+        'px-3 py-2 text-[14px] font-medium rounded-xl border border-white/[0.12] bg-white/[0.02] text-white/75 hover:text-white hover:border-white/[0.22] hover:bg-white/[0.05] transition-colors disabled:opacity-30 disabled:cursor-not-allowed min-h-11 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2',
       )}
     >
       {children}
@@ -104,8 +104,8 @@ export function PillGroup({ options, value, onChange, ariaLabel }: {
           className={cn(
             'text-[14px] font-medium px-3 py-2 rounded-lg border transition-all duration-150 min-h-11 focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--color-accent)]',
             o.value === value
-              ? 'border-[#b36cff]/45 bg-[#9b5cff]/[0.14] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
-              : 'border-white/[0.08] bg-white/[0.015] text-white/60 hover:text-white hover:border-[#9b5cff]/30 hover:bg-[#9b5cff]/[0.05]',
+              ? 'border-[var(--color-accent)]/35 bg-[var(--color-accent-soft)] text-white'
+              : 'border-white/[0.08] bg-white/[0.015] text-white/60 hover:text-white hover:border-white/[0.18] hover:bg-white/[0.05]',
           )}
         >
           {o.label}
@@ -144,10 +144,10 @@ export function ExamplePrompts({ items, onPick, title = 'Try one of these' }: {
             key={text}
             type="button"
             onClick={() => onPick(text)}
-            className="group text-left px-3.5 py-3 rounded-xl border border-white/[0.08] bg-white/[0.02] hover:border-[#9b5cff]/35 hover:bg-[#9b5cff]/[0.05] transition-all text-[15px] text-white/75 hover:text-white min-h-11 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2"
+            className="group text-left px-3.5 py-3 rounded-xl border border-white/[0.08] bg-white/[0.02] hover:border-white/[0.18] hover:bg-white/[0.05] transition-colors text-[15px] text-white/75 hover:text-white min-h-11 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2"
           >
             <span className="flex items-start gap-2">
-              <span className="text-[#b487ef] group-hover:text-[#d7b8ff] transition-colors mt-px">→</span>
+              <span className="text-[var(--color-accent)] mt-px">→</span>
               <span className="leading-relaxed">{text}</span>
             </span>
           </button>
@@ -182,7 +182,7 @@ const TONE: Record<string, string> = {
   pink: 'bg-pink-400/15 text-pink-300 border-pink-400/20',
   slate: 'bg-white/[0.05] text-white/60 border-white/10',
   rose: 'bg-rose-400/15 text-rose-300 border-rose-400/20',
-  teal: 'bg-[var(--color-accent-soft)] text-[#cba6ff] border-[#9b5cff]/30',
+  teal: 'bg-[var(--color-accent-soft)] text-[var(--color-accent)] border-[var(--color-accent)]/30',
 }
 
 export function Badge({ children, tone = 'slate' }: { children: React.ReactNode; tone?: keyof typeof TONE }) {

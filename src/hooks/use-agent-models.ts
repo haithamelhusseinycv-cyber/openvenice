@@ -1,6 +1,9 @@
 import { useMemo } from 'react'
 import { useModels } from './use-models'
-import { isAllowedChatModel } from '../lib/allowed-models'
+import {
+  ALLOWED_CHAT_MODEL_IDS,
+  isAllowedChatModel,
+} from '../lib/allowed-models'
 import type {
   ModelCapabilities,
   ModelTrait,
@@ -18,18 +21,8 @@ export interface AgentModel {
   uncensored: boolean
 }
 
-/*
- * The ONLY text / agent models allowed
- * anywhere in this OpenVenice build.
- */
-export const ALLOWED_AGENT_MODELS = [
-  'olafangensan-glm-4.7-flash-heretic',
-  'olafangensan-glm-4-7-flash-heretic',
-] as const
+export const ALLOWED_AGENT_MODELS = ALLOWED_CHAT_MODEL_IDS
 
-/*
- * Exact UI order.
- */
 const MODEL_ORDER = new Map<string, number>(
   ALLOWED_AGENT_MODELS.map((id, index) => [id, index]),
 )
@@ -41,14 +34,8 @@ export function useAgentModels() {
     if (!data) return []
 
     return data
-
-      // Second defensive filter.
-      // Even if another part of OpenVenice changes later,
-      // nothing outside our selected models reaches the Agent picker.
       .filter((m) => isAllowedChatModel(m.id))
-
       .filter((m) => !m.model_spec?.offline)
-
       .map<AgentModel>((m) => {
         const caps = m.model_spec?.capabilities ?? {}
         const traits = m.model_spec?.traits ?? []
@@ -56,16 +43,6 @@ export function useAgentModels() {
         return {
           id: m.id,
           name: m.model_spec?.name || m.id,
-
-          /*
-           * Noor is a conversation-first surface. The legacy function-call
-           * runner is a workflow editor, so routing every function-capable
-           * model through it can turn an ordinary question into a slow
-           * "0 edits" result. Keep the model's other capabilities, but use
-           * Noor's direct structured-response path for normal conversation
-           * and workflow mutations alike. That path still emits and applies
-           * workflow patches when the user actually asks for them.
-           */
           capabilities: {
             ...caps,
             supportsFunctionCalling: false,
@@ -73,47 +50,24 @@ export function useAgentModels() {
           traits,
           contextTokens:
             m.model_spec?.availableContextTokens,
-
-          /*
-           * All selected models are deliberately approved for Noor,
-           * so don't use OpenVenice's old recommendation logic.
-           */
-          recommended: true,
-
-          /*
-           * Tier follows our preferred model order.
-           */
+          recommended: MODEL_ORDER.get(m.id) !== undefined,
           tier: MODEL_ORDER.get(m.id) ?? 999,
-
           reasoning:
             caps.supportsReasoning === true,
-
-          /*
-           * These are intentionally our selected
-           * uncensored / least-restricted text models.
-           */
           uncensored:
             traits.includes('most_uncensored')
             || m.id.includes('uncensored')
             || m.id.includes('heretic'),
         }
       })
-
       .sort((a, b) => {
-        const orderA =
-          MODEL_ORDER.get(a.id) ?? 999
-        const orderB =
-          MODEL_ORDER.get(b.id) ?? 999
-
-        return orderA - orderB
+        const orderA = MODEL_ORDER.get(a.id) ?? 999
+        const orderB = MODEL_ORDER.get(b.id) ?? 999
+        if (orderA !== orderB) return orderA - orderB
+        return a.name.localeCompare(b.name)
       })
   }, [data])
 
-  /*
-   * React Query may report a background/loading state while it already has
-   * usable cached model data. Noor should remain send-ready in that case.
-   * Only expose "loading" while there is genuinely no compatible model yet.
-   */
   const modelListLoading = isLoading && models.length === 0
 
   return {
@@ -122,10 +76,6 @@ export function useAgentModels() {
   }
 }
 
-/*
- * Returns the AgentModel for an exact id.
- * No fallback to an unwanted model.
- */
 export function findAgentModel(
   models: AgentModel[],
   id: string,
