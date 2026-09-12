@@ -148,9 +148,58 @@ class PipeTests(unittest.TestCase):
         with patch.dict(os.environ, {"NUBE_API_KEY": "nube", "OPENCODE_API_KEY": "zen"}, clear=False):
             result = asyncio.run(self.pipe.pipe({"messages": [{"role": "user", "content": "implement this python function"}]}))
         self.assertEqual(result, "nube-code")
-        self.assertEqual(client.requests[0][0], "https://opencode.ai/zen/v1/chat/completions")
+        self.assertEqual(client.requests[0][0], "https://opencode.ai/zen/v1/responses")
         self.assertEqual(client.requests[0][2]["model"], "kimi-k2.7-code")
         self.assertEqual(client.requests[1][2]["model"], "kimi-k2.6")
+
+    def test_zen_hop_uses_responses_shape_and_returns_its_text(self):
+        client = Client([
+            Response(200, {
+                "id": "resp_1",
+                "output": [
+                    {"type": "message", "content": [{"type": "output_text", "text": "zen-code-ok"}]},
+                ],
+            }),
+        ])
+        MODULE.httpx.AsyncClient = lambda timeout: client
+        with patch.dict(os.environ, {"NUBE_API_KEY": "nube", "OPENCODE_API_KEY": "zen"}, clear=False):
+            result = asyncio.run(self.pipe.pipe({"messages": [{"role": "user", "content": "refactor this typescript endpoint"}]}))
+        self.assertEqual(result, "zen-code-ok")
+        self.assertEqual(len(client.requests), 1)
+        url, _headers, payload = client.requests[0]
+        self.assertEqual(url, "https://opencode.ai/zen/v1/responses")
+        self.assertEqual(payload["model"], "kimi-k2.7-code")
+        self.assertIn("input", payload)
+        self.assertFalse(payload["stream"])
+        self.assertNotIn("temperature", payload)
+        self.assertNotIn("top_p", payload)
+
+    def test_zen_hop_maps_system_messages_to_instructions(self):
+        payload = self.pipe._responses_payload(
+            {"messages": [
+                {"role": "system", "content": "be terse"},
+                {"role": "user", "content": "hi"},
+            ]},
+            "kimi-k2.7-code",
+        )
+        self.assertEqual(payload["instructions"], "be terse")
+        self.assertEqual(payload["input"], "user: hi")
+
+    def test_zen_hop_handles_plain_output_text_fallback(self):
+        client = Client([Response(200, {"output_text": "plain-text-ok"})])
+        MODULE.httpx.AsyncClient = lambda timeout: client
+        with patch.dict(os.environ, {"NUBE_API_KEY": "nube", "OPENCODE_API_KEY": "zen"}, clear=False):
+            result = asyncio.run(self.pipe.pipe({"messages": [{"role": "user", "content": "debug this python traceback"}]}))
+        self.assertEqual(result, "plain-text-ok")
+
+    def test_non_coding_request_never_calls_zen(self):
+        client = Client([Response(200, {"choices": [{"message": {"content": "plain"}}]})])
+        MODULE.httpx.AsyncClient = lambda timeout: client
+        with patch.dict(os.environ, {"NUBE_API_KEY": "nube", "OPENCODE_API_KEY": "zen"}, clear=False):
+            result = asyncio.run(self.pipe.pipe({"messages": [{"role": "user", "content": "summarize this contract"}]}))
+        self.assertEqual(result, "plain")
+        self.assertTrue(all("/responses" not in r[0] for r in client.requests))
+
 
     def test_search_tools_are_injected_when_exa_key_is_set(self):
         client = Client([Response(200, {"choices": [{"message": {"content": "ok"}}]})])

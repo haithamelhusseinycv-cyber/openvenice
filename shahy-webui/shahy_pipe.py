@@ -1,7 +1,7 @@
 """
 title: Shahy
 author: OpenAI / Shahy recovery
-version: 1.8.0
+version: 1.9.0
 description: Shahy work operator. Nube Kimi/DeepSeek for research and analysis, OpenCode Zen for coding, Exa/Tavily for search. Adult image/video/undress/swap belongs in Venice.
 """
 
@@ -297,7 +297,63 @@ DELIVERY STANDARD
             })
         return hops
 
+    @staticmethod
+    def _responses_payload(body: dict, model: str) -> dict:
+        """OpenCode Zen serves the Responses API; chat/completions is not
+        available for this account (HTTP 500 for every model). Map chat
+        messages onto a Responses request. Zen rejects temperature/top_p."""
+        instructions = []
+        conversation = []
+        for message in body.get("messages") or []:
+            if not isinstance(message, dict):
+                continue
+            role = message.get("role") or "user"
+            content = message.get("content")
+            if isinstance(content, list):
+                content = "\n".join(
+                    str(part.get("text") or "")
+                    for part in content
+                    if isinstance(part, dict)
+                )
+            text = str(content or "")
+            if role == "system":
+                instructions.append(text)
+            else:
+                conversation.append(f"{role}: {text}")
+        payload = {
+            "model": model,
+            "input": "\n\n".join(conversation),
+            "stream": False,
+        }
+        if instructions:
+            payload["instructions"] = "\n\n".join(instructions)
+        return payload
+
+    @staticmethod
+    def _responses_text(data: dict) -> str:
+        """Extract assistant text from a Responses API payload."""
+        chunks = []
+        for item in data.get("output") or []:
+            if not isinstance(item, dict) or item.get("type") not in (None, "message"):
+                continue
+            for part in item.get("content") or []:
+                if isinstance(part, dict) and part.get("type") in ("output_text", "text"):
+                    chunks.append(str(part.get("text") or ""))
+        text = "\n".join(chunk for chunk in chunks if chunk).strip()
+        if text:
+            return text
+        fallback = data.get("output_text")
+        if isinstance(fallback, str) and fallback.strip():
+            return fallback
+        return str(data)
+
     async def _call(self, client, hop: dict, body: dict):
+        if hop["name"] == "zen":
+            return await client.post(
+                f"{hop['base']}/responses",
+                headers=hop["headers"],
+                json=self._responses_payload(body, hop["model"]),
+            )
         return await client.post(
             f"{hop['base']}/chat/completions",
             headers=hop["headers"],
@@ -345,6 +401,8 @@ DELIVERY STANDARD
                         if not response.is_success:
                             break
                         data = response.json()
+                        if hop["name"] == "zen":
+                            return self._responses_text(data)
                         message = data.get("choices", [{}])[0].get("message", {})
                         if not message.get("tool_calls"):
                             return self._visible_text(data, hop["name"].title())
