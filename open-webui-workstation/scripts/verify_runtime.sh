@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-OWUI_URL="${OWUI_URL:-https://8rhrqskupcsqvq-8080.proxy.runpod.net}"
+# Pod was recreated 2026-09-11 (new id q6wseo4cjwhvn6, image open-webui:v0.11.3).
+# The RunPod proxy hostname embeds the pod id, so every pod recreation
+# changes it. Prefer OWUI_URL env (repo variable or secret) over this default.
+OWUI_URL="${OWUI_URL:-https://q6wseo4cjwhvn6-8080.proxy.runpod.net}"
 OWUI_URL="${OWUI_URL%/}"
 UA='Shahy-Deployment-Check/1.0'
 failed=0
