@@ -1,4 +1,5 @@
-const CACHE_NAME = 'openvenice-shell-v5'
+const APP_CACHE_PREFIX = 'openvenice-'
+const CACHE_NAME = APP_CACHE_PREFIX + 'shell-v5'
 const APP_SHELL = ['/manifest.webmanifest', '/favicon.svg', '/icon-192.png', '/icon-512.png']
 
 self.addEventListener('install', (event) => {
@@ -9,7 +10,10 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
+      // Only delete app-owned caches from this origin; never touch other apps' caches.
+      .then((keys) => Promise.all(keys
+        .filter((key) => key.startsWith(APP_CACHE_PREFIX) && key !== CACHE_NAME)
+        .map((key) => caches.delete(key))))
       .then(() => self.clients.claim()),
   )
 })
