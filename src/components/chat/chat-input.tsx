@@ -298,7 +298,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory
                 onClick={() => fileRef.current?.click()}
                 disabled={disabled || isPreparing || images.length >= 4 || isListening}
                 aria-label="Attach image"
-                className="flex h-10 w-10 shrink-0 items-center justify-center text-white/50 hover:text-white transition-colors rounded-lg hover:bg-white/[0.05] disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
+                className="flex h-11 w-11 shrink-0 items-center justify-center text-white/50 hover:text-white transition-colors rounded-lg hover:bg-white/[0.05] disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
                 title="Attach image"
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -312,8 +312,8 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory
                 aria-label={isListening ? 'Stop listening' : `Voice command in ${voiceLocaleLabel(voiceLocale)}`}
                 aria-pressed={isListening}
                 className={cn(
-                  'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] disabled:opacity-40',
-                  isListening ? 'border-rose-400/30 bg-rose-500/15 text-rose-100' : 'border-transparent text-white/55 hover:bg-white/[0.05] hover:text-white',
+                  'flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] disabled:opacity-40',
+                  isListening ? 'border-white/[0.2] bg-white text-black' : 'border-transparent text-white/55 hover:bg-white/[0.05] hover:text-white',
                 )}
                 title={isListening ? 'Stop listening' : `Speak to Nour · ${voiceLocaleLabel(voiceLocale)}`}
               >
@@ -324,7 +324,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory
                 onClick={toggleVoiceLocale}
                 disabled={isListening || isStreaming}
                 aria-label={`Voice language: ${voiceLocaleLabel(voiceLocale)}. Tap to switch.`}
-                className="min-h-10 shrink-0 rounded-lg px-2 text-[12px] font-semibold text-white/60 hover:bg-white/[0.05] hover:text-white disabled:opacity-40"
+                className="min-h-11 shrink-0 rounded-lg px-2 text-[12px] font-semibold text-white/60 hover:bg-white/[0.05] hover:text-white disabled:opacity-40"
                 title="Switch voice language between English and Egyptian Arabic"
               >
                 {voiceLocaleShortLabel(voiceLocale)}
@@ -334,7 +334,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory
                 onClick={() => { void toggleSpokenReplies() }}
                 aria-pressed={speakReplies}
                 aria-label={speakReplies ? 'Spoken voice replies on' : 'Spoken voice replies off'}
-                className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors', speakReplies ? 'text-emerald-100/70 hover:bg-emerald-400/[0.08]' : 'text-white/30 hover:bg-white/[0.05]')}
+                className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-lg transition-colors', speakReplies ? 'text-[var(--color-accent)] hover:bg-white/[0.05]' : 'text-white/30 hover:bg-white/[0.05]')}
                 title={speakReplies ? 'Nour will speak replies to voice commands' : 'Voice reply playback is off'}
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5z" /><path d="M15 9a4 4 0 010 6M18 6a8 8 0 010 12" /></svg>
@@ -342,7 +342,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory
               <button
                 type="button"
                 onClick={onOpenHistory}
-                className="min-h-10 shrink-0 rounded-lg px-2 text-[12px] font-medium text-white/50 hover:bg-white/[0.05] hover:text-white"
+                className="min-h-11 shrink-0 rounded-lg px-2 text-[12px] font-medium text-white/50 hover:bg-white/[0.05] hover:text-white"
               >
                 <span className="hidden sm:inline">History</span>
                 <span className="sm:hidden" aria-label="History">History</span>
@@ -353,7 +353,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory
                 type="button"
                 onClick={onStop}
                 aria-label="Stop generating"
-                className="flex min-h-10 shrink-0 items-center gap-1.5 px-3 text-[13px] font-medium text-white/85 bg-white/[0.08] hover:bg-white/[0.14] border border-white/[0.12] rounded-lg transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
+                className="flex min-h-11 shrink-0 items-center gap-1.5 px-3 text-[13px] font-medium text-white/85 bg-white/[0.08] hover:bg-white/[0.14] border border-white/[0.12] rounded-lg transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
               >
                 <svg width="9" height="9" viewBox="0 0 8 8" fill="currentColor"><rect width="8" height="8" rx="1" /></svg>
                 Stop
@@ -365,7 +365,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory
                 disabled={!value.trim() || disabled || isPreparing || isListening}
                 aria-label="Send message"
                 className={cn(
-                  'w-10 h-10 shrink-0 flex items-center justify-center rounded-xl transition-all duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2',
+                  'w-11 h-11 shrink-0 flex items-center justify-center rounded-xl transition-[background-color,transform] duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2',
                   value.trim() && !disabled && !isPreparing && !isListening
                     ? 'bg-white text-black hover:bg-white/95 active:scale-95 shadow-sm'
                     : 'bg-white/[0.06] text-white/25',

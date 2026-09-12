@@ -24,8 +24,8 @@ export function ImagePage() {
             className={cn(
               'text-[14px] font-semibold px-4 min-h-11 rounded-full border transition-all duration-150',
               tab === t.id
-                ? 'border-transparent bg-[linear-gradient(135deg,#8f46ff_0%,#b447e8_48%,#d64cb0_100%)] text-white shadow-[0_8px_24px_rgba(143,70,255,0.22)]'
-                : 'border-white/[0.07] bg-white/[0.025] text-white/45 hover:text-white/75 hover:border-[#9b5cff]/30 hover:bg-[#9b5cff]/[0.04]',
+                ? 'border-white/[0.14] bg-white text-black'
+                : 'border-white/[0.08] bg-white/[0.03] text-white/55 hover:text-white hover:border-white/[0.16]',
             )}
           >
             {t.label}

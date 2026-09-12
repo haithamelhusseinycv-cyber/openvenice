@@ -112,7 +112,7 @@ export function PlaygroundView() {
   return (
     <div className="flex h-full max-w-full min-w-0 overflow-hidden">
       <div className="flex w-full max-w-full min-w-0 shrink-0 flex-col overflow-hidden border-r border-white/[0.06] lg:w-[420px]">
-        <div className="flex min-w-0 shrink-0 items-center justify-between gap-2 border-b border-white/[0.06] bg-[#0a0a0a] px-3 h-11">
+        <div className="flex min-h-12 min-w-0 shrink-0 items-center justify-between gap-2 border-b border-white/[0.06] bg-[#0a0a0a] px-3">
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-[14px] font-medium text-white/65 shrink-0">Playground</span>
             <span className="text-[11px] px-1.5 py-0.5 rounded bg-white/[0.06] text-white/45 uppercase tracking-wider shrink-0">Agent</span>
@@ -121,7 +121,7 @@ export function PlaygroundView() {
             <AgentModelPicker value={currentAgentModel} onChange={setPlaygroundAgentModel} />
             <button
               onClick={handleReset}
-              className="text-[12px] text-white/45 hover:text-white/80 transition-colors px-1.5 py-1 rounded focus-visible:outline focus-visible:outline-1 focus-visible:outline-white/40"
+              className="min-h-11 text-[12px] text-white/45 hover:text-white/80 transition-colors px-2 rounded-md focus-visible:outline focus-visible:outline-1 focus-visible:outline-white/40"
               title="Clear conversation"
             >
               Clear

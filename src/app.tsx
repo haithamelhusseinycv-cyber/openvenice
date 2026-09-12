@@ -21,6 +21,25 @@ const views = {
 
 const TAB_ORDER: Tab[] = ['playground', 'image']
 
+function AgentNavIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 2v4M4.9 4.9l2.8 2.8M2 12h4M18 12h4M16.3 7.7l2.8-2.8" />
+      <rect x="5" y="9" width="14" height="11" rx="3" />
+    </svg>
+  )
+}
+
+function ImageNavIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="8.5" cy="8.5" r="1.5" />
+      <polyline points="21 15 16 10 5 21" />
+    </svg>
+  )
+}
+
 export function App() {
   const needsUnlock = useAuthStore((s) => s.hasEncrypted && !s.apiKey)
   const hydrateFromDevice = useAuthStore((s) => s.hydrateFromDevice)
@@ -156,8 +175,9 @@ export function App() {
           </Suspense>
         </main>
         <nav aria-label="Mobile navigation" className="lg:hidden shrink-0 grid grid-cols-2 border-t border-white/[0.08] bg-[#0d0d11] pb-[env(safe-area-inset-bottom)]">
-          {([['playground', 'Noor'], ['image', 'Create']] as const).map(([id, label]) => (
-            <button key={id} type="button" onClick={() => setActiveTab(id)} aria-current={safeTab === id ? 'page' : undefined} className={`min-h-14 px-2 text-[13px] font-medium ${safeTab === id ? 'text-[var(--color-accent)] bg-white/[0.04]' : 'text-white/55'}`}>
+          {([['playground', 'Noor', AgentNavIcon], ['image', 'Create', ImageNavIcon]] as const).map(([id, label, Icon]) => (
+            <button key={id} type="button" onClick={() => setActiveTab(id)} aria-current={safeTab === id ? 'page' : undefined} className={`min-h-14 px-2 text-[12px] font-medium flex flex-col items-center justify-center gap-0.5 ${safeTab === id ? 'text-[var(--color-accent)]' : 'text-white/50'}`}>
+              <Icon />
               {label}
             </button>
           ))}

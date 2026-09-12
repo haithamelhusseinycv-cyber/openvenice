@@ -51,7 +51,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: Props) {
         <button
           onClick={onMobileClose}
           aria-label="Close menu"
-          className="lg:hidden ml-auto p-1 text-white/45 hover:text-white/80 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
+          className="lg:hidden ml-auto min-h-11 min-w-11 flex items-center justify-center text-white/45 hover:text-white/80 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
         </button>
@@ -76,7 +76,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: Props) {
                     title={!expanded ? label : undefined}
                     className={cn(
                       'relative flex items-center gap-2.5 rounded-lg text-[14px] transition-all duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2',
-                      expanded ? 'px-2.5 py-2' : 'lg:px-0 lg:py-2 lg:justify-center px-2.5 py-2',
+                      expanded ? 'min-h-11 px-2.5 py-2' : 'min-h-11 lg:px-0 lg:py-2 lg:justify-center px-2.5 py-2',
                       isActive
                         ? 'bg-white/[0.06] text-white'
                         : 'text-white/55 hover:text-white hover:bg-white/[0.03]',
