@@ -174,6 +174,15 @@ function normalizeSpeechText(text: string) {
     .trim()
 }
 
+function pickBrowserVoice(locale: VoiceLocale): SpeechSynthesisVoice | undefined {
+  const voices = window.speechSynthesis.getVoices()
+  const wanted = locale.toLowerCase()
+  const prefix = locale === 'ar-EG' ? 'ar' : 'en'
+  return voices.find((voice) => voice.lang.toLowerCase() === wanted)
+    || voices.find((voice) => voice.lang.toLowerCase().startsWith(wanted))
+    || voices.find((voice) => voice.lang.toLowerCase().startsWith(prefix))
+}
+
 export async function speakVoice(
   text: string,
   locale: VoiceLocale,
@@ -197,12 +206,26 @@ export async function speakVoice(
     throw new Error('Text-to-speech is not available in this browser')
   }
 
+  if (window.speechSynthesis.getVoices().length === 0) {
+    await new Promise<void>((resolve) => {
+      const done = () => resolve()
+      window.speechSynthesis.addEventListener('voiceschanged', done, { once: true })
+      window.setTimeout(done, 400)
+    })
+  }
+
   await new Promise<void>((resolve, reject) => {
     const utterance = new SpeechSynthesisUtterance(clean)
-    utterance.lang = locale
+    const voice = pickBrowserVoice(locale)
+    if (voice) utterance.voice = voice
+    utterance.lang = voice?.lang || locale
     utterance.rate = options.rate ?? 1
     utterance.pitch = options.pitch ?? 1
-    const cleanup = () => options.signal?.removeEventListener('abort', onAbort)
+    let keepAlive: number | undefined
+    const cleanup = () => {
+      if (keepAlive) window.clearInterval(keepAlive)
+      options.signal?.removeEventListener('abort', onAbort)
+    }
     const onAbort = () => {
       window.speechSynthesis.cancel()
       cleanup()
@@ -211,9 +234,29 @@ export async function speakVoice(
     utterance.onend = () => { cleanup(); resolve() }
     utterance.onerror = () => { cleanup(); reject(new Error('Text-to-speech failed')) }
     options.signal?.addEventListener('abort', onAbort, { once: true })
+    // Chrome on Android silently truncates long utterances unless we pulse
+    // pause/resume while speaking.
+    keepAlive = window.setInterval(() => {
+      if (!window.speechSynthesis.speaking) return
+      window.speechSynthesis.pause()
+      window.speechSynthesis.resume()
+    }, 5000)
     window.speechSynthesis.cancel()
     window.speechSynthesis.speak(utterance)
   })
+}
+
+export async function speakVoiceQueued(
+  text: string,
+  locale: VoiceLocale,
+  options: { rate?: number; pitch?: number; signal?: AbortSignal } = {},
+) {
+  const { splitNourSpeechText } = await import('./nour-character')
+  const chunks = splitNourSpeechText(text, 140, 220)
+  for (const chunk of chunks) {
+    if (options.signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError')
+    await speakVoice(chunk, locale, options)
+  }
 }
 
 export async function stopVoiceSpeaking() {

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { cn } from '../../lib/utils'
 import { formatBytes, prepareImage, type ImagePreparationStage } from '../../lib/image-input'
-import { cancelVoiceListening, listenForVoice, speakVoice, stopVoiceSpeaking, voiceLocaleLabel, voiceLocaleShortLabel } from '../../lib/voice-chat'
+import { cancelVoiceListening, listenForVoice, speakVoiceQueued, stopVoiceSpeaking, voiceLocaleLabel, voiceLocaleShortLabel } from '../../lib/voice-chat'
 import { useChatStore } from '../../stores/chat-store'
 import { agentToolLabel, useAgentStatusStore } from '../../stores/agent-status-store'
 import { useVoiceStore } from '../../stores/voice-store'
@@ -32,6 +32,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const preparationAbortRef = useRef<AbortController | null>(null)
+  const speechAbortRef = useRef<AbortController | null>(null)
   const pendingVoiceReplyLocaleRef = useRef<'en-US' | 'ar-EG' | null>(null)
   const previousStreamingRef = useRef(isStreaming)
   const activeConversationId = useChatStore((state) => state.activeConversationId)
@@ -61,6 +62,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory
   useEffect(() => { textareaRef.current?.focus() }, [])
   useEffect(() => () => {
     preparationAbortRef.current?.abort()
+    speechAbortRef.current?.abort()
     void cancelVoiceListening()
     void stopVoiceSpeaking()
   }, [])
@@ -75,11 +77,20 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory
     if (!replyLocale || !speakReplies || !latestAssistantText.trim()) return
 
     setIsSpeaking(true)
-    void speakVoice(latestAssistantText, replyLocale)
+    speechAbortRef.current?.abort()
+    const controller = new AbortController()
+    speechAbortRef.current = controller
+    void speakVoiceQueued(latestAssistantText, replyLocale, { signal: controller.signal })
       .catch((error) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return
         toast.fromError(error, replyLocale === 'ar-EG' ? 'تعذر تشغيل الرد الصوتي' : 'Could not play voice reply')
       })
-      .finally(() => setIsSpeaking(false))
+      .finally(() => {
+        if (speechAbortRef.current === controller) {
+          speechAbortRef.current = null
+          setIsSpeaking(false)
+        }
+      })
   }, [isStreaming, latestAssistantText, speakReplies])
 
   const handleSubmit = () => {
@@ -101,6 +112,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory
     }
 
     if (isSpeaking) {
+      speechAbortRef.current?.abort()
       await stopVoiceSpeaking()
       setIsSpeaking(false)
     }
@@ -130,6 +142,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory
     const next = !speakReplies
     setSpeakReplies(next)
     if (!next) {
+      speechAbortRef.current?.abort()
       await stopVoiceSpeaking()
       setIsSpeaking(false)
     }
@@ -186,7 +199,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled, onOpenHistory
   }
 
   return (
-    <div className="max-w-full min-w-0 shrink-0 overflow-x-hidden bg-[#0a0a0c] px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 sm:px-6 sm:pb-5">
+    <div className="max-w-full min-w-0 shrink-0 overflow-x-hidden bg-[#0a0a0c] px-2 pb-[max(0.5rem,env(safe-area-inset-bottom),var(--keyboard-inset,0px))] pt-2 sm:px-6 sm:pb-5">
       <div className="mx-auto w-full max-w-[860px] min-w-0">
         {(isListening || isSpeaking) && (
           <div className="mb-1.5 flex items-center gap-2 px-1 text-[11px] font-medium text-white/55" aria-live="polite">

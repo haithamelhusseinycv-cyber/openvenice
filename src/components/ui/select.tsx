@@ -65,7 +65,7 @@ export function Select({ value, onChange, options, placeholder = 'Select...', se
               />
             </div>
           )}
-          <div className="max-h-60 overflow-y-auto p-0.5">
+          <div className="max-h-[min(16rem,45dvh)] overflow-y-auto overscroll-contain p-0.5">
             {filtered.length === 0 ? (
               <div className="px-2.5 py-3 text-[15px] text-white/40 text-center">No results</div>
             ) : (

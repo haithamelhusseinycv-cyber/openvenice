@@ -3,6 +3,7 @@ import { NOUR_SYSTEM_PROMPT, nourLanguagePrompt, nourRequestProfile, type NourLa
 import { NODE_SCHEMAS } from './workflow-schema'
 import type { WorkflowPatch } from './workflow-mutations'
 import { withVeniceChatParams } from './venice-policy'
+import { DEFAULT_CHAT_MODEL_ID, FALLBACK_CHAT_MODEL_ID } from './allowed-models'
 import type { ChatCompletionResponse, ModelCapabilities } from '../types/venice'
 import type { Node, Edge } from '@xyflow/react'
 import type { VeniceNodeData, VeniceNodeType } from '../stores/workflow-store'
@@ -16,9 +17,8 @@ export interface AgentResponse {
 
 const VALID_OPS = new Set(['add_node', 'remove_node', 'set_params', 'move_node', 'connect', 'disconnect', 'clear'])
 
-// Noor's preferred model and its high-context uncensored backup.
-export const DEFAULT_AGENT_MODEL = 'olafangensan-glm-4.7-flash-heretic'
-export const FALLBACK_AGENT_MODEL = 'olafangensan-glm-4-7-flash-heretic'
+export const DEFAULT_AGENT_MODEL = DEFAULT_CHAT_MODEL_ID
+export const FALLBACK_AGENT_MODEL = FALLBACK_CHAT_MODEL_ID
 
 function nodeCatalog(): string {
   return Object.values(NODE_SCHEMAS)

@@ -9,6 +9,7 @@ import { DeviceDiagnosticsDialog } from './components/chat/device-diagnostics-di
 import { ErrorBoundary } from './components/ui/error-boundary'
 import { Toaster } from './components/ui/toaster'
 import { isVisibleTab } from './lib/allowed-models'
+import { checkVoiceTutHealth } from './lib/venice-client'
 
 const ImagePage = lazy(() => import('./components/image/image-page').then((module) => ({ default: module.ImagePage })))
 const PlaygroundView = lazy(() => import('./components/playground/playground-view').then((module) => ({ default: module.PlaygroundView })))
@@ -36,6 +37,33 @@ export function App() {
       if (restored) setApiKeyOpen(false)
     })
   }, [hydrateFromDevice])
+
+  useEffect(() => {
+    void checkVoiceTutHealth().catch(() => undefined)
+  }, [])
+
+  useEffect(() => {
+    const root = document.documentElement
+    const syncKeyboard = () => {
+      const viewport = window.visualViewport
+      if (!viewport) {
+        root.style.setProperty('--keyboard-inset', '0px')
+        return
+      }
+      const inset = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
+      root.style.setProperty('--keyboard-inset', `${Math.round(inset)}px`)
+    }
+    syncKeyboard()
+    window.visualViewport?.addEventListener('resize', syncKeyboard)
+    window.visualViewport?.addEventListener('scroll', syncKeyboard)
+    window.addEventListener('resize', syncKeyboard)
+    return () => {
+      window.visualViewport?.removeEventListener('resize', syncKeyboard)
+      window.visualViewport?.removeEventListener('scroll', syncKeyboard)
+      window.removeEventListener('resize', syncKeyboard)
+      root.style.removeProperty('--keyboard-inset')
+    }
+  }, [])
 
   useEffect(() => {
     if (!isVisibleTab(activeTab)) setActiveTab('playground')

@@ -535,7 +535,7 @@ export function PlaygroundChat() {
         )}
       </div>
 
-      <div className="max-w-full min-w-0 shrink-0 overflow-x-hidden border-t border-white/[0.06] p-3">
+      <div className="max-w-full min-w-0 shrink-0 overflow-x-hidden border-t border-white/[0.06] p-3 pb-[max(0.75rem,var(--keyboard-inset,0px))]">
         <div className="mb-2 grid max-w-full grid-cols-2 gap-2" aria-label="Noor language mode">
           {(Object.entries(NOUR_LANGUAGE_LABELS) as Array<[NourLanguageMode, string]>).map(([mode, label]) => (
             <button

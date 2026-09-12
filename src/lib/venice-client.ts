@@ -246,7 +246,7 @@ class VoiceTutResponseError extends Error {
   }
 }
 
-const SAFE_VOICETUT_FALLBACK_STATUSES = new Set([400, 401, 403, 404, 405, 413, 415, 422, 429])
+const SAFE_VOICETUT_FALLBACK_STATUSES = new Set([400, 401, 403, 404, 405, 413, 415, 422, 429, 502, 503, 504])
 
 function dispatchTtsProvider(provider: 'voicetut' | 'venice', reason?: string) {
   if (typeof window === 'undefined') return
@@ -344,23 +344,17 @@ export async function veniceBlob(path: string, body: object, init: { signal?: Ab
 
   if (path === '/audio/speech' && speechBody.model === 'voicetut') {
     const settings = useVoiceStore.getState()
-    let shouldUseVenice = true
     if (settings.ttsProvider === 'voicetut' && settings.voiceTutBaseUrl.trim()) {
       try {
-        await checkVoiceTutHealth(init)
-        shouldUseVenice = false
+        // Skip the health preflight on the hot path. A cold health wait was
+        // adding ~8s before the first audio byte; VoiceTut 5xx/429 fall back.
+        return await voiceTutBlob(speechBody, init)
       } catch (error) {
         if (init.signal?.aborted) throw error
-        const reason = error instanceof Error ? error.message : 'VoiceTut unavailable'
-        dispatchTtsProvider('venice', reason)
-      }
-
-      if (!shouldUseVenice) {
-        try {
-          return await voiceTutBlob(speechBody, init)
-        } catch (error) {
-          if (!(error instanceof VoiceTutResponseError) || !SAFE_VOICETUT_FALLBACK_STATUSES.has(error.status)) throw error
+        if (error instanceof VoiceTutResponseError && SAFE_VOICETUT_FALLBACK_STATUSES.has(error.status)) {
           dispatchTtsProvider('venice', error.message)
+        } else {
+          throw error
         }
       }
     } else {
