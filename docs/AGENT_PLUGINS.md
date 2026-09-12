@@ -6,8 +6,6 @@ The plugin manager is the control plane for tools that Qwen can discover and ena
 
 Built-in plugins:
 
-- **Local Dream** — enabled by default; generation, img2img, inpaint, model control, and upscale.
-- **FaceFusion** — enabled by default only in native Android when the signature-protected bridge is available.
 - **GitHub** — enabled by default; read-only repo, issue, pull, commit, and CI insight through `/connectors/github`. Requires `GITHUB_CONNECTOR_TOKEN` or `GITHUB_TOKEN` on the host.
 - **Microsoft Graph** — enabled by default; read-only Outlook mail, calendar, contacts, OneDrive, and SharePoint through `/connectors/graph`. Requires `MICROSOFT_GRAPH_TOKEN` on the host.
 - **Research** — enabled by default; Exa search/contents with Tavily fallback through `/connectors/exa` and `/connectors/tavily`. Requires `EXA_API_KEY` or `TAVILY_API_KEY` on the host.
