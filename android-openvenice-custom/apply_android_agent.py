@@ -74,7 +74,7 @@ if gradle.is_file():
         # Upgrade in place so version bumps propagate to existing projects.
         gradle_text = _re.sub(
             r'implementation "androidx\.biometric:biometric:[^"]+"',
-            'implementation "androidx.biometric:biometric:1.4.0"',
+            'implementation "androidx.biometric:biometric:1.1.0"',
             gradle_text,
         )
     else:
@@ -83,7 +83,7 @@ if gradle.is_file():
             raise RuntimeError('Could not locate capacitor dependency marker in app/build.gradle')
         gradle_text = gradle_text.replace(
             marker,
-            marker + '\n    implementation "androidx.biometric:biometric:1.4.0"',
+            marker + '\n    implementation "androidx.biometric:biometric:1.1.0"',
             1,
         )
     gradle.write_text(gradle_text, encoding='utf-8')
