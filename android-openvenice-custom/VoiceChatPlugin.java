@@ -31,7 +31,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Locale;
-import java.util.Map;
 import java.util.UUID;
 
 @CapacitorPlugin(
@@ -288,11 +287,14 @@ public final class VoiceChatPlugin extends Plugin {
                 connection.setConnectTimeout(15_000);
                 connection.setReadTimeout(FETCH_TIMEOUT_MS);
                 connection.setRequestMethod(method.toUpperCase(Locale.US));
-                Map<String, Object> headers = call.getObject("headers");
+                JSObject headers = call.getObject("headers");
                 if (headers != null) {
-                    for (Map.Entry<String, Object> entry : headers.entrySet()) {
-                        if (entry.getValue() != null) {
-                            connection.setRequestProperty(entry.getKey(), String.valueOf(entry.getValue()));
+                    java.util.Iterator<String> headerKeys = headers.keys();
+                    while (headerKeys.hasNext()) {
+                        String headerKey = headerKeys.next();
+                        Object headerValue = headers.opt(headerKey);
+                        if (headerValue != null) {
+                            connection.setRequestProperty(headerKey, String.valueOf(headerValue));
                         }
                     }
                 }
