@@ -31,6 +31,115 @@ import java.util.UUID;
 
 @CapacitorPlugin(name = "MediaActions")
 public final class MediaActionsPlugin extends Plugin {
+    private static final String CRASH_FILE_NAME = "openvenice-last-crash.txt";
+
+    /**
+     * Exports the last crash report into public Downloads via MediaStore —
+     * visible from any file manager on Android 10+ without permissions.
+     * Called automatically after a fatal exception; safe to call anytime.
+     */
+    private void exportCrashToDownloads() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return;
+        try {
+            Context context = getContext();
+            File internal = new File(context.getCacheDir(), CRASH_FILE_NAME);
+            File external = context.getExternalFilesDir(null);
+            File externalFile = external != null ? new File(external, CRASH_FILE_NAME) : null;
+            File source = internal.exists() ? internal : (externalFile != null && externalFile.exists() ? externalFile : null);
+            if (source == null || source.length() == 0) return;
+
+            ContentResolver resolver = context.getContentResolver();
+            // Avoid duplicates: replace the previous export if present.
+            String selection = MediaStore.MediaColumns.DISPLAY_NAME + "=? AND " + MediaStore.MediaColumns.RELATIVE_PATH + "=?";
+            try (android.database.Cursor cursor = resolver.query(
+                MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                new String[]{MediaStore.MediaColumns._ID},
+                selection,
+                new String[]{CRASH_FILE_NAME, Environment.DIRECTORY_DOWNLOADS + "/"},
+                null)) {
+                if (cursor != null) {
+                    while (cursor.moveToNext()) {
+                        long id = cursor.getLong(0);
+                        resolver.delete(MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                            MediaStore.MediaColumns._ID + "=?", new String[]{String.valueOf(id)});
+                    }
+                }
+            }
+
+            ContentValues values = new ContentValues();
+            values.put(MediaStore.MediaColumns.DISPLAY_NAME, CRASH_FILE_NAME);
+            values.put(MediaStore.MediaColumns.MIME_TYPE, "text/plain");
+            values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
+            Uri target = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+            if (target == null) return;
+            try (InputStream in = new java.io.FileInputStream(source);
+                 OutputStream out = resolver.openOutputStream(target)) {
+                if (out == null) return;
+                byte[] buffer = new byte[8192];
+                int read;
+                while ((read = in.read(buffer)) != -1) out.write(buffer, 0, read);
+            }
+        } catch (Throwable ignored) {
+            // Crash export is best-effort only.
+        }
+    }
+
+    @PluginMethod
+    public void getLastCrash(PluginCall call) {
+        try {
+            Context context = getContext();
+            File internal = new File(context.getCacheDir(), CRASH_FILE_NAME);
+            File external = context.getExternalFilesDir(null);
+            File externalFile = external != null ? new File(external, CRASH_FILE_NAME) : null;
+            File source = internal.exists() ? internal : (externalFile != null && externalFile.exists() ? externalFile : null);
+            JSObject result = new JSObject();
+            if (source == null || source.length() == 0) {
+                result.put("found", false);
+                call.resolve(result);
+                return;
+            }
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            try (InputStream in = new java.io.FileInputStream(source)) {
+                byte[] chunk = new byte[8192];
+                int read;
+                while ((read = in.read(chunk)) != -1) buffer.write(chunk, 0, read);
+            }
+            String content = buffer.toString("UTF-8");
+            // Trim to a reasonable paste size.
+            if (content.length() > 12000) content = content.substring(0, 12000) + "\n…(truncated)";
+            result.put("found", true);
+            result.put("path", source.getAbsolutePath());
+            result.put("content", content);
+            call.resolve(result);
+        } catch (Throwable error) {
+            call.reject("Could not read crash report", error);
+        }
+    }
+
+    @PluginMethod
+    public void clearLastCrash(PluginCall call) {
+        try {
+            Context context = getContext();
+            new File(context.getCacheDir(), CRASH_FILE_NAME).delete();
+            File external = context.getExternalFilesDir(null);
+            if (external != null) new File(external, CRASH_FILE_NAME).delete();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                try {
+                    ContentResolver resolver = context.getContentResolver();
+                    resolver.delete(MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                        MediaStore.MediaColumns.DISPLAY_NAME + "=? AND " + MediaStore.MediaColumns.RELATIVE_PATH + "=?",
+                        new String[]{CRASH_FILE_NAME, Environment.DIRECTORY_DOWNLOADS + "/"});
+                } catch (Throwable ignored) {
+                }
+            }
+            JSObject result = new JSObject();
+            result.put("cleared", true);
+            call.resolve(result);
+        } catch (Exception error) {
+            call.reject("Could not clear crash report", error);
+        }
+    }
+
     @PluginMethod
     public void shareText(PluginCall call) {
         String text = call.getString("text");

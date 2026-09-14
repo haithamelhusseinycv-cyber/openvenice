@@ -13,6 +13,8 @@ import { biometricGateAvailability } from './lib/auth-gate'
 import { isVisibleTab } from './lib/allowed-models'
 import { haptic } from './lib/haptics'
 import { checkVoiceTutHealth } from './lib/venice-client'
+import { readLastCrashReport, clearLastCrashReport, copyCrashReport } from './lib/crash-report'
+import { toast } from './stores/toast-store'
 
 const ImagePage = lazy(() => import('./components/image/image-page').then((module) => ({ default: module.ImagePage })))
 const PlaygroundView = lazy(() => import('./components/playground/playground-view').then((module) => ({ default: module.PlaygroundView })))
@@ -129,6 +131,25 @@ export function App() {
   useEffect(() => {
     if (!isVisibleTab(activeTab)) setActiveTab('playground')
   }, [activeTab, setActiveTab])
+
+  useEffect(() => {
+    // Surface any crash the previous run recorded, so failures on phones we
+    // cannot reach are still diagnosable: copy the trace to the clipboard.
+    let disposed = false
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        const report = await readLastCrashReport()
+        if (disposed || !report?.found || !report.content?.trim()) return
+        const copied = await copyCrashReport(report.content)
+        toast.info(
+          'Crash report from last run',
+          copied ? 'Trace copied to clipboard — send it to Shahy.' : 'Saved in Downloads as openvenice-last-crash.txt.',
+        )
+        await clearLastCrashReport()
+      })()
+    }, 2500)
+    return () => { disposed = true; window.clearTimeout(timer) }
+  }, [])
 
   useEffect(() => {
     const onInvalidKey = () => setApiKeyOpen(true)
