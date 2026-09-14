@@ -69,16 +69,24 @@ if 'android:allowBackup="false"' not in text:
 gradle = app / 'build.gradle'
 if gradle.is_file():
     gradle_text = gradle.read_text(encoding='utf-8')
-    if 'androidx.biometric:biometric' not in gradle_text:
+    import re as _re
+    if 'androidx.biometric:biometric' in gradle_text:
+        # Upgrade in place so version bumps propagate to existing projects.
+        gradle_text = _re.sub(
+            r'implementation "androidx\.biometric:biometric:[^"]+"',
+            'implementation "androidx.biometric:biometric:1.4.0"',
+            gradle_text,
+        )
+    else:
         marker = "implementation project(':capacitor-cordova-android-plugins')"
         if marker not in gradle_text:
             raise RuntimeError('Could not locate capacitor dependency marker in app/build.gradle')
         gradle_text = gradle_text.replace(
             marker,
-            marker + '\n    implementation "androidx.biometric:biometric:1.1.0"',
+            marker + '\n    implementation "androidx.biometric:biometric:1.4.0"',
             1,
         )
-        gradle.write_text(gradle_text, encoding='utf-8')
+    gradle.write_text(gradle_text, encoding='utf-8')
 
 provider = '''\n        <provider\n            android:name="androidx.core.content.FileProvider"\n            android:authorities="${applicationId}.fileprovider"\n            android:exported="false"\n            android:grantUriPermissions="true">\n            <meta-data\n                android:name="android.support.FILE_PROVIDER_PATHS"\n                android:resource="@xml/file_paths" />\n        </provider>\n'''
 if '${applicationId}.fileprovider' not in text:

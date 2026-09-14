@@ -160,51 +160,69 @@ public class AuthVaultPlugin extends Plugin {
      * or device credential fallback). The vault key itself stays independent of
      * biometric enrollment so re-enrolling a fingerprint never orphans saved
      * credentials; this gate is the front-door lock for the app shell.
+     *
+     * Armor: BiometricPrompt internals have crashed apps on new Android
+     * releases (1.1.0 era bugs, OEM quirks). Any Throwable here falls OPEN —
+     * the lock must never be able to kill the app.
      */
     @PluginMethod
     public void gate(PluginCall call) {
-        android.app.Activity activity = getBridge() != null ? getBridge().getActivity() : null;
-        if (!(activity instanceof FragmentActivity)) {
-            call.reject("Biometric gate requires the app activity");
-            return;
-        }
+        try {
+            android.app.Activity activity = getBridge() != null ? getBridge().getActivity() : null;
+            if (!(activity instanceof FragmentActivity)) {
+                // Fall open — the gate is a lock, not a launch requirement.
+                JSObject result = new JSObject();
+                result.put("unlocked", true);
+                result.put("fallback", true);
+                result.put("reason", "activity-unavailable");
+                call.resolve(result);
+                return;
+            }
 
-        int status = biometricStatus();
-        if (status != BiometricManager.BIOMETRIC_SUCCESS) {
-            // No usable authenticator (none enrolled, no lock screen, hardware
-            // missing): fall open so the app is never bricked, and surface why.
+            int status = biometricStatus();
+            if (status != BiometricManager.BIOMETRIC_SUCCESS) {
+                // No usable authenticator (none enrolled, no lock screen, hardware
+                // missing): fall open so the app is never bricked, and surface why.
+                JSObject result = new JSObject();
+                result.put("unlocked", true);
+                result.put("fallback", true);
+                result.put("status", status);
+                call.resolve(result);
+                return;
+            }
+
+            FragmentActivity fragmentActivity = (FragmentActivity) activity;
+            Executor executor = ContextCompat.getMainExecutor(getContext());
+            BiometricPrompt.PromptInfo info = new BiometricPrompt.PromptInfo.Builder()
+                .setTitle(call.getString("title", "Unlock OpenVenice"))
+                .setSubtitle(call.getString("subtitle", ""))
+                .setAllowedAuthenticators(
+                    BiometricManager.Authenticators.BIOMETRIC_WEAK
+                        | BiometricManager.Authenticators.DEVICE_CREDENTIAL)
+                .build();
+
+            BiometricPrompt prompt = new BiometricPrompt(fragmentActivity, executor,
+                new BiometricPrompt.AuthenticationCallback() {
+                    @Override
+                    public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) {
+                        JSObject response = new JSObject();
+                        response.put("unlocked", true);
+                        call.resolve(response);
+                    }
+
+                    @Override
+                    public void onAuthenticationError(int errorCode, CharSequence errString) {
+                        call.reject(errString != null ? errString.toString() : "Authentication failed");
+                    }
+                });
+            prompt.authenticate(info);
+        } catch (Throwable error) {
+            // Never let biometric internals take the app down.
             JSObject result = new JSObject();
             result.put("unlocked", true);
             result.put("fallback", true);
-            result.put("status", status);
+            result.put("reason", error.getClass().getSimpleName());
             call.resolve(result);
-            return;
         }
-
-        FragmentActivity fragmentActivity = (FragmentActivity) activity;
-        Executor executor = ContextCompat.getMainExecutor(getContext());
-        BiometricPrompt.PromptInfo info = new BiometricPrompt.PromptInfo.Builder()
-            .setTitle(call.getString("title", "Unlock OpenVenice"))
-            .setSubtitle(call.getString("subtitle", ""))
-            .setAllowedAuthenticators(
-                BiometricManager.Authenticators.BIOMETRIC_WEAK
-                    | BiometricManager.Authenticators.DEVICE_CREDENTIAL)
-            .build();
-
-        BiometricPrompt prompt = new BiometricPrompt(fragmentActivity, executor,
-            new BiometricPrompt.AuthenticationCallback() {
-                @Override
-                public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) {
-                    JSObject response = new JSObject();
-                    response.put("unlocked", true);
-                    call.resolve(response);
-                }
-
-                @Override
-                public void onAuthenticationError(int errorCode, CharSequence errString) {
-                    call.reject(errString != null ? errString.toString() : "Authentication failed");
-                }
-            });
-        prompt.authenticate(info);
     }
 }
