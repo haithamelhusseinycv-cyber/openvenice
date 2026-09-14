@@ -143,10 +143,16 @@ public class AuthVaultPlugin extends Plugin {
     }
 
     private int biometricStatus() {
-        BiometricManager manager = BiometricManager.from(getContext());
-        return manager.canAuthenticate(
-            BiometricManager.Authenticators.BIOMETRIC_WEAK
-                | BiometricManager.Authenticators.DEVICE_CREDENTIAL);
+        try {
+            BiometricManager manager = BiometricManager.from(getContext());
+            return manager.canAuthenticate(
+                BiometricManager.Authenticators.BIOMETRIC_WEAK
+                    | BiometricManager.Authenticators.DEVICE_CREDENTIAL);
+        } catch (Throwable error) {
+            // Some OEM builds throw from canAuthenticate (missing KeyguardManager
+            // bindings etc.). Treat as unavailable rather than crashing the app.
+            return BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE;
+        }
     }
 
     /**

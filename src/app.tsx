@@ -62,14 +62,19 @@ export function App() {
 
   useEffect(() => {
     let disposed = false
-    void biometricGateAvailability().then((availability) => {
-      if (disposed) return
-      const usable = availability.available && availability.biometric
-      setBiometricUsable(usable)
-      setGateReady(true)
-      if (usable) setLocked(true)
-    })
-    return () => { disposed = true }
+    // Defer the gate probe until the first frame has painted. Locking during
+    // bridge startup can race the activity window and black-screen the app on
+    // some devices; a short delay keeps the shell visible before the prompt.
+    const timer = window.setTimeout(() => {
+      void biometricGateAvailability().then((availability) => {
+        if (disposed) return
+        const usable = availability.available && availability.biometric
+        setBiometricUsable(usable)
+        setGateReady(true)
+        if (usable) setLocked(true)
+      })
+    }, 350)
+    return () => { disposed = true; window.clearTimeout(timer) }
   }, [])
 
   useEffect(() => {
