@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect } from 'react'
+import { lazy, Suspense, useState, useEffect, useRef } from 'react'
 import { useSettingsStore, type Tab } from './stores/settings-store'
 import { usePlaygroundStore } from './stores/playground-store'
 import { useAuthStore } from './stores/auth-store'
@@ -9,6 +9,7 @@ import { DeviceDiagnosticsDialog } from './components/chat/device-diagnostics-di
 import { ErrorBoundary } from './components/ui/error-boundary'
 import { Toaster } from './components/ui/toaster'
 import { isVisibleTab } from './lib/allowed-models'
+import { haptic } from './lib/haptics'
 import { checkVoiceTutHealth } from './lib/venice-client'
 
 const ImagePage = lazy(() => import('./components/image/image-page').then((module) => ({ default: module.ImagePage })))
@@ -50,6 +51,7 @@ export function App() {
   const setActiveTab = useSettingsStore((s) => s.setActiveTab)
   const safeTab = isVisibleTab(activeTab) ? activeTab : 'playground'
   const ActiveView = views[safeTab]
+  const touchStart = useRef<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
     void hydrateFromDevice().then((restored) => {
@@ -167,16 +169,43 @@ export function App() {
           onOpenDiagnostics={() => setDiagnosticsOpen(true)}
           onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
         />
-        <main className="max-w-full min-h-0 min-w-0 flex-1 overflow-hidden">
-          <Suspense fallback={<div className="flex h-full items-center justify-center text-[14px] text-white/45" role="status">Loading…</div>}>
+        <main
+          className="max-w-full min-h-0 min-w-0 flex-1 overflow-hidden"
+          onTouchStart={(e) => {
+            const touch = e.touches[0]
+            touchStart.current = { x: touch.clientX, y: touch.clientY }
+          }}
+          onTouchEnd={(e) => {
+            const start = touchStart.current
+            touchStart.current = null
+            if (!start || window.innerWidth >= 1024) return
+            const touch = e.changedTouches[0]
+            const dx = touch.clientX - start.x
+            const dy = touch.clientY - start.y
+            if (Math.abs(dx) < 72 || Math.abs(dy) > Math.abs(dx) * 1.2) return
+            const currentIndex = TAB_ORDER.indexOf(safeTab)
+            const nextIndex = dx < 0 ? currentIndex + 1 : currentIndex - 1
+            if (nextIndex < 0 || nextIndex >= TAB_ORDER.length) return
+            haptic('select')
+            setActiveTab(TAB_ORDER[nextIndex])
+          }}
+        >
+          <Suspense fallback={<div className="flex h-full items-center justify-center" role="status"><span className="h-6 w-6 animate-spin rounded-full border-2 border-white/15 border-t-[var(--color-accent)]" aria-hidden="true" /></div>}>
             <ErrorBoundary key={safeTab}>
               <ActiveView />
             </ErrorBoundary>
           </Suspense>
         </main>
-        <nav aria-label="Mobile navigation" className="lg:hidden shrink-0 grid grid-cols-2 border-t border-white/[0.08] bg-[#0d0d11] pb-[env(safe-area-inset-bottom)]">
+        <nav aria-label="Mobile navigation" className="lg:hidden shrink-0 grid grid-cols-2 border-t border-white/[0.08] bg-[#0d0d11]/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
           {([['playground', 'Noor', AgentNavIcon], ['image', 'Create', ImageNavIcon]] as const).map(([id, label, Icon]) => (
-            <button key={id} type="button" onClick={() => setActiveTab(id)} aria-current={safeTab === id ? 'page' : undefined} className={`min-h-14 px-2 text-[12px] font-medium flex flex-col items-center justify-center gap-0.5 ${safeTab === id ? 'text-[var(--color-accent)]' : 'text-white/50'}`}>
+            <button
+              key={id}
+              type="button"
+              onClick={() => { if (id !== safeTab) haptic('tap'); setActiveTab(id) }}
+              aria-current={safeTab === id ? 'page' : undefined}
+              className={`relative min-h-14 px-2 text-[12px] font-medium flex flex-col items-center justify-center gap-0.5 transition-colors ${safeTab === id ? 'text-[var(--color-accent)]' : 'text-white/50'}`}
+            >
+              {safeTab === id && <span aria-hidden="true" className="absolute top-0 h-0.5 w-10 rounded-full bg-[var(--color-accent)] shadow-[0_0_12px_var(--color-accent)]" />}
               <Icon />
               {label}
             </button>

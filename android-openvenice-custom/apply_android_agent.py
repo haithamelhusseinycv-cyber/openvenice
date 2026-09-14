@@ -20,10 +20,10 @@ for source in ('FaceFusionAgentPlugin.java', 'MediaActionsPlugin.java', 'VoiceCh
     )
 
 # Explicit plugin registration keeps the native surface deterministic and makes
-# it easy to verify in CI. Loopback mixed content is needed only because Local
-# Dream exposes its generation service over localhost HTTP.
-(main_java / 'MainActivity.java').write_text('''package ai.openvenice.app;\n\nimport android.os.Bundle;\nimport android.webkit.WebSettings;\n\nimport com.getcapacitor.BridgeActivity;\n\npublic class MainActivity extends BridgeActivity {\n    @Override\n    public void onCreate(Bundle savedInstanceState) {\n        registerPlugin(FaceFusionAgentPlugin.class);\n        registerPlugin(MediaActionsPlugin.class);\n        registerPlugin(VoiceChatPlugin.class);\n        registerPlugin(AuthVaultPlugin.class);\n        super.onCreate(savedInstanceState);\n        if (getBridge() != null && getBridge().getWebView() != null) {\n            getBridge().getWebView().getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);\n        }\n    }\n}\n''', encoding='utf-8')
-
+# it easy to verify in CI. Mixed content is left at the secure default
+# (MIXED_CONTENT_NEVER_ALLOW) because the OpenVenice agent does not rely on
+# loopback HTTP services.
+(main_java / 'MainActivity.java').write_text('''package ai.openvenice.app;\n\nimport android.os.Bundle;\n\nimport com.getcapacitor.BridgeActivity;\n\npublic class MainActivity extends BridgeActivity {\n    @Override\n    public void onCreate(Bundle savedInstanceState) {\n        registerPlugin(FaceFusionAgentPlugin.class);\n        registerPlugin(MediaActionsPlugin.class);\n        registerPlugin(VoiceChatPlugin.class);\n        registerPlugin(AuthVaultPlugin.class);\n        super.onCreate(savedInstanceState);\n    }\n}\n''', encoding='utf-8')
 # FileProvider stays limited to app-private cache/files. It is used for temporary
 # agent inputs and Android share intents; generated files are never exposed as
 # arbitrary filesystem paths.
@@ -36,6 +36,7 @@ text = manifest.read_text(encoding='utf-8')
 permissions = [
     '    <uses-permission android:name="ai.openvenice.permission.FACEFUSION_AGENT" />\n',
     '    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n',
+    '    <uses-permission android:name="android.permission.VIBRATE" />\n',
     '    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />\n',
 ]
 for permission in permissions:
@@ -57,6 +58,9 @@ if '<action android:name="android.speech.RecognitionService"' not in text:
 
 if 'android:networkSecurityConfig=' not in text:
     text = text.replace('<application', '<application\n        android:networkSecurityConfig="@xml/network_security_config"', 1)
+
+if 'android:allowBackup=' not in text:
+    text = text.replace('<application', '<application\n        android:allowBackup="false"', 1)
 
 provider = '''\n        <provider\n            android:name="androidx.core.content.FileProvider"\n            android:authorities="${applicationId}.fileprovider"\n            android:exported="false"\n            android:grantUriPermissions="true">\n            <meta-data\n                android:name="android.support.FILE_PROVIDER_PATHS"\n                android:resource="@xml/file_paths" />\n        </provider>\n'''
 if '${applicationId}.fileprovider' not in text:

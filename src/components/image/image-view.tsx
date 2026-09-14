@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import type { ImageToolId } from '../../stores/image-workspace-store'
 import { useSettingsStore } from '../../stores/settings-store'
 import { useModels } from '../../hooks/use-models'
@@ -15,8 +15,12 @@ import {
   pickAspectFromPrompt,
 } from '../../lib/defaults'
 import { formatVeniceError } from '../../lib/venice-client'
+import { saveImage, shareImage, defaultImageFileName } from '../../lib/native-media'
+import { haptic } from '../../lib/haptics'
+import { toast } from '../../stores/toast-store'
 import { Label, TextArea, PrimaryButton, PillGroup, ErrorText } from '../ui/shared'
 import { GenerationView } from '../ui/generation-view'
+import { BottomSheet } from '../ui/bottom-sheet'
 import { TaskProgress } from '../ui/task-progress'
 import type { ImageConstraints } from '../../types/venice'
 
@@ -90,7 +94,8 @@ export function ImageView() {
   const [seed, setSeed] = useState(() => loadSaved('venice-image-seed', ''))
   const [variants, setVariants] = useState(LOCKED_IMAGE_VARIANTS)
   const [images, setImages] = useState<string[]>([])
-  const [selectedImage, setSelectedImage] = useState<string | null>(null)
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
+  const [paramsOpen, setParamsOpen] = useState(false)
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
@@ -144,6 +149,7 @@ export function ImageView() {
 
   const sendToTool = useImageWorkspace((s) => s.sendToTool)
   const [undressTarget, setUndressTarget] = useState<{ src: string; name: string } | null>(null)
+  const viewerTouch = useRef<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
     const onBack = (e: Event) => {
@@ -152,14 +158,14 @@ export function ImageView() {
         setUndressTarget(null)
         return
       }
-      if (selectedImage) {
+      if (selectedIndex !== null) {
         e.preventDefault()
-        setSelectedImage(null)
+        setSelectedIndex(null)
       }
     }
     window.addEventListener('venice-back', onBack)
     return () => window.removeEventListener('venice-back', onBack)
-  }, [selectedImage, undressTarget])
+  }, [selectedIndex, undressTarget])
 
   const aspectOptions = useMemo(() => {
     if (!hasAspectRatios) return []
@@ -182,14 +188,42 @@ export function ImageView() {
     if (!undressTarget) return
     sendToTool('undress', undressTarget.src, undressTarget.name)
     setUndressTarget(null)
-    setSelectedImage(null)
+    setSelectedIndex(null)
   }
 
-  const downloadImage = (b64: string, index?: number) => {
-    const a = document.createElement('a')
-    a.href = toImageSrc(b64)
-    a.download = `venice-image${index !== undefined ? `-${index + 1}` : ''}.png`
-    a.click()
+  const [mediaBusy, setMediaBusy] = useState<'save' | 'share' | null>(null)
+  const saveGenerated = async (b64: string, index?: number) => {
+    if (mediaBusy) return
+    setMediaBusy('save')
+    try {
+      const src = toImageSrc(b64)
+      const name = defaultImageFileName(`gen-${index ?? 0}-${Date.now()}`, 'image/jpeg')
+      const result = await saveImage(src, 'image/jpeg', name)
+      haptic('success')
+      toast.success('Saved to gallery', result.fileName || name)
+    } catch (error) {
+      toast.fromError(error, 'Could not save image')
+    } finally {
+      setMediaBusy(null)
+    }
+  }
+
+  const shareGenerated = async (b64: string, index?: number) => {
+    if (mediaBusy) return
+    setMediaBusy('share')
+    try {
+      const src = toImageSrc(b64)
+      const name = defaultImageFileName(`gen-${index ?? 0}-${Date.now()}`, 'image/jpeg')
+      const result = await shareImage(src, 'image/jpeg', name)
+      haptic('success')
+      if (result === 'saved') toast.info('Sharing unavailable', 'Image saved to gallery instead.')
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === 'AbortError')) {
+        toast.fromError(error, 'Could not share image')
+      }
+    } finally {
+      setMediaBusy(null)
+    }
   }
 
   const copyPrompt = async () => {
@@ -271,7 +305,7 @@ export function ImageView() {
               key={label}
               type="button"
               aria-pressed={prompt === value}
-              onClick={() => { updatePrompt(value); mutation.reset() }}
+              onClick={() => { haptic('select'); updatePrompt(value); mutation.reset() }}
               className={prompt === value
                 ? 'min-h-11 min-w-0 rounded-full border border-white bg-white px-2 text-[13px] text-black'
                 : 'min-h-11 min-w-0 rounded-full border border-white/[0.1] px-2 text-[13px] text-white/70 hover:border-white/25 hover:text-white'}
@@ -282,37 +316,23 @@ export function ImageView() {
         </div>
         <TextArea value={prompt} onChange={updatePrompt} placeholder="Describe the image you want to create…" rows={5} maxLength={promptLimit} />
       </div>
-      <div><Label>Negative prompt</Label><TextArea value={negativePrompt} onChange={setNegativePrompt} placeholder="blurry, clothes, CGI…" rows={2} /></div>
 
-      {hasAspectRatios ? (
-        <div><Label>Aspect Ratio</Label><PillGroup options={aspectOptions} value={effectiveAspectRatio} onChange={setAspectRatio} /></div>
-      ) : (
-        <div><Label>Size</Label><PillGroup options={DEFAULT_SIZES} value={sizeIdx} onChange={setSizeIdx} /></div>
-      )}
-
-      {hasResolutions && (
-        <div><Label>Resolution</Label><PillGroup options={resolutionOptions} value={effectiveResolution} onChange={setResolution} /></div>
-      )}
-
-      <div>
-        <Label hint={String(effectiveSteps)}>Steps</Label>
-        <input type="range" min={1} max={maxSteps} value={effectiveSteps} onChange={(e) => setSteps(Number(e.target.value))} className="w-full min-h-11" />
-      </div>
-      <div>
-        <Label hint={String(variants)}>Variants</Label>
-        <input type="range" min={1} max={2} value={variants} onChange={(e) => setVariants(Number(e.target.value))} className="w-full min-h-11" />
-      </div>
-      <div>
-        <Label hint={seed.trim() === '' ? 'random' : seed}>Seed</Label>
-        <input
-          type="text"
-          inputMode="numeric"
-          value={seed}
-          onChange={(e) => setSeed(e.target.value.replace(/[^0-9-]/g, ''))}
-          placeholder="Leave empty for random"
-          className="w-full bg-white/[0.04] border border-white/[0.08] rounded-md px-3 py-2.5 text-[16px] text-white outline-none focus:border-white/[0.25] placeholder:text-white/35 min-h-11"
-        />
-      </div>
+      <button
+        type="button"
+        onClick={() => { haptic('tap'); setParamsOpen(true) }}
+        aria-expanded={paramsOpen}
+        className="flex min-h-11 w-full items-center justify-between rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 text-[14px] text-white/75 transition-colors hover:border-white/[0.16] hover:text-white"
+      >
+        <span className="font-medium">Parameters</span>
+        <span className="flex items-center gap-2 text-[12px] text-white/40">
+          <span>{effectiveAspectRatio || DEFAULT_SIZES.find((s) => s.value === sizeIdx)?.label}</span>
+          <span>·</span>
+          <span>{effectiveSteps} steps</span>
+          <span>·</span>
+          <span>{seed.trim() === '' ? 'random seed' : `seed ${seed}`}</span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
+        </span>
+      </button>
 
       <div
         className={promptTooLong ? 'text-[14px] leading-relaxed text-red-300/95' : 'text-[14px] leading-relaxed text-white/60'}
@@ -330,33 +350,87 @@ export function ImageView() {
       {mutation.isPending && (
         <TaskProgress label="Generating image" detail="Venice is rendering a compressed JPEG result" indeterminate showElapsed />
       )}
-      {images.length > 0 && (
-        <button
-          type="button"
-          onClick={() => { setImages([]); setSelectedImage(null) }}
-          className="text-[14px] text-white/60 hover:text-white min-h-11"
-        >
-          Clear gallery
-        </button>
-      )}
       {mutation.error && <ErrorText>{formatVeniceError(mutation.error)}</ErrorText>}
+
+      <BottomSheet open={paramsOpen} onClose={() => setParamsOpen(false)} title="Generation parameters">
+        <div className="flex flex-col gap-4 pt-1">
+          <div><Label>Negative prompt</Label><TextArea value={negativePrompt} onChange={setNegativePrompt} placeholder="blurry, clothes, CGI…" rows={2} /></div>
+
+          {hasAspectRatios ? (
+            <div><Label>Aspect Ratio</Label><PillGroup options={aspectOptions} value={effectiveAspectRatio} onChange={(v) => { haptic('select'); setAspectRatio(v) }} /></div>
+          ) : (
+            <div><Label>Size</Label><PillGroup options={DEFAULT_SIZES} value={sizeIdx} onChange={(v) => { haptic('select'); setSizeIdx(v) }} /></div>
+          )}
+
+          {hasResolutions && (
+            <div><Label>Resolution</Label><PillGroup options={resolutionOptions} value={effectiveResolution} onChange={(v) => { haptic('select'); setResolution(v) }} /></div>
+          )}
+
+          <div>
+            <Label hint={String(effectiveSteps)}>Steps</Label>
+            <input type="range" min={1} max={maxSteps} value={effectiveSteps} onChange={(e) => setSteps(Number(e.target.value))} className="w-full min-h-11" />
+          </div>
+          <div>
+            <Label hint={String(variants)}>Variants</Label>
+            <input type="range" min={1} max={2} value={variants} onChange={(e) => { haptic('select'); setVariants(Number(e.target.value)) }} className="w-full min-h-11" />
+          </div>
+          <div>
+            <Label hint={seed.trim() === '' ? 'random' : seed}>Seed</Label>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={seed}
+              onChange={(e) => setSeed(e.target.value.replace(/[^0-9-]/g, ''))}
+              placeholder="Leave empty for random"
+              className="w-full bg-white/[0.04] border border-white/[0.08] rounded-md px-3 py-2.5 text-[16px] text-white outline-none focus:border-white/[0.25] placeholder:text-white/35 min-h-11"
+            />
+          </div>
+        </div>
+      </BottomSheet>
     </>
   )
 
   const output = (
     <>
-      {selectedImage && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-black/95 animate-fade-in" onClick={() => setSelectedImage(null)}>
+      {selectedIndex !== null && images[selectedIndex] !== undefined && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col bg-black/95 animate-fade-in"
+          onTouchStart={(e) => {
+            const touch = e.touches[0]
+            viewerTouch.current = { x: touch.clientX, y: touch.clientY }
+          }}
+          onTouchEnd={(e) => {
+            const start = viewerTouch.current
+            viewerTouch.current = null
+            if (!start || images.length < 2) return
+            const touch = e.changedTouches[0]
+            const dx = touch.clientX - start.x
+            const dy = touch.clientY - start.y
+            if (Math.abs(dx) < 56 || Math.abs(dy) > Math.abs(dx)) return
+            haptic('select')
+            setSelectedIndex((current) => {
+              if (current === null) return current
+              const next = dx < 0 ? current + 1 : current - 1
+              return (next + images.length) % images.length
+            })
+          }}
+          onClick={() => setSelectedIndex(null)}
+        >
           <div className="flex-1 min-h-0 flex items-center justify-center p-3" onClick={(e) => e.stopPropagation()}>
-            <img src={toImageSrc(selectedImage)} alt="Generated" className="max-w-full max-h-full object-contain rounded-xl" />
+            <img src={toImageSrc(images[selectedIndex])} alt={`Generated ${selectedIndex + 1}`} className="max-w-full max-h-full object-contain rounded-xl" />
           </div>
-          <div className="shrink-0 grid grid-cols-2 sm:grid-cols-5 gap-2 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-black/80" onClick={(e) => e.stopPropagation()}>
-            <button type="button" onClick={() => sendGenerated('edit', selectedImage)} className="min-h-12 rounded-lg bg-white text-black text-[15px] font-medium">Edit</button>
-            <button type="button" onClick={() => sendGenerated('swap', selectedImage)} className="min-h-12 rounded-lg bg-white/15 text-white text-[15px] font-medium">Swap</button>
-            <button type="button" onClick={() => setUndressTarget({ src: toImageSrc(selectedImage), name: fileName() })} className="min-h-12 rounded-lg bg-white/15 text-white text-[15px] font-medium">Undress</button>
-            <button type="button" onClick={() => downloadImage(selectedImage)} className="min-h-12 rounded-lg bg-white/15 text-white text-[15px] font-medium">Save</button>
-            <button type="button" onClick={() => setSelectedImage(null)} className="min-h-12 rounded-lg bg-white/15 text-white text-[15px] font-medium col-span-2 sm:col-span-1">Close</button>
+          <div className="shrink-0 grid grid-cols-3 sm:grid-cols-5 gap-2 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-black/80" onClick={(e) => e.stopPropagation()}>
+            <button type="button" onClick={() => sendGenerated('edit', images[selectedIndex], selectedIndex)} className="min-h-12 rounded-lg bg-white text-black text-[15px] font-medium">Edit</button>
+            <button type="button" onClick={() => sendGenerated('swap', images[selectedIndex], selectedIndex)} className="min-h-12 rounded-lg bg-white/15 text-white text-[15px] font-medium">Swap</button>
+            <button type="button" onClick={() => setUndressTarget({ src: toImageSrc(images[selectedIndex]), name: fileName(selectedIndex ?? undefined) })} className="min-h-12 rounded-lg bg-white/15 text-white text-[15px] font-medium">Undress</button>
+            <button type="button" disabled={mediaBusy === 'save'} onClick={() => { void saveGenerated(images[selectedIndex], selectedIndex) }} className="min-h-12 rounded-lg bg-white/15 text-white text-[15px] font-medium disabled:opacity-50">{mediaBusy === 'save' ? 'Saving…' : 'Save'}</button>
+            <button type="button" disabled={mediaBusy === 'share'} onClick={() => { void shareGenerated(images[selectedIndex], selectedIndex) }} className="min-h-12 rounded-lg bg-white/15 text-white text-[15px] font-medium disabled:opacity-50 sm:col-span-1 col-span-3">{mediaBusy === 'share' ? 'Sharing…' : 'Share'}</button>
           </div>
+          {images.length > 1 && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-2.5 py-1 text-[12px] text-white/70" aria-hidden="true">
+              {selectedIndex + 1} / {images.length}
+            </div>
+          )}
         </div>
       )}
       {images.length === 0 ? (
@@ -371,18 +445,18 @@ export function ImageView() {
             <div key={`skel-${i}`} className="aspect-[3/2] rounded-xl skeleton" />
           ))}
           {images.map((img, i) => (
-            <div key={i} className="relative">
+            <div key={i} className="relative overflow-hidden rounded-xl border border-white/[0.08] shadow-[var(--shadow-1)]">
               <img
                 src={toImageSrc(img)}
                 alt={`Generated ${i + 1}`}
-                className="w-full rounded-xl cursor-pointer border border-white/[0.08]"
-                onClick={() => setSelectedImage(img)}
+                className="w-full cursor-pointer"
+                onClick={() => { haptic('tap'); setSelectedIndex(i) }}
               />
-              <div className="mt-2 grid grid-cols-4 gap-1.5">
-                <button type="button" onClick={() => sendGenerated('edit', img, i)} className="min-h-11 rounded-lg bg-white/10 text-white text-[13px] font-medium">Edit</button>
-                <button type="button" onClick={() => sendGenerated('swap', img, i)} className="min-h-11 rounded-lg bg-white/10 text-white text-[13px] font-medium">Swap</button>
-                <button type="button" onClick={() => setUndressTarget({ src: toImageSrc(img), name: fileName(i) })} className="min-h-11 rounded-lg bg-white/10 text-white text-[13px] font-medium">Undress</button>
-                <button type="button" onClick={() => downloadImage(img, i)} className="min-h-11 rounded-lg bg-white/10 text-white text-[13px] font-medium">Save</button>
+              <div className="grid grid-cols-4 gap-1.5 bg-[#0c0c10] p-2">
+                <button type="button" onClick={() => { haptic('tap'); sendGenerated('edit', img, i) }} className="min-h-11 rounded-lg bg-white/10 text-white text-[13px] font-medium hover:bg-white/[0.16]">Edit</button>
+                <button type="button" onClick={() => { haptic('tap'); sendGenerated('swap', img, i) }} className="min-h-11 rounded-lg bg-white/10 text-white text-[13px] font-medium hover:bg-white/[0.16]">Swap</button>
+                <button type="button" onClick={() => { void saveGenerated(img, i) }} disabled={mediaBusy === 'save'} className="min-h-11 rounded-lg bg-white/10 text-white text-[13px] font-medium hover:bg-white/[0.16] disabled:opacity-50">{mediaBusy === 'save' ? '…' : 'Save'}</button>
+                <button type="button" onClick={() => { void shareGenerated(img, i) }} disabled={mediaBusy === 'share'} className="min-h-11 rounded-lg bg-white/10 text-white text-[13px] font-medium hover:bg-white/[0.16] disabled:opacity-50">{mediaBusy === 'share' ? '…' : 'Share'}</button>
               </div>
             </div>
           ))}

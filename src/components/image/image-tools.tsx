@@ -8,6 +8,8 @@ import { Label, TextArea, PrimaryButton, ErrorText, EmptyState } from '../ui/sha
 import { TaskProgress } from '../ui/task-progress'
 import { cn } from '../../lib/utils'
 import { toast } from '../../stores/toast-store'
+import { haptic } from '../../lib/haptics'
+import { saveImage } from '../../lib/native-media'
 import { buildSwapPrompt, UNDRESS_PROMPT, type SwapKind, type SwapPerson } from '../../lib/tool-prompts'
 import { prepareImage, formatBytes, type ImagePreparationStage, type PreparedImage } from '../../lib/image-input'
 import { useModels } from '../../hooks/use-models'
@@ -250,12 +252,20 @@ export function ImageTools() {
           ? upscaleMutation.error
           : bgRemoveMutation.error
 
-  const downloadResult = () => {
+  const [saving, setSaving] = useState(false)
+  const downloadResult = async () => {
     if (!resultUrl) return
-    const a = document.createElement('a')
-    a.href = resultUrl
-    a.download = `venice-${tool}-result.png`
-    a.click()
+    setSaving(true)
+    try {
+      const name = `venice-${tool}-result-${Date.now()}.png`
+      await saveImage(resultUrl, 'image/png', name)
+      haptic('success')
+      toast.success('Saved to gallery', name)
+    } catch (error) {
+      toast.fromError(error, 'Could not save result')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const selectedEditModelReady = editModelOptions.some((option) => option.value === editModel)
@@ -553,9 +563,7 @@ export function ImageTools() {
           <div className="animate-fade-in flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2">
               <Label>Result</Label>
-              <button type="button" onClick={downloadResult} className="min-h-11 px-3 rounded-lg bg-white text-black text-[15px] font-medium">
-                Save
-              </button>
+              <button type="button" onClick={() => { void downloadResult() }} disabled={saving} className="min-h-11 px-3 rounded-lg bg-white text-black text-[15px] font-medium disabled:opacity-50">{saving ? 'Saving…' : 'Save'}</button>
             </div>
             <FitImg src={resultUrl} alt="Result" className={cn(tool === 'remove-bg' && 'bg-[repeating-conic-gradient(#1a1a1a_0%_25%,#111_0%_50%)_0_0/20px_20px]')} />
           </div>

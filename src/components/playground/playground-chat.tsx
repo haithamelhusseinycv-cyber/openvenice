@@ -8,7 +8,7 @@ import { useAgentModels } from '../../hooks/use-agent-models'
 import { callAgent, DEFAULT_AGENT_MODEL, FALLBACK_AGENT_MODEL } from '../../lib/playground-agent'
 import { runAgentTools, type RunStep } from '../../lib/playground-agent-tools'
 import { shouldUseModelFallback } from '../../lib/model-routing'
-import { cancelVoiceListening, listenForVoice, speakVoice, stopVoiceSpeaking, voiceLocaleShortLabel, type VoiceLocale } from '../../lib/voice-chat'
+import { cancelVoiceListening, listenForVoice, speakVoice, stopVoiceSpeaking, type VoiceLocale } from '../../lib/voice-chat'
 import {
   NOUR_AGE,
   NOUR_LANGUAGE_LABELS,
@@ -24,6 +24,9 @@ import { formatVeniceError, veniceBlob } from '../../lib/venice-client'
 import { applyPatch, type WorkflowPatch } from '../../lib/workflow-mutations'
 import { generateId } from '../../lib/utils'
 import { cn } from '../../lib/utils'
+import { haptic } from '../../lib/haptics'
+import { BottomSheet } from '../ui/bottom-sheet'
+import { SegmentedControl } from '../ui/segmented-control'
 
 const STARTER_PROMPTS = [
   'Create a polished 9:16 portrait from my idea and prepare it for generation',
@@ -89,6 +92,7 @@ export function PlaygroundChat() {
   const [speakingId, setSpeakingId] = useState<string | null>(null)
   const [voiceStatus, setVoiceStatus] = useState<string | null>(null)
   const [listeningLocale, setListeningLocale] = useState<VoiceLocale | null>(null)
+  const [sessionOpen, setSessionOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const shouldStickToBottomRef = useRef(true)
   const abortRef = useRef<AbortController | null>(null)
@@ -442,27 +446,32 @@ export function PlaygroundChat() {
         }}
       >
         {messages.length === 0 ? (
-          <div className="flex flex-col gap-3 pt-5">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full border border-white/[0.14]">
-                <img src="/nour-portrait.png" alt="" className="h-full w-full object-cover object-[50%_18%]" />
+          <div className="ambient-mesh flex flex-col gap-3 pt-5">
+            <div className="relative flex flex-col items-center gap-3 pb-1 pt-2 text-center">
+              <div className="relative h-20 w-20 shrink-0">
+                <span aria-hidden="true" className="absolute inset-0 rounded-full bg-[var(--color-accent)]/25 blur-xl" />
+                <div className="relative h-full w-full overflow-hidden rounded-full border border-white/[0.14] shadow-[var(--shadow-2)]">
+                  <img src="/nour-portrait.png" alt="" className="h-full w-full object-cover object-[50%_18%]" />
+                </div>
               </div>
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-[16px] text-white font-semibold">{NOUR_NAME}</span>
+                <div className="flex items-center justify-center gap-2">
+                  <span className="text-[17px] font-semibold tracking-[-0.01em] text-white">{NOUR_NAME}</span>
                   <span className="rounded-full border border-white/[0.1] bg-white/[0.04] px-2 py-0.5 text-[10px] text-white/55">{NOUR_AGE} · Adult</span>
                 </div>
-                <div className="text-[12px] text-white/45 truncate">{NOUR_TAGLINE}</div>
+                <div className="mt-0.5 text-[12.5px] text-white/45">{NOUR_TAGLINE}</div>
               </div>
+              <div className="text-[15px] font-semibold text-white/85">Tell me what you want done.</div>
+              <p className="max-w-[34ch] text-[13px] leading-relaxed text-white/45">
+                Chat naturally or use the mic below — English or Egyptian. Noor can read every reply aloud and run your tools.
+              </p>
             </div>
-            <div className="text-[15px] text-white/85 font-semibold mb-1">Tell me what you want done.</div>
-            <div className="text-[13px] text-white/45 mb-4">Chat naturally or use the English / Egyptian microphone buttons below. Noor can read every reply aloud and execute supported agent commands.</div>
-            <div className="flex flex-col gap-2">
+            <div className="relative flex flex-col gap-2">
               {STARTER_PROMPTS.map((p) => (
                 <button
                   key={p}
-                  onClick={() => void send(p)}
-                  className="min-h-11 text-left px-3 py-2.5 rounded-xl border border-white/[0.07] bg-white/[0.02] hover:border-white/[0.16] hover:bg-white/[0.04] transition-colors text-[13px] text-white/70 hover:text-white/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2"
+                  onClick={() => { haptic('select'); void send(p) }}
+                  className="min-h-11 rounded-xl border border-white/[0.07] bg-white/[0.03] px-3.5 py-2.5 text-left text-[13px] text-white/70 shadow-[var(--shadow-1)] transition-all hover:border-white/[0.16] hover:bg-white/[0.05] hover:text-white/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2"
                 >
                   {p}
                 </button>
@@ -480,7 +489,7 @@ export function PlaygroundChat() {
                   className={cn(
                     'max-w-[90%] min-w-0 break-words [overflow-wrap:anywhere] px-3.5 py-2.5 rounded-xl text-[15px] leading-[1.6] whitespace-pre-wrap sm:max-w-[88%]',
                     m.role === 'user'
-                      ? 'bg-white/[0.09] text-white border border-white/[0.05]'
+                      ? 'bg-white/[0.10] text-white border border-white/[0.06] shadow-[var(--shadow-1)]'
                       : 'bg-white/[0.04] border border-white/[0.07] text-white/85',
                   )}
                 >
@@ -546,76 +555,20 @@ export function PlaygroundChat() {
       </div>
 
       <div className="max-w-full min-w-0 shrink-0 overflow-x-hidden border-t border-white/[0.06] px-3 pt-2 pb-[max(0.75rem,var(--keyboard-inset,0px))]">
-        <div className="mb-2 grid max-w-full grid-cols-2 gap-2" aria-label="Noor language mode">
-          {(Object.entries(NOUR_LANGUAGE_LABELS) as Array<[NourLanguageMode, string]>).map(([mode, label]) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => {
-                stopVoice()
-                setLanguageMode(mode)
-              }}
-              aria-pressed={languageMode === mode}
-              className={cn(
-                'min-h-11 min-w-0 rounded-full border px-2 text-[12px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]',
-                languageMode === mode
-                  ? 'border-white/[0.16] bg-white text-black'
-                  : 'border-white/[0.09] bg-white/[0.03] text-white/55 hover:text-white/85',
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        <div className="mb-2 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2.75rem] gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              if (speakReplies) stopVoice()
-              setSpeakReplies(!speakReplies)
-            }}
-            aria-pressed={speakReplies}
-            aria-label={speakReplies ? 'Auto-read replies on' : 'Auto-read replies off'}
-            className={cn(
-              'min-h-11 min-w-0 rounded-xl border px-2 text-[12px] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]',
-              speakReplies
-                ? 'border-white/[0.16] bg-white/[0.08] text-white'
-                : 'border-white/[0.09] bg-white/[0.03] text-white/55 hover:text-white/85',
-            )}
-          >
-            {speakReplies ? 'Auto-read on' : 'Auto-read off'}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              stopVoice()
-              setPlaybackMode(playbackMode === 'fast' ? 'studio' : 'fast')
-            }}
-            aria-label={`Voice mode: ${playbackMode}`}
-            className="min-h-11 min-w-0 rounded-xl border border-white/[0.09] bg-white/[0.03] px-2 text-[12px] font-semibold text-white/70 hover:border-white/[0.18] hover:text-white"
-          >
-            {playbackMode === 'fast' ? 'Fast · device' : `Studio · ${NOUR_TTS_VOICE}`}
-          </button>
-          <button
-            type="button"
-            disabled={isThinking}
-            onClick={() => void listenAndSend(languageMode === 'cairo-street' ? 'ar-EG' : 'en-US')}
-            aria-label={listeningLocale ? 'Stop listening' : `Microphone · ${languageMode === 'cairo-street' ? 'Egyptian Arabic' : 'English'}`}
-            className={cn(
-              'flex min-h-11 min-w-11 items-center justify-center rounded-xl border transition-colors disabled:opacity-40',
-              listeningLocale
-                ? 'border-white/[0.2] bg-white text-black'
-                : 'border-white/[0.09] bg-white/[0.03] text-white/70 hover:text-white',
-            )}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <rect x="9" y="2" width="6" height="12" rx="3" />
-              <path d="M5 10a7 7 0 0014 0M12 17v5M8 22h8" />
-            </svg>
-          </button>
-        </div>
-        {listeningLocale && <div className="mb-2 text-center text-[11px] text-white/45">Listening · {voiceLocaleShortLabel(listeningLocale)}</div>}
+        <button
+          type="button"
+          onClick={() => { haptic('tap'); setSessionOpen(true) }}
+          aria-haspopup="dialog"
+          className="mb-2 flex max-w-full min-h-9 items-center gap-1.5 rounded-full border border-white/[0.09] bg-white/[0.03] px-3 py-1 text-[11.5px] font-medium text-white/60 transition-colors hover:border-white/[0.2] hover:text-white/90"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0" aria-hidden="true">
+            <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33h0a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51h0a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82v0a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" />
+          </svg>
+          <span className="truncate">
+            {NOUR_LANGUAGE_LABELS[languageMode]} · {speakReplies ? 'auto-read on' : 'auto-read off'} · {playbackMode === 'fast' ? 'fast voice' : `studio · ${NOUR_TTS_VOICE}`}
+          </span>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+        </button>
         {error && <div role="alert" className="mb-2 break-words [overflow-wrap:anywhere] text-[13px] text-red-300/95">{error}</div>}
         <div className="flex max-w-full min-w-0 items-end gap-2">
           <textarea
@@ -624,6 +577,7 @@ export function PlaygroundChat() {
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault()
+                haptic('tap')
                 void send(input)
               }
             }}
@@ -631,25 +585,122 @@ export function PlaygroundChat() {
             rows={2}
             disabled={isThinking || Boolean(listeningLocale)}
             aria-label="Message Noor"
-            className="min-h-11 min-w-0 flex-1 resize-none rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-[16px] text-white/90 outline-none placeholder:text-white/30 focus:border-white/[0.2] disabled:opacity-60"
+            className="min-h-11 min-w-0 flex-1 resize-none rounded-xl border border-white/[0.08] bg-white/[0.04] px-3.5 py-2.5 text-[16px] text-white/90 shadow-[var(--shadow-1)] outline-none placeholder:text-white/30 transition-colors focus:border-white/[0.22] disabled:opacity-60"
           />
+          <button
+            type="button"
+            disabled={isThinking}
+            onClick={() => { haptic('tap'); void listenAndSend(languageMode === 'cairo-street' ? 'ar-EG' : 'en-US') }}
+            aria-label={listeningLocale ? 'Stop listening' : `Microphone · ${languageMode === 'cairo-street' ? 'Egyptian Arabic' : 'English'}`}
+            className={cn(
+              'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors disabled:opacity-40',
+              listeningLocale
+                ? 'border-white/[0.2] bg-white text-black'
+                : 'border-white/[0.09] bg-white/[0.04] text-white/70 hover:text-white',
+            )}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="9" y="2" width="6" height="12" rx="3" />
+              <path d="M5 10a7 7 0 0014 0M12 17v5M8 22h8" />
+            </svg>
+          </button>
           {isThinking ? (
             <button
               onClick={cancel}
-              className="shrink-0 min-h-11 px-3 py-2 text-[13px] text-white/85 hover:text-white border border-white/[0.12] hover:bg-white/[0.05] rounded-lg transition-colors"
+              className="shrink-0 min-h-11 px-3 py-2 text-[13px] text-white/85 hover:text-white border border-white/[0.12] hover:bg-white/[0.05] rounded-xl transition-colors"
             >
               Stop
             </button>
           ) : (
             <button
-              onClick={() => void send(input)}
+              onClick={() => { haptic('tap'); void send(input) }}
               disabled={!input.trim() || !hasKey || agentModelsLoading || !activeAgentModel || Boolean(listeningLocale)}
-              className="shrink-0 min-h-11 px-4 py-2 text-[13px] font-medium bg-white text-black rounded-lg hover:bg-white/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-black shadow-[var(--shadow-1)] transition-transform hover:bg-white/92 active:scale-95 disabled:bg-white/[0.07] disabled:text-white/25 disabled:shadow-none"
+              aria-label="Send message"
             >
-              Send
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
             </button>
           )}
         </div>
+
+        <BottomSheet open={sessionOpen} onClose={() => setSessionOpen(false)} title="Voice session">
+          <div className="flex flex-col gap-4 pt-1">
+            <div>
+              <div className="mb-1.5 text-[12px] font-semibold uppercase tracking-[0.06em] text-[#c6beb5]">Language</div>
+              <SegmentedControl
+                ariaLabel="Noor language mode"
+                options={(Object.entries(NOUR_LANGUAGE_LABELS) as Array<[NourLanguageMode, string]>).map(([mode, label]) => ({ value: mode, label }))}
+                value={languageMode}
+                onChange={(mode) => { haptic('select'); stopVoice(); setLanguageMode(mode) }}
+              />
+            </div>
+            <div>
+              <div className="mb-1.5 text-[12px] font-semibold uppercase tracking-[0.06em] text-[#c6beb5]">Voice engine</div>
+              <SegmentedControl
+                ariaLabel="Voice playback mode"
+                options={[
+                  { value: 'fast' as const, label: 'Fast · device' },
+                  { value: 'studio' as const, label: `Studio · ${NOUR_TTS_VOICE}` },
+                ]}
+                value={playbackMode}
+                onChange={(mode) => { haptic('select'); stopVoice(); setPlaybackMode(mode) }}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => { haptic('select'); if (speakReplies) stopVoice(); setSpeakReplies(!speakReplies) }}
+              aria-pressed={speakReplies}
+              className="flex min-h-12 w-full items-center justify-between rounded-xl border border-white/[0.09] bg-white/[0.03] px-3.5 py-2.5 text-left text-[14px] text-white/80 transition-colors hover:border-white/[0.18]"
+            >
+              <span>
+                <span className="font-medium">Auto-read replies</span>
+                <span className="mt-0.5 block text-[12px] text-white/40">Noor speaks every answer aloud</span>
+              </span>
+              <span
+                aria-hidden="true"
+                className={cn(
+                  'relative h-6 w-10 shrink-0 rounded-full transition-colors',
+                  speakReplies ? 'bg-[var(--color-accent)]/85' : 'bg-white/[0.14]',
+                )}
+              >
+                <span
+                  className={cn(
+                    'absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all',
+                    speakReplies ? 'left-[1.125rem]' : 'left-0.5',
+                  )}
+                />
+              </span>
+            </button>
+            <p className="text-[12px] leading-relaxed text-white/35">
+              Studio voice renders through the Omnia model for richer playback; Fast uses the on-device speech engine.
+            </p>
+          </div>
+        </BottomSheet>
+
+        {listeningLocale && (
+          <div className="fixed inset-0 z-[80] flex flex-col items-center justify-center gap-8 bg-[#0a0a0c]/95 animate-fade-in" role="status" aria-live="polite">
+            <div className="relative flex h-40 w-40 items-center justify-center">
+              <span aria-hidden="true" className="absolute inset-0 rounded-full border border-[var(--color-accent)]/40 animate-voice-ring" />
+              <span aria-hidden="true" className="absolute inset-0 rounded-full border border-[var(--color-accent)]/30 animate-voice-ring" style={{ animationDelay: '0.8s' }} />
+              <div className="relative h-24 w-24 overflow-hidden rounded-full border border-white/[0.15] shadow-[var(--shadow-3)]">
+                <img src="/nour-portrait.png" alt="" className="h-full w-full object-cover object-[50%_18%]" />
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="text-[17px] font-semibold text-white/90">Listening…</div>
+              <div className="mt-1 text-[13px] text-white/45">{listeningLocale === 'ar-EG' ? 'اتكلم بحرية — Egyptian Arabic' : 'Speak naturally — English'}</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => { haptic('warn'); void listenAndSend(listeningLocale) }}
+              className="min-h-12 rounded-full border border-white/[0.14] px-6 text-[14px] font-medium text-white/75 transition-colors hover:border-white/[0.3] hover:text-white"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

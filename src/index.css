@@ -24,6 +24,13 @@
   /* Accent — Venice teal, used sparingly for status, focus rings, primary CTAs */
   --color-accent: #6ee7d3;
   --color-accent-soft: rgba(110, 231, 211, 0.16);
+
+  /* Elevation — layered surfaces for premium depth */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --shadow-2: 0 4px 16px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --shadow-3: 0 12px 48px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --surface-raised: #121217;
+  --surface-overlay: #17171d;
 }
 
 html {
@@ -79,10 +86,75 @@ body {
   50% { transform: translateX(110%); }
   100% { transform: translateX(280%); }
 }
+@keyframes sheet-in {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes sheet-out {
+  from { transform: translateY(0); }
+  to { transform: translateY(100%); }
+}
+@keyframes backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes backdrop-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes voice-ring {
+  0% { transform: scale(0.85); opacity: 0.55; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
+@keyframes ambient-drift {
+  0% { transform: translate3d(-4%, -2%, 0) scale(1); }
+  50% { transform: translate3d(4%, 3%, 0) scale(1.08); }
+  100% { transform: translate3d(-4%, -2%, 0) scale(1); }
+}
 .animate-fade-in { animation: fade-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .animate-scale-in { animation: scale-in 0.14s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .animate-pulse-dot { animation: pulse-dot 1.4s ease-in-out infinite; }
 .animate-progress-indeterminate { animation: progress-indeterminate 1.25s ease-in-out infinite; }
+.animate-sheet-in { animation: sheet-in 0.32s cubic-bezier(0.32, 0.72, 0.24, 1); }
+.animate-sheet-out { animation: sheet-out 0.22s cubic-bezier(0.5, 0, 0.75, 0.4); }
+.animate-backdrop-in { animation: backdrop-in 0.2s ease-out; }
+.animate-backdrop-out { animation: backdrop-out 0.2s ease-in; }
+.animate-voice-ring { animation: voice-ring 1.6s cubic-bezier(0.2, 0.6, 0.3, 1) infinite; }
+
+/* Ambient brand mesh — one signature moment, kept subtle */
+.ambient-mesh {
+  position: relative;
+  overflow: hidden;
+}
+.ambient-mesh::before,
+.ambient-mesh::after {
+  content: '';
+  position: absolute;
+  width: 60vmax;
+  height: 60vmax;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.14;
+  pointer-events: none;
+  animation: ambient-drift 18s ease-in-out infinite;
+}
+.ambient-mesh::before {
+  top: -22vmax;
+  right: -18vmax;
+  background: radial-gradient(circle, #6ee7d3 0%, transparent 65%);
+}
+.ambient-mesh::after {
+  bottom: -26vmax;
+  left: -20vmax;
+  background: radial-gradient(circle, #a78bfa 0%, transparent 65%);
+  animation-delay: -9s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ambient-mesh::before,
+  .ambient-mesh::after {
+    animation: none;
+  }
+}
 
 .skeleton {
   background: linear-gradient(90deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.07) 50%, rgba(255,255,255,0.03) 100%);

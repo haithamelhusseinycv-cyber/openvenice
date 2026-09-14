@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { createSafeStorage } from '../lib/safe-storage'
+import { isNativeOpenVeniceAndroid } from '../connectors/facefusion/capacitor-facefusion-bridge'
 import type { VoiceLocale } from '../lib/voice-chat'
 
 export type NourTtsProvider = 'voicetut' | 'venice'
@@ -37,7 +38,7 @@ export const useVoiceStore = create<VoiceState>()(
       locale: 'en-US',
       speakReplies: true,
       autoSend: true,
-      ttsProvider: 'voicetut',
+      ttsProvider: isNativeOpenVeniceAndroid() ? 'venice' : 'voicetut',
       playbackMode: 'fast',
       ttsVoice: 'Omnia',
       voiceTutBaseUrl: DEFAULT_VOICETUT_BASE_URL,
