@@ -197,14 +197,18 @@ public class AuthVaultPlugin extends Plugin {
             String title = call.getString("title", "Unlock OpenVenice");
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                BiometricPrompt.PromptInfo info = new BiometricPrompt.PromptInfo.Builder()
-                    .setTitle(title)
-                    .setSubtitle(call.getString("subtitle", ""))
-                    .setAllowedAuthenticators(
-                        BiometricManager.Authenticators.BIOMETRIC_WEAK
-                            | BiometricManager.Authenticators.DEVICE_CREDENTIAL)
-                    .build();
-                new BiometricPrompt(activity, executor, callbackFor(call)).authenticate(info);
+                android.hardware.biometrics.BiometricPrompt prompt =
+                    new android.hardware.biometrics.BiometricPrompt.Builder(activity)
+                        .setTitle(title)
+                        .setSubtitle(call.getString("subtitle", ""))
+                        .setAllowedAuthenticators(
+                            BiometricManager.Authenticators.BIOMETRIC_WEAK
+                                | BiometricManager.Authenticators.DEVICE_CREDENTIAL)
+                        .build();
+                android.os.CancellationSignal cancellation = new android.os.CancellationSignal();
+                cancellation.setOnCancelListener(() ->
+                    call.reject("Authentication cancelled"));
+                prompt.authenticate(null, cancellation, executor, callbackFor(call));
                 return;
             }
 

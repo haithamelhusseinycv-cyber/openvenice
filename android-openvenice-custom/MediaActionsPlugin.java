@@ -112,7 +112,7 @@ public final class MediaActionsPlugin extends Plugin {
             result.put("content", content);
             call.resolve(result);
         } catch (Throwable error) {
-            call.reject("Could not read crash report", error);
+            call.reject("Could not read crash report: " + (error.getMessage() != null ? error.getMessage() : error.getClass().getSimpleName()));
         }
     }
 
@@ -136,7 +136,7 @@ public final class MediaActionsPlugin extends Plugin {
             result.put("cleared", true);
             call.resolve(result);
         } catch (Exception error) {
-            call.reject("Could not clear crash report", error);
+            call.reject("Could not clear crash report: " + (error.getMessage() != null ? error.getMessage() : error.getClass().getSimpleName()));
         }
     }
 
