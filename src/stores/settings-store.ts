@@ -31,6 +31,8 @@ interface SettingsState {
   setPlaygroundAgentModel: (modelId: string) => void
   nourLanguageMode: NourLanguageMode
   setNourLanguageMode: (mode: NourLanguageMode) => void
+  biometricLock: boolean
+  setBiometricLock: (enabled: boolean) => void
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -53,6 +55,8 @@ export const useSettingsStore = create<SettingsState>()(
       setPlaygroundAgentModel: (modelId) => set({ playgroundAgentModel: modelId }),
       nourLanguageMode: 'cairo-street',
       setNourLanguageMode: (mode) => set({ nourLanguageMode: mode }),
+      biometricLock: true,
+      setBiometricLock: (enabled) => set({ biometricLock: enabled }),
     }),
     {
       name: 'venice-settings',
@@ -78,6 +82,7 @@ export const useSettingsStore = create<SettingsState>()(
         selectedModels: sanitizeSelectedModels(state.selectedModels),
         playgroundAgentModel: state.playgroundAgentModel,
         nourLanguageMode: state.nourLanguageMode,
+        biometricLock: state.biometricLock,
       }),
     },
   ),

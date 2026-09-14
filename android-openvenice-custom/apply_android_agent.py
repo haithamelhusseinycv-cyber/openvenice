@@ -36,6 +36,7 @@ text = manifest.read_text(encoding='utf-8')
 permissions = [
     '    <uses-permission android:name="ai.openvenice.permission.FACEFUSION_AGENT" />\n',
     '    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n',
+    '    <uses-permission android:name="android.permission.USE_BIOMETRIC" />\n',
     '    <uses-permission android:name="android.permission.VIBRATE" />\n',
     '    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />\n',
 ]
@@ -64,6 +65,20 @@ if 'android:allowBackup="false"' not in text:
         text = text.replace('android:allowBackup="true"', 'android:allowBackup="false"', 1)
     else:
         text = text.replace('<application', '<application\n        android:allowBackup="false"', 1)
+
+gradle = app / 'build.gradle'
+if gradle.is_file():
+    gradle_text = gradle.read_text(encoding='utf-8')
+    if 'androidx.biometric:biometric' not in gradle_text:
+        marker = "implementation project(':capacitor-cordova-android-plugins')"
+        if marker not in gradle_text:
+            raise RuntimeError('Could not locate capacitor dependency marker in app/build.gradle')
+        gradle_text = gradle_text.replace(
+            marker,
+            marker + '\n    implementation "androidx.biometric:biometric:1.1.0"',
+            1,
+        )
+        gradle.write_text(gradle_text, encoding='utf-8')
 
 provider = '''\n        <provider\n            android:name="androidx.core.content.FileProvider"\n            android:authorities="${applicationId}.fileprovider"\n            android:exported="false"\n            android:grantUriPermissions="true">\n            <meta-data\n                android:name="android.support.FILE_PROVIDER_PATHS"\n                android:resource="@xml/file_paths" />\n        </provider>\n'''
 if '${applicationId}.fileprovider' not in text:

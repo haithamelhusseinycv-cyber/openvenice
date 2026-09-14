@@ -241,7 +241,7 @@ public final class FaceFusionAgentPlugin extends Plugin {
         }
 
         if (resolveService() == null) {
-            failConnectionQueue("FaceFusion AgentBridgeService is not installed.");
+            failConnectionQueue("FaceFusion AgentBridgeService is not installed. Install the OpenVenice FaceFusion companion APK (same release channel as this app).");
             return;
         }
 

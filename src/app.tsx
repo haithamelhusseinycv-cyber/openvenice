@@ -8,6 +8,8 @@ import { ApiKeyDialog } from './components/layout/api-key-dialog'
 import { DeviceDiagnosticsDialog } from './components/chat/device-diagnostics-dialog'
 import { ErrorBoundary } from './components/ui/error-boundary'
 import { Toaster } from './components/ui/toaster'
+import { LockScreen } from './components/ui/lock-screen'
+import { biometricGateAvailability } from './lib/auth-gate'
 import { isVisibleTab } from './lib/allowed-models'
 import { haptic } from './lib/haptics'
 import { checkVoiceTutHealth } from './lib/venice-client'
@@ -51,7 +53,40 @@ export function App() {
   const setActiveTab = useSettingsStore((s) => s.setActiveTab)
   const safeTab = isVisibleTab(activeTab) ? activeTab : 'playground'
   const ActiveView = views[safeTab]
+  const biometricLock = useSettingsStore((s) => s.biometricLock)
+  const [gateReady, setGateReady] = useState(false)
+  const [biometricUsable, setBiometricUsable] = useState(false)
+  const [locked, setLocked] = useState(false)
+  const relockArmedRef = useRef(false)
   const touchStart = useRef<{ x: number; y: number } | null>(null)
+
+  useEffect(() => {
+    let disposed = false
+    void biometricGateAvailability().then((availability) => {
+      if (disposed) return
+      const usable = availability.available && availability.biometric
+      setBiometricUsable(usable)
+      setGateReady(true)
+      if (usable) setLocked(true)
+    })
+    return () => { disposed = true }
+  }, [])
+
+  useEffect(() => {
+    if (!biometricUsable) return
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        relockArmedRef.current = true
+        return
+      }
+      if (document.visibilityState === 'visible' && relockArmedRef.current) {
+        relockArmedRef.current = false
+        if (biometricLock) setLocked(true)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
+  }, [biometricUsable, biometricLock])
 
   useEffect(() => {
     void hydrateFromDevice().then((restored) => {
@@ -152,6 +187,10 @@ export function App() {
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [setActiveTab])
+
+  if (gateReady && locked) {
+    return <LockScreen onUnlocked={() => { setLocked(false); haptic('success') }} />
+  }
 
   return (
     <div className="flex h-[100dvh] w-full max-w-[100vw] overflow-hidden pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">

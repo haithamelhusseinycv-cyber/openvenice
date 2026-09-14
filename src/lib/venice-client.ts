@@ -1,6 +1,7 @@
 import type { VeniceError } from '../types/venice'
 import { useAuthStore } from '../stores/auth-store'
 import { useVoiceStore } from '../stores/voice-store'
+import { isNativeOpenVeniceAndroid } from '../connectors/facefusion/capacitor-facefusion-bridge'
 import { NOUR_TTS_FALLBACK_MODEL, NOUR_TTS_FALLBACK_VOICE } from './nour-character'
 import { applyVeniceRequestPolicy } from './venice-policy'
 
@@ -265,28 +266,60 @@ export async function voiceTutBlob(body: VoiceTutSpeechRequest, init: { signal?:
   const abortFromCaller = () => controller.abort()
   init.signal?.addEventListener('abort', abortFromCaller, { once: true })
 
+  const payload = {
+    model: 'mohammedaly22/VoiceTut-TTS',
+    voice: settings.ttsVoice || body.voice || 'Omnia',
+    input: body.input || '',
+    language: body.language === 'English' ? 'en' : 'arz',
+    speed: settings.voiceRate,
+    response_format: 'wav',
+  }
+
   try {
+    // The Android WebView enforces the page CSP, which blocks foreign origins.
+    // Route through the native bridge there; keep plain fetch for browsers.
+    if (isNativeOpenVeniceAndroid()) {
+      const apiKey = useAuthStore.getState().apiKey
+      const response = await nativeVoiceFetch(`${baseUrl}/v1/audio/speech`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      }, controller.signal)
+
+      if (response.status < 200 || response.status >= 300) {
+        let detail = `HTTP ${response.status}`
+        try {
+          const parsed = JSON.parse(new TextDecoder().decode(response.bytes)) as { detail?: string; message?: string }
+          detail = parsed.detail || parsed.message || detail
+        } catch { /* keep HTTP status */ }
+        throw new VoiceTutResponseError(`VoiceTut: ${detail}`, response.status)
+      }
+
+      const contentType = (response.contentType || '').split(';')[0].trim().toLowerCase()
+      if (!contentType.startsWith('audio/')) {
+        throw new Error(`VoiceTut returned ${response.contentType || 'an unknown content type'} instead of audio`)
+      }
+      dispatchTtsProvider('voicetut')
+      return new Blob([response.bytes], { type: contentType })
+    }
+
     const response = await fetch(`${baseUrl}/v1/audio/speech`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: 'mohammedaly22/VoiceTut-TTS',
-        voice: settings.ttsVoice || body.voice || 'Omnia',
-        input: body.input || '',
-        language: body.language === 'English' ? 'en' : 'arz',
-        speed: settings.voiceRate,
-        response_format: 'wav',
-      }),
+      body: JSON.stringify(payload),
       signal: controller.signal,
     })
 
     if (!response.ok) {
       let detail = `HTTP ${response.status}`
       try {
-        const payload = await response.json() as { detail?: string; message?: string }
-        detail = payload.detail || payload.message || detail
+        const parsed = await response.json() as { detail?: string; message?: string }
+        detail = parsed.detail || parsed.message || detail
       } catch {
         /* keep HTTP status */
       }
@@ -311,6 +344,53 @@ export interface VoiceTutHealth {
   loaded: boolean
 }
 
+interface NativeVoiceResponse {
+  status: number
+  contentType: string
+  bytes: Uint8Array<ArrayBuffer>
+}
+
+function base64ToBytes(base64: string): Uint8Array<ArrayBuffer> {
+  const binary = atob(base64)
+  const bytes = new Uint8Array(new ArrayBuffer(binary.length))
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index)
+  return bytes
+}
+
+/**
+ * Fetch through the native Android bridge. Only used inside the OpenVenice
+ * app where the WebView CSP would otherwise block the VoiceTut voice service.
+ * The native side only accepts http(s) URLs and GET/POST.
+ */
+async function nativeVoiceFetch(
+  url: string,
+  init: { method?: string; headers?: Record<string, string>; body?: string },
+  signal?: AbortSignal,
+): Promise<NativeVoiceResponse> {
+  if (signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError')
+  const runtime = typeof window !== 'undefined' ? window.Capacitor : undefined
+  if (!runtime) throw new Error('Native bridge is unavailable.')
+  const invoke = async () => {
+    if (typeof runtime.nativePromise === 'function') {
+      return await runtime.nativePromise('VoiceChat', 'fetchBinary', {
+        url,
+        method: init.method || 'GET',
+        headers: init.headers || {},
+        body: init.body,
+      }) as { status: number; contentType: string; bodyBase64: string }
+    }
+    const fn = runtime.Plugins?.VoiceChat?.fetchBinary
+    if (!fn) throw new Error('Native fetch is unavailable.')
+    return await fn({ url, method: init.method || 'GET', headers: init.headers || {}, body: init.body }) as { status: number; contentType: string; bodyBase64: string }
+  }
+  const result = await invoke()
+  return {
+    status: result.status,
+    contentType: result.contentType || '',
+    bytes: base64ToBytes(result.bodyBase64 || ''),
+  }
+}
+
 /** Check the same-origin VoiceTut proxy without exposing either provider credential. */
 export async function checkVoiceTutHealth(init: { signal?: AbortSignal } = {}): Promise<VoiceTutHealth> {
   const baseUrl = useVoiceStore.getState().voiceTutBaseUrl.trim().replace(/\/$/, '')
@@ -322,6 +402,16 @@ export async function checkVoiceTutHealth(init: { signal?: AbortSignal } = {}): 
   const abortFromCaller = () => controller.abort()
   init.signal?.addEventListener('abort', abortFromCaller, { once: true })
   try {
+    if (isNativeOpenVeniceAndroid()) {
+      const nativeResponse = await nativeVoiceFetch(`${baseUrl}/health`, { method: 'GET', headers: { Accept: 'application/json' } }, controller.signal)
+      if (nativeResponse.status < 200 || nativeResponse.status >= 300) {
+        throw new Error(`VoiceTut health check failed: HTTP ${nativeResponse.status}`)
+      }
+      const payload = JSON.parse(new TextDecoder().decode(nativeResponse.bytes)) as VoiceTutHealth
+      if (!payload.ok || !payload.loaded) throw new Error('VoiceTut is reachable but the Omnia model is not ready')
+      return payload
+    }
+
     const response = await fetch(`${baseUrl}/health`, {
       method: 'GET',
       headers: { Accept: 'application/json' },

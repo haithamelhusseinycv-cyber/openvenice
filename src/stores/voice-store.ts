@@ -3,11 +3,11 @@ import { createJSONStorage, persist } from 'zustand/middleware'
 import { createSafeStorage } from '../lib/safe-storage'
 import { isNativeOpenVeniceAndroid } from '../connectors/facefusion/capacitor-facefusion-bridge'
 import type { VoiceLocale } from '../lib/voice-chat'
-
 export type NourTtsProvider = 'voicetut' | 'venice'
 export type NourPlaybackMode = 'fast' | 'studio'
 
-const DEFAULT_VOICETUT_BASE_URL = (import.meta.env.VITE_VOICETUT_BASE_URL as string | undefined)?.trim() || '/voicetut'
+const DEFAULT_VOICETUT_BASE_URL = (import.meta.env.VITE_VOICETUT_BASE_URL as string | undefined)?.trim()
+  || (isNativeOpenVeniceAndroid() ? 'https://openvenice-production.up.railway.app/voicetut' : '/voicetut')
 
 interface VoiceState {
   locale: VoiceLocale

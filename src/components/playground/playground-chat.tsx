@@ -8,7 +8,7 @@ import { useAgentModels } from '../../hooks/use-agent-models'
 import { callAgent, DEFAULT_AGENT_MODEL, FALLBACK_AGENT_MODEL } from '../../lib/playground-agent'
 import { runAgentTools, type RunStep } from '../../lib/playground-agent-tools'
 import { shouldUseModelFallback } from '../../lib/model-routing'
-import { cancelVoiceListening, listenForVoice, speakVoice, stopVoiceSpeaking, type VoiceLocale } from '../../lib/voice-chat'
+import { cancelVoiceListening, listenForVoice, speakBinaryNative, speakVoice, stopVoiceSpeaking, isNativeAndroid, type VoiceLocale } from '../../lib/voice-chat'
 import {
   NOUR_AGE,
   NOUR_LANGUAGE_LABELS,
@@ -195,6 +195,14 @@ export function PlaygroundChat() {
       .catch((requestError: unknown) => ({ error: requestError }))
 
     const playStudioBlob = async (blob: Blob, index: number) => {
+      setVoiceStatus(`Speaking ${index + 1} of ${segments.length}`)
+
+      if (isNativeAndroid()) {
+        // Native MediaPlayer path — reliable blob playback inside the app.
+        await speakBinaryNative(blob, controller.signal)
+        return
+      }
+
       const url = URL.createObjectURL(blob)
       const audio = new Audio(url)
       audio.preload = 'auto'

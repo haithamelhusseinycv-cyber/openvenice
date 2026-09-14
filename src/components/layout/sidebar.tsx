@@ -1,5 +1,8 @@
+import { useEffect, useState } from 'react'
 import { cn } from '../../lib/utils'
 import { useSettingsStore, type Tab } from '../../stores/settings-store'
+import { biometricGateAvailability } from '../../lib/auth-gate'
+import { haptic } from '../../lib/haptics'
 import { VeniceLogo, VeniceWordmark } from '../ui/logo'
 
 function AgentIcon() {
@@ -33,7 +36,18 @@ export function Sidebar({ mobileOpen, onMobileClose }: Props) {
   const activeTab = useSettingsStore((s) => s.activeTab)
   const setActiveTab = useSettingsStore((s) => s.setActiveTab)
   const sidebarOpen = useSettingsStore((s) => s.sidebarOpen)
+  const biometricLock = useSettingsStore((s) => s.biometricLock)
+  const setBiometricLock = useSettingsStore((s) => s.setBiometricLock)
+  const [biometricUsable, setBiometricUsable] = useState(false)
   const expanded = sidebarOpen || mobileOpen
+
+  useEffect(() => {
+    let disposed = false
+    void biometricGateAvailability().then((availability) => {
+      if (!disposed) setBiometricUsable(availability.available && availability.biometric)
+    })
+    return () => { disposed = true }
+  }, [])
 
   return (
     <aside
@@ -96,6 +110,44 @@ export function Sidebar({ mobileOpen, onMobileClose }: Props) {
       </nav>
 
       <div className="flex-1" />
+
+      {biometricUsable && (
+        <button
+          type="button"
+          onClick={() => { haptic('select'); setBiometricLock(!biometricLock) }}
+          aria-pressed={biometricLock}
+          className={cn(
+            'mx-3 mb-2 flex min-h-11 items-center justify-between gap-2 rounded-xl border px-3 text-[12.5px] font-medium transition-colors',
+            expanded ? '' : 'lg:mx-2',
+            biometricLock
+              ? 'border-[var(--color-accent)]/25 bg-[var(--color-accent-soft)] text-white'
+              : 'border-white/[0.08] bg-white/[0.03] text-white/60 hover:text-white',
+          )}
+          title="Require biometrics when opening the app"
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0" aria-hidden="true">
+              <rect x="4" y="10" width="16" height="11" rx="2.5" />
+              <path d="M8 10V7a4 4 0 018 0v3" />
+            </svg>
+            {expanded && <span className="truncate">{biometricLock ? 'Biometric lock on' : 'Biometric lock off'}</span>}
+          </span>
+          <span
+            aria-hidden="true"
+            className={cn(
+              'relative h-5 w-9 shrink-0 rounded-full transition-colors',
+              biometricLock ? 'bg-[var(--color-accent)]/80' : 'bg-white/[0.14]',
+            )}
+          >
+            <span
+              className={cn(
+                'absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all',
+                biometricLock ? 'left-[1.125rem]' : 'left-0.5',
+              )}
+            />
+          </span>
+        </button>
+      )}
 
       {expanded && (
         <div className="px-3 py-2.5 border-t border-white/[0.04]">

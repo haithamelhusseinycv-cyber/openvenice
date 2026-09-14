@@ -5,6 +5,11 @@ import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
 import android.util.Base64;
 
+import androidx.biometric.BiometricManager;
+import androidx.biometric.BiometricPrompt;
+import androidx.core.content.ContextCompat;
+import androidx.fragment.app.FragmentActivity;
+
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -13,6 +18,7 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
+import java.util.concurrent.Executor;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
@@ -132,6 +138,67 @@ public class AuthVaultPlugin extends Plugin {
         JSObject result = new JSObject();
         result.put("available", true);
         result.put("storage", "Android Keystore");
+        result.put("biometric", biometricStatus() == BiometricManager.BIOMETRIC_SUCCESS);
         call.resolve(result);
+    }
+
+    private int biometricStatus() {
+        BiometricManager manager = BiometricManager.from(getContext());
+        return manager.canAuthenticate(
+            BiometricManager.Authenticators.BIOMETRIC_WEAK
+                | BiometricManager.Authenticators.DEVICE_CREDENTIAL);
+    }
+
+    /**
+     * Premium lock gate: shows the platform BiometricPrompt (fingerprint, face,
+     * or device credential fallback). The vault key itself stays independent of
+     * biometric enrollment so re-enrolling a fingerprint never orphans saved
+     * credentials; this gate is the front-door lock for the app shell.
+     */
+    @PluginMethod
+    public void gate(PluginCall call) {
+        android.app.Activity activity = getBridge() != null ? getBridge().getActivity() : null;
+        if (!(activity instanceof FragmentActivity)) {
+            call.reject("Biometric gate requires the app activity");
+            return;
+        }
+
+        int status = biometricStatus();
+        if (status != BiometricManager.BIOMETRIC_SUCCESS) {
+            // No usable authenticator (none enrolled, no lock screen, hardware
+            // missing): fall open so the app is never bricked, and surface why.
+            JSObject result = new JSObject();
+            result.put("unlocked", true);
+            result.put("fallback", true);
+            result.put("status", status);
+            call.resolve(result);
+            return;
+        }
+
+        FragmentActivity fragmentActivity = (FragmentActivity) activity;
+        Executor executor = ContextCompat.getMainExecutor(getContext());
+        BiometricPrompt.PromptInfo info = new BiometricPrompt.PromptInfo.Builder()
+            .setTitle(call.getString("title", "Unlock OpenVenice"))
+            .setSubtitle(call.getString("subtitle", ""))
+            .setAllowedAuthenticators(
+                BiometricManager.Authenticators.BIOMETRIC_WEAK
+                    | BiometricManager.Authenticators.DEVICE_CREDENTIAL)
+            .build();
+
+        BiometricPrompt prompt = new BiometricPrompt(fragmentActivity, executor,
+            new BiometricPrompt.AuthenticationCallback() {
+                @Override
+                public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) {
+                    JSObject response = new JSObject();
+                    response.put("unlocked", true);
+                    call.resolve(response);
+                }
+
+                @Override
+                public void onAuthenticationError(int errorCode, CharSequence errString) {
+                    call.reject(errString != null ? errString.toString() : "Authentication failed");
+                }
+            });
+        prompt.authenticate(info);
     }
 }

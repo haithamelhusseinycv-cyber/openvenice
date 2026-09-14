@@ -54,11 +54,41 @@ function nativeRuntime() {
   return typeof window !== 'undefined' ? window.Capacitor : undefined
 }
 
-function isNativeAndroid() {
+export function isNativeAndroid() {
   const runtime = nativeRuntime()
   if (!runtime) return false
   if (typeof runtime.isNativePlatform === 'function') return runtime.isNativePlatform()
   return runtime.getPlatform?.() === 'android'
+}
+
+/**
+ * Play pre-rendered audio (wav/mp3 blob) through the native MediaPlayer.
+ * Used for Studio voice segments inside the Android app where HTMLAudio
+ * handling of streamed blobs is less reliable and CSP blocks remote fetch.
+ */
+export async function speakBinaryNative(audio: Blob, signal?: AbortSignal): Promise<void> {
+  if (!isNativeAndroid()) throw new Error('Native audio is unavailable outside the Android app')
+  if (signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError')
+
+  const buffer = await audio.arrayBuffer()
+  const bytes = new Uint8Array(buffer)
+  let binary = ''
+  const CHUNK = 0x8000
+  for (let index = 0; index < bytes.length; index += CHUNK) {
+    binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(index, index + CHUNK)))
+  }
+  const audioBase64 = btoa(binary)
+
+  const onAbort = () => {
+    void invokeNative('stopSpeaking').catch(() => undefined)
+  }
+  signal?.addEventListener('abort', onAbort, { once: true })
+  try {
+    await invokeNative('speakBinary', { audioBase64 })
+    if (signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError')
+  } finally {
+    signal?.removeEventListener('abort', onAbort)
+  }
 }
 
 async function invokeNative<T>(method: string, options: Record<string, unknown> = {}): Promise<T> {

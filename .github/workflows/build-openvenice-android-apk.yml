@@ -103,6 +103,9 @@ jobs:
           grep -q '${applicationId}.fileprovider' "$manifest"
           grep -q 'network_security_config' "$manifest"
           grep -q 'openVeniceStableDebug' android/app/build.gradle
+          grep -q 'androidx.biometric:biometric' android/app/build.gradle
+          grep -q 'android.permission.USE_BIOMETRIC' "$manifest"
+          grep -q 'android.permission.VIBRATE' "$manifest"
           test -f android/app/src/main/java/ai/openvenice/app/FaceFusionAgentPlugin.java
           test -f android/app/src/main/java/ai/openvenice/app/MediaActionsPlugin.java
           test -f android/app/src/main/java/ai/openvenice/app/VoiceChatPlugin.java
