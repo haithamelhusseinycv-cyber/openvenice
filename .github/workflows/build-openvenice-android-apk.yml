@@ -109,6 +109,7 @@ jobs:
           grep -q 'registerPlugin(FaceFusionAgentPlugin.class)' android/app/src/main/java/ai/openvenice/app/MainActivity.java
           grep -q 'registerPlugin(MediaActionsPlugin.class)' android/app/src/main/java/ai/openvenice/app/MainActivity.java
           grep -q 'registerPlugin(VoiceChatPlugin.class)' android/app/src/main/java/ai/openvenice/app/MainActivity.java
+          grep -q 'registerPlugin(AuthVaultPlugin.class)' android/app/src/main/java/ai/openvenice/app/MainActivity.java
 
       - name: Build debug APK
         working-directory: android
