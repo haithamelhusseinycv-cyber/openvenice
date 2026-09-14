@@ -59,8 +59,11 @@ if '<action android:name="android.speech.RecognitionService"' not in text:
 if 'android:networkSecurityConfig=' not in text:
     text = text.replace('<application', '<application\n        android:networkSecurityConfig="@xml/network_security_config"', 1)
 
-if 'android:allowBackup=' not in text:
-    text = text.replace('<application', '<application\n        android:allowBackup="false"', 1)
+if 'android:allowBackup="false"' not in text:
+    if 'android:allowBackup="true"' in text:
+        text = text.replace('android:allowBackup="true"', 'android:allowBackup="false"', 1)
+    else:
+        text = text.replace('<application', '<application\n        android:allowBackup="false"', 1)
 
 provider = '''\n        <provider\n            android:name="androidx.core.content.FileProvider"\n            android:authorities="${applicationId}.fileprovider"\n            android:exported="false"\n            android:grantUriPermissions="true">\n            <meta-data\n                android:name="android.support.FILE_PROVIDER_PATHS"\n                android:resource="@xml/file_paths" />\n        </provider>\n'''
 if '${applicationId}.fileprovider' not in text:
