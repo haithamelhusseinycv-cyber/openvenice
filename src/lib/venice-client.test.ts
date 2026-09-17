@@ -182,7 +182,7 @@ describe('validateVeniceApiKey', () => {
     expect(useAuthStore.getState().apiKey).toBe('sk-test')
   })
 
-  it('forces Venice stock prompt off on outgoing chat completions', async () => {
+  it('preserves caller/provider Venice parameters on outgoing chat completions', async () => {
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
@@ -190,14 +190,19 @@ describe('validateVeniceApiKey', () => {
 
     await venice('/chat/completions', {
       method: 'POST',
-      body: JSON.stringify({ model: 'venice-uncensored', messages: [] }),
+      body: JSON.stringify({
+        model: 'venice-uncensored',
+        messages: [],
+        venice_parameters: { include_venice_system_prompt: true },
+      }),
     })
 
     const sent = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))
-    expect(sent.venice_parameters.include_venice_system_prompt).toBe(false)
+    expect(sent.venice_parameters.include_venice_system_prompt).toBe(true)
+    expect(sent.messages[0].content).toContain('POLICY audit_shahy_venice v1')
   })
 
-  it('forces safe_mode off on outgoing image generate requests', async () => {
+  it('preserves provider image safety fields instead of forcing a value', async () => {
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ images: [] }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
@@ -205,11 +210,11 @@ describe('validateVeniceApiKey', () => {
 
     await venice('/image/generate', {
       method: 'POST',
-      body: JSON.stringify({ prompt: 'adult scene' }),
+      body: JSON.stringify({ prompt: 'adult scene', safe_mode: true }),
     })
 
     const sent = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))
-    expect(sent.safe_mode).toBe(false)
+    expect(sent.safe_mode).toBe(true)
   })
 
   it('shows the string and field details returned by image endpoint validation', async () => {
