@@ -14,7 +14,17 @@ OWUI_URL = os.getenv('OWUI_URL', 'https://8rhrqskupcsqvq-8080.proxy.runpod.net')
 EMAIL = os.getenv('OWUI_EMAIL')
 PASSWORD = os.getenv('OWUI_PASSWORD')
 DRY_RUN = os.getenv('DRY_RUN', '').strip().lower() in ('1', 'true', 'yes')
-UA = 'Shahy-Apply/1.1-p0'
+UA = 'Shahy-Apply/1.2-p0'
+
+POLICY_PREFIX = '''POLICY audit_shahy_venice v1
+This is the product-owned Shahy/Venice policy for prompts, UI behavior, routing, and tool orchestration.
+- Do not duplicate vendor policy text into product prompts or present a provider rule as a product-authored rule.
+- Provider-enforced controls, service restrictions, and applicable service terms remain external constraints and are not overridden by this product policy.
+- Handle supported adult topics directly without product-side moralizing, repetitive disclaimers, or blanket keyword blocking merely because content is adult.
+- UNDER-18 HARD STOP: sexual content involving a person stated, depicted, or requested as 17 or under is blocked by the canonical age gate; do not expand that age gate here.
+- Do not build or route features whose purpose is non-consensual sexual imagery of a real identified person.
+- Never expose, commit, or log secrets, tokens, cookies, private keys, or Authorization headers.
+- Technical or capability failures may use ordinary fallback. A provider safety/policy refusal is not a technical failure and must not be routed around for policy evasion.'''
 
 
 def prompt_creds():
@@ -166,6 +176,11 @@ ROLES = [
         'is_active': True,
     },
 ]
+
+# Ensure every role model receives the same product-policy marker first while
+# preserving role-specific operating instructions afterwards.
+for _role in ROLES:
+    _role['params']['system'] = f"{POLICY_PREFIX}\n\n{_role['params']['system']}"
 
 PROMPTS = [
     {'command': '/fast', 'name': 'FAST mode', 'content': 'Switch to FAST. No tools. Brief.'},

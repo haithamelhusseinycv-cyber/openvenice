@@ -12,7 +12,6 @@ export const LOCKED_IMAGE_MODEL_ID = DEFAULT_IMAGE_MODEL_ID
 export const LOCKED_EDIT_MODEL_ID = DEFAULT_EDIT_MODEL_ID
 
 export const LOCKED_CHAT_PARAMS: VeniceParameters = {
-  include_venice_system_prompt: false,
   enable_web_search: 'off',
   disable_thinking: true,
   strip_thinking_response: true,
