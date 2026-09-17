@@ -143,7 +143,7 @@ class PipeTests(unittest.TestCase):
         self.assertNotIn("lawful_only OFF", prompt)
         self.assertNotIn("consensual_only OFF", prompt)
         self.assertNotIn("switch model or tool, and continue", prompt)
-        self.assertNotIn("provider or manufacturer rule was erased", prompt.lower())
+        self.assertIn("Never claim a provider or manufacturer rule was erased, disabled, or superseded", prompt)
 
     def test_coding_request_uses_zen_then_nube_on_technical_failure(self):
         client = Client([
