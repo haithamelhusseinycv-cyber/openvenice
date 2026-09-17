@@ -52,4 +52,12 @@ describe('Shahy/Venice policy surfaces', () => {
     expect(source).not.toContain('hop["name"] == "zen" or self._eligible_failure')
     expect(source).not.toContain('switch model or tool, and continue')
   })
+
+  it('injects the marker in the legacy Kimi/DeepSeek fallback without policy-evasion routing', () => {
+    const source = repoFile('open-webui-workstation/functions/shahy_kimi_fallback.py')
+    expect(source).toContain('POLICY_MARKER = "POLICY audit_shahy_venice v1"')
+    expect(source).toContain('payload["messages"] = cls._with_policy_messages')
+    expect(source).toContain('self._eligible_failure(')
+    expect(source).not.toContain('switch model or tool, and continue')
+  })
 })
