@@ -30,10 +30,23 @@ httpx_stub = types.SimpleNamespace(
 sys.modules.setdefault("httpx", httpx_stub)
 
 PIPE_PATH = pathlib.Path(__file__).with_name("shahy_pipe.py")
+REPO_ROOT = PIPE_PATH.parent.parent
 SPEC = importlib.util.spec_from_file_location("shahy_pipe", PIPE_PATH)
 MODULE = importlib.util.module_from_spec(SPEC)
 assert SPEC and SPEC.loader
 SPEC.loader.exec_module(MODULE)
+
+UNSAFE_OVERRIDE_STRINGS = (
+    "Moderation OFF",
+    "Safe mode OFF",
+    "lawful_only OFF",
+    "consensual_only OFF",
+    "switch model or tool, and continue",
+)
+
+
+def repo_text(relative_path: str) -> str:
+    return (REPO_ROOT / relative_path).read_text(encoding="utf-8")
 
 
 class Response:
@@ -144,6 +157,42 @@ class PipeTests(unittest.TestCase):
         self.assertNotIn("consensual_only OFF", prompt)
         self.assertNotIn("switch model or tool, and continue", prompt)
         self.assertIn("Never claim a provider or manufacturer rule was erased, disabled, or superseded", prompt)
+
+    def test_qwen_and_playground_use_shared_policy_path(self):
+        qwen = repo_text("src/lib/qwen-client.ts")
+        self.assertIn("import { applyChatPolicyToObject } from './venice-policy'", qwen)
+        self.assertIn("applyChatPolicyToObject(payload as Record<string, unknown>)", qwen)
+
+        playground = repo_text("src/lib/playground-agent.ts")
+        self.assertIn("NOUR_SYSTEM_PROMPT", playground)
+        self.assertIn("withVeniceChatParams", playground)
+
+    def test_open_webui_prompt_assets_do_not_reintroduce_provider_bypass_directives(self):
+        for relative_path in (
+            "open-webui-workstation/prompts/global/core.md",
+            "open-webui-workstation/prompts/global/open-mature-direct.md",
+        ):
+            text = repo_text(relative_path)
+            self.assertIn("POLICY audit_shahy_venice v1", text)
+            self.assertIn("Provider-enforced controls", text)
+            for forbidden in UNSAFE_OVERRIDE_STRINGS:
+                self.assertNotIn(forbidden, text)
+
+    def test_legacy_kimi_fallback_injects_marker_and_keeps_failover_technical_only(self):
+        source = repo_text("open-webui-workstation/functions/shahy_kimi_fallback.py")
+        self.assertIn('POLICY_MARKER = "POLICY audit_shahy_venice v1"', source)
+        self.assertIn('payload["messages"] = cls._with_policy_messages', source)
+        self.assertIn("self._eligible_failure(", source)
+        for forbidden in UNSAFE_OVERRIDE_STRINGS:
+            self.assertNotIn(forbidden, source)
+
+    def test_open_webui_role_bootstrap_prefixes_policy_without_bypass_directives(self):
+        source = repo_text("open-webui-workstation/runtime/apply/shahy_apply.py")
+        self.assertIn("POLICY_PREFIX = '''POLICY audit_shahy_venice v1", source)
+        self.assertIn("_role['params']['system'] = f\"{POLICY_PREFIX}\\n\\n{_role['params']['system']}\"", source)
+        self.assertIn("provider safety/policy refusal is not a technical failure", source)
+        for forbidden in UNSAFE_OVERRIDE_STRINGS:
+            self.assertNotIn(forbidden, source)
 
     def test_coding_request_uses_zen_then_nube_on_technical_failure(self):
         client = Client([
