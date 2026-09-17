@@ -60,4 +60,12 @@ describe('Shahy/Venice policy surfaces', () => {
     expect(source).toContain('self._eligible_failure(')
     expect(source).not.toContain('switch model or tool, and continue')
   })
+
+  it('prefixes every Open WebUI role model with the product marker', () => {
+    const source = repoFile('open-webui-workstation/runtime/apply/shahy_apply.py')
+    expect(source).toContain("POLICY_PREFIX = '''POLICY audit_shahy_venice v1")
+    expect(source).toContain("_role['params']['system'] = f\"{POLICY_PREFIX}\\n\\n{_role['params']['system']}\"")
+    expect(source).toContain('provider safety/policy refusal is not a technical failure')
+    for (const forbidden of unsafeOverrideStrings) expect(source).not.toContain(forbidden)
+  })
 })
