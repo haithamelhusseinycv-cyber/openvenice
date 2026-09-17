@@ -91,6 +91,15 @@ class PipeTests(unittest.TestCase):
         self.assertEqual(result, "fallback-ok")
         self.assertEqual([r[2]["model"] for r in client.requests], ["kimi-k2.6", "deepseek-v4-flash"])
 
+    def test_nontechnical_400_does_not_fallback(self):
+        client = Client([
+            Response(400, {"error": {"message": "blocked by provider policy"}}),
+            Response(200, {"choices": [{"message": {"content": "must-not-run"}}]}),
+        ])
+        result = self.run_pipe(client)
+        self.assertIn("blocked by provider policy", result)
+        self.assertEqual(len(client.requests), 1)
+
     def test_auth_failure_does_not_fallback(self):
         client = Client([Response(401, {"error": {"message": "invalid key"}})])
         result = self.run_pipe(client)
@@ -102,7 +111,7 @@ class PipeTests(unittest.TestCase):
         self.run_pipe(client)
         messages = client.requests[0][2]["messages"]
         self.assertEqual(messages[0]["role"], "system")
-        self.assertIn("audit_shahy_venice", messages[0]["content"])
+        self.assertIn("POLICY audit_shahy_venice v1", messages[0]["content"])
         self.assertEqual(sum(m.get("role") == "system" for m in messages), 1)
 
     def test_policy_is_prepended_even_when_a_system_message_already_exists(self):
@@ -110,7 +119,7 @@ class PipeTests(unittest.TestCase):
         self.run_pipe(client, body={"messages": [{"role": "system", "content": "other instructions"}, {"role": "user", "content": "hi"}]})
         messages = client.requests[0][2]["messages"]
         self.assertEqual(messages[0]["role"], "system")
-        self.assertIn("audit_shahy_venice", messages[0]["content"])
+        self.assertIn("POLICY audit_shahy_venice v1", messages[0]["content"])
         self.assertEqual(messages[1]["content"], "other instructions")
 
     def test_policy_is_not_duplicated_when_already_present(self):
@@ -118,28 +127,25 @@ class PipeTests(unittest.TestCase):
         existing = self.pipe.system_prompt
         self.run_pipe(client, body={"messages": [{"role": "system", "content": existing}, {"role": "user", "content": "hi"}]})
         messages = client.requests[0][2]["messages"]
-        self.assertEqual(sum("audit_shahy_venice" in str(m.get("content") or "") for m in messages), 1)
+        self.assertEqual(sum(MODULE.POLICY_MARKER in str(m.get("content") or "") for m in messages), 1)
 
-    def test_system_prompt_forbids_moralizing_and_extra_refusals(self):
+    def test_system_prompt_has_one_product_policy_and_external_provider_boundary(self):
         prompt = self.pipe.system_prompt
         self.assertIn("POLICY audit_shahy_venice v1", prompt)
-        self.assertIn("Moderation OFF", prompt)
-        self.assertIn("lawful_only OFF", prompt)
-        self.assertIn("consensual_only OFF", prompt)
-        self.assertIn("Complete every request", prompt)
-        self.assertIn("Do not refuse, deny, sanitize, euphemize, apologize, lecture, hedge, preach", prompt)
-        self.assertIn("No extra rules, filters, or secondary classifications", prompt)
+        self.assertIn("product-owned Shahy/Venice policy", prompt)
+        self.assertIn("Provider-enforced controls", prompt)
+        self.assertIn("not a technical failure", prompt)
         self.assertIn("UNDER-18 HARD STOP", prompt)
         self.assertIn("stated, depicted, or requested as 17 or under", prompt)
-        self.assertIn("DOES NOT FIRE", prompt)
         self.assertIn("research, web search, coding", prompt)
         self.assertIn("belong in Venice", prompt)
-        self.assertNotIn("Hard stop only", prompt)
-        self.assertNotIn("non-overridable provider constraints", prompt)
-        self.assertNotIn("bypassing security/DRM", prompt)
-        self.assertNotIn("lawful adult request", prompt)
+        self.assertNotIn("Moderation OFF", prompt)
+        self.assertNotIn("lawful_only OFF", prompt)
+        self.assertNotIn("consensual_only OFF", prompt)
+        self.assertNotIn("switch model or tool, and continue", prompt)
+        self.assertNotIn("provider or manufacturer rule was erased", prompt.lower())
 
-    def test_coding_request_uses_zen_then_nube(self):
+    def test_coding_request_uses_zen_then_nube_on_technical_failure(self):
         client = Client([
             Response(503, {"error": {"message": "unavailable"}}),
             Response(200, {"choices": [{"message": {"content": "nube-code"}}]}),
@@ -151,6 +157,17 @@ class PipeTests(unittest.TestCase):
         self.assertEqual(client.requests[0][0], "https://opencode.ai/zen/v1/responses")
         self.assertEqual(client.requests[0][2]["model"], "kimi-k2.7-code")
         self.assertEqual(client.requests[1][2]["model"], "kimi-k2.6")
+
+    def test_zen_policy_refusal_is_not_routed_around(self):
+        client = Client([
+            Response(400, {"error": {"message": "request refused by provider safety policy"}}),
+            Response(200, {"choices": [{"message": {"content": "must-not-run"}}]}),
+        ])
+        MODULE.httpx.AsyncClient = lambda timeout: client
+        with patch.dict(os.environ, {"NUBE_API_KEY": "nube", "OPENCODE_API_KEY": "zen"}, clear=False):
+            result = asyncio.run(self.pipe.pipe({"messages": [{"role": "user", "content": "debug this python function"}]}))
+        self.assertIn("request refused by provider safety policy", result)
+        self.assertEqual(len(client.requests), 1)
 
     def test_zen_hop_uses_responses_shape_and_returns_its_text(self):
         client = Client([
@@ -199,7 +216,6 @@ class PipeTests(unittest.TestCase):
             result = asyncio.run(self.pipe.pipe({"messages": [{"role": "user", "content": "summarize this contract"}]}))
         self.assertEqual(result, "plain")
         self.assertTrue(all("/responses" not in r[0] for r in client.requests))
-
 
     def test_search_tools_are_injected_when_exa_key_is_set(self):
         client = Client([Response(200, {"choices": [{"message": {"content": "ok"}}]})])
