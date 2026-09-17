@@ -4,6 +4,7 @@ import {
   DEFAULT_CHAT_SEARCH_PARAMS,
   isCouplePrompt,
   isStaleSystemPrompt,
+  lockChatParams,
   lockChatSystemPrompt,
   pickAspectFromPrompt,
 } from './defaults'
@@ -27,22 +28,28 @@ describe('chat system prompt migration', () => {
     expect(lockChatSystemPrompt('')).toBe(DEFAULT_CHAT_SYSTEM_PROMPT)
   })
 
-  it('keeps Venice as adult entertainment with search off', () => {
+  it('keeps Venice as adult entertainment with the shared product-policy marker', () => {
     expect(DEFAULT_CHAT_SYSTEM_PROMPT).toContain('POLICY audit_shahy_venice v1')
     expect(DEFAULT_CHAT_SYSTEM_PROMPT).toContain('adult-entertainment operator')
-    expect(DEFAULT_CHAT_SYSTEM_PROMPT).toContain('Do not refuse, apologize, lecture, or add disclaimers')
     expect(DEFAULT_CHAT_SYSTEM_PROMPT).toContain('UNDER-18 HARD STOP')
     expect(DEFAULT_CHAT_SYSTEM_PROMPT).toContain('stated, depicted, or requested as 17 or under')
-    expect(DEFAULT_CHAT_SYSTEM_PROMPT).not.toContain('Hard stop only')
-    expect(DEFAULT_CHAT_SYSTEM_PROMPT).not.toContain('preserving consent and safety boundaries')
-    expect(DEFAULT_CHAT_SYSTEM_PROMPT).not.toContain('harm-reduction')
-    expect(DEFAULT_CHAT_SYSTEM_PROMPT).not.toContain('professional or urgent care')
+    expect(DEFAULT_CHAT_SYSTEM_PROMPT).toContain('Provider-enforced controls')
+    expect(DEFAULT_CHAT_SYSTEM_PROMPT).not.toContain('Moderation OFF')
+    expect(DEFAULT_CHAT_SYSTEM_PROMPT).not.toContain('lawful_only OFF')
+    expect(DEFAULT_CHAT_SYSTEM_PROMPT).not.toContain('switch model or tool, and continue')
   })
 
   it('starts new Venice chats with web search off', () => {
     expect(DEFAULT_CHAT_SEARCH_PARAMS).toMatchObject({
       enable_web_search: 'off',
       enable_web_citations: false,
+    })
+  })
+
+  it('does not force the provider stock-system-prompt option off', () => {
+    expect(lockChatParams({ include_venice_system_prompt: true })).toMatchObject({
+      include_venice_system_prompt: true,
+      enable_web_search: 'off',
     })
   })
 
