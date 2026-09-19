@@ -11,6 +11,8 @@ http {
   sendfile on;
   gzip on;
   gzip_types text/plain application/javascript text/css application/json image/svg+xml;
+  limit_req_zone $binary_remote_addr zone=openvenice_api:10m rate=30r/m;
+  limit_conn_zone $binary_remote_addr zone=openvenice_conn:10m;
 
   map $uri $openvenice_cache_control {
     default "";

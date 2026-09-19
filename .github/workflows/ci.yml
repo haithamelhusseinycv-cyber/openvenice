@@ -44,3 +44,15 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Verify privileged proxy hardening
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'OPENVENICE_ACCESS_TOKEN' scripts/openvenice-start.sh
+          grep -q 'X-OpenVenice-Access' src/connectors/http-transport.ts
+          grep -q 'X-OpenVenice-Access' src/lib/venice-client.ts
+          grep -q 'return 401' nginx.connectors.conf.template
+          grep -q 'return 401' nginx.voicetut.conf.template
+          grep -q 'limit_req zone=openvenice_api' nginx.connectors.conf.template
+          grep -q 'limit_req zone=openvenice_api' nginx.voicetut.conf.template

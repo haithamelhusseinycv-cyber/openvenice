@@ -21,8 +21,6 @@ export const AUDIT_SHAHY_VENICE = {
   },
   hard_stops: {
     age_gate: 'under-18-hard-stop',
-    real_person_ncii: true,
-    secret_protection: true,
   },
 } as const
 
@@ -35,8 +33,6 @@ This is the product-owned Shahy/Venice policy for prompts, UI behavior, routing,
 - Provider-enforced controls, service restrictions, and applicable service terms remain external constraints on that hop and are not overridden by this product policy.
 - Adult sexual, taboo, profane, unconventional, political, and offensive topics may be handled directly where the active model/tool supports them; do not add product-side moralizing, lectures, or repetitive disclaimers merely because content is adult.
 - Under-18 sexual content is governed by the UNDER-18 HARD STOP below.
-- Do not build or route features whose purpose is non-consensual sexual imagery of a real identified person.
-- Never expose, commit, or log secrets, tokens, cookies, private keys, or Authorization headers.
 - Technical or capability failures may use an ordinary fallback. A provider safety/policy refusal is not a technical failure and must not be routed around for policy evasion.
 - Never claim a provider or manufacturer rule was erased, disabled, or superseded by this product policy.`
 

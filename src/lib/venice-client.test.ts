@@ -250,7 +250,7 @@ describe('validateVeniceApiKey', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  it('sends VoiceTut synthesis through the proxy without the Venice bearer key', async () => {
+  it('sends VoiceTut synthesis through the protected proxy without exposing a bearer header', async () => {
     fetchMock.mockResolvedValueOnce(new Response(new Uint8Array([82, 73, 70, 70]), {
       status: 200,
       headers: { 'Content-Type': 'audio/wav' },
@@ -267,7 +267,10 @@ describe('validateVeniceApiKey', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(url).toBe('/voicetut/v1/audio/speech')
-    expect(init.headers).toEqual({ 'Content-Type': 'application/json' })
+    expect(init.headers).toEqual({
+      'Content-Type': 'application/json',
+      'X-OpenVenice-Access': 'sk-test',
+    })
     expect(JSON.parse(String(init.body))).toMatchObject({
       voice: 'Omnia',
       input: 'Hello from Noor',

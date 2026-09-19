@@ -1,4 +1,5 @@
 location = /voicetut/health {
+  if ($http_x_openvenice_access != "__OPENVENICE_ACCESS_TOKEN__") { return 401; }
   limit_except GET { deny all; }
   proxy_pass __VOICETUT_UPSTREAM__/ready;
   proxy_ssl_server_name on;
@@ -14,6 +15,9 @@ location = /voicetut/health {
 }
 
 location = /voicetut/v1/audio/speech {
+  if ($http_x_openvenice_access != "__OPENVENICE_ACCESS_TOKEN__") { return 401; }
+  limit_req zone=openvenice_api burst=3 nodelay;
+  limit_conn openvenice_conn 1;
   limit_except POST { deny all; }
   proxy_pass __VOICETUT_UPSTREAM__/v1/audio/speech;
   proxy_ssl_server_name on;
