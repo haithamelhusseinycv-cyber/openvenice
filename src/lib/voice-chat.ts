@@ -213,6 +213,36 @@ function pickBrowserVoice(locale: VoiceLocale): SpeechSynthesisVoice | undefined
     || voices.find((voice) => voice.lang.toLowerCase().startsWith(prefix))
 }
 
+
+export type SpeakPayload = { display: string; speakText: string; speakLocale: VoiceLocale }
+
+/** English on screen; optional [[speak-ar]] / [[speak-en]] trailer for TTS. */
+export function splitSpeakPayload(raw: string, fallbackLocale: VoiceLocale = 'ar-EG'): SpeakPayload {
+  const text = String(raw || '')
+  const mAr = text.match(/\[\[speak-ar\]\]\s*([\s\S]*)$/i)
+  const mEn = text.match(/\[\[speak-en\]\]\s*([\s\S]*)$/i)
+  if (mAr) {
+    return {
+      display: text.replace(/\s*\[\[speak-ar\]\][\s\S]*$/i, '').trim(),
+      speakText: mAr[1].trim(),
+      speakLocale: 'ar-EG',
+    }
+  }
+  if (mEn) {
+    return {
+      display: text.replace(/\s*\[\[speak-en\]\][\s\S]*$/i, '').trim(),
+      speakText: mEn[1].trim(),
+      speakLocale: 'en-US',
+    }
+  }
+  const arabic = (text.match(/[؀-ۿ]/g) || []).length
+  return {
+    display: text,
+    speakText: text,
+    speakLocale: arabic >= 3 ? 'ar-EG' : fallbackLocale,
+  }
+}
+
 export async function speakVoice(
   text: string,
   locale: VoiceLocale,
@@ -281,10 +311,12 @@ export async function speakVoiceQueued(
   options: { rate?: number; pitch?: number; signal?: AbortSignal } = {},
 ) {
   const { splitNourSpeechText } = await import('./nour-character')
-  const chunks = splitNourSpeechText(text, 140, 220)
+  const payload = splitSpeakPayload(text, locale)
+  const speakLocale = payload.speakLocale
+  const chunks = splitNourSpeechText(payload.speakText, 140, 220)
   for (const chunk of chunks) {
     if (options.signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError')
-    await speakVoice(chunk, locale, options)
+    await speakVoice(chunk, speakLocale, options)
   }
 }
 

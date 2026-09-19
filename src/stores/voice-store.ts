@@ -35,7 +35,7 @@ interface VoiceState {
 export const useVoiceStore = create<VoiceState>()(
   persist(
     (set, get) => ({
-      locale: 'en-US',
+      locale: 'ar-EG',
       speakReplies: true,
       autoSend: true,
       ttsProvider: isNativeOpenVeniceAndroid() ? 'venice' : 'voicetut',
