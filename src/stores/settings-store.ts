@@ -53,8 +53,8 @@ export const useSettingsStore = create<SettingsState>()(
         })),
       playgroundAgentModel: '',
       setPlaygroundAgentModel: (modelId) => set({ playgroundAgentModel: modelId }),
-      nourLanguageMode: 'cairo-street',
-      setNourLanguageMode: (mode) => set({ nourLanguageMode: mode }),
+      nourLanguageMode: 'dual-dialect',
+      setNourLanguageMode: () => set({ nourLanguageMode: 'dual-dialect' }),
       biometricLock: true,
       setBiometricLock: (enabled) => set({ biometricLock: enabled }),
     }),
@@ -72,8 +72,8 @@ export const useSettingsStore = create<SettingsState>()(
         s.activeTab = s.activeTab === 'image' ? 'image' : 'playground'
         // Reset stale agent selections once so Noor adopts the preferred model.
         s.playgroundAgentModel = ''
-        // Cairo Street is the preferred Noor mode for this build.
-        s.nourLanguageMode = 'cairo-street'
+        // Noor dialect is fixed: English + Egyptian Arabic (dual-dialect).
+        s.nourLanguageMode = 'dual-dialect'
         return s as SettingsState
       },
       partialize: (state) => ({

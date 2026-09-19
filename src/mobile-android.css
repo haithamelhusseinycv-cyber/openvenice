@@ -1,0 +1,43 @@
+/* Android phone optimization — OpenVenice */
+:root {
+  --tap: 48px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  touch-action: manipulation;
+}
+body {
+  min-height: 100dvh;
+  overscroll-behavior-y: contain;
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+}
+/* Prevent iOS/Android input zoom kick; keep readable */
+input, textarea, select, button {
+  font-size: 16px !important;
+  min-height: var(--tap);
+  touch-action: manipulation;
+}
+button, [role="button"], a.btn, .tap-target {
+  min-height: var(--tap);
+  min-width: var(--tap);
+}
+/* Scroll containers */
+.scroll-y, [data-scroll="y"] {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+/* Bottom composers clear gesture bar */
+.composer, .bottom-bar, [data-role="composer"] {
+  padding-bottom: calc(12px + var(--safe-bottom));
+}
+@media (max-width: 480px) {
+  body { font-size: 16px; }
+  h1 { font-size: 1.35rem; }
+  h2 { font-size: 1.15rem; }
+}

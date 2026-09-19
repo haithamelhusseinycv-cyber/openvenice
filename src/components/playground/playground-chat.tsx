@@ -11,6 +11,7 @@ import { shouldUseModelFallback } from '../../lib/model-routing'
 import { cancelVoiceListening, listenForVoice, speakBinaryNative, speakVoice, stopVoiceSpeaking, isNativeAndroid, type VoiceLocale } from '../../lib/voice-chat'
 import {
   NOUR_AGE,
+  NOUR_LANGUAGE_LABEL,
   NOUR_LANGUAGE_LABELS,
   NOUR_NAME,
   NOUR_TAGLINE,
@@ -67,8 +68,8 @@ function summarizeStep(step: RunStep): PlaygroundActivity {
   }
 }
 
-function languageModeForVoice(locale: VoiceLocale): NourLanguageMode {
-  return locale === 'ar-EG' ? 'cairo-street' : 'american-egyptian'
+function languageModeForVoice(_locale: VoiceLocale): NourLanguageMode {
+  return 'dual-dialect'
 }
 
 export function PlaygroundChat() {
@@ -166,7 +167,7 @@ export function PlaygroundChat() {
       return
     }
 
-    const locale: VoiceLocale = mode === 'cairo-street' ? 'ar-EG' : 'en-US'
+    const locale: VoiceLocale = 'en-US'
     let completedSegments = 0
 
     const speakFast = async (from = 0) => {
@@ -430,7 +431,7 @@ export function PlaygroundChat() {
       const result = await listenForVoice(locale)
       if (result.cancelled || !result.text.trim()) return
       const mode = languageModeForVoice(locale)
-      setLanguageMode(mode)
+      setLanguageMode('dual-dialect')
       await send(result.text, { languageMode: mode })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Voice recognition failed')
@@ -573,7 +574,7 @@ export function PlaygroundChat() {
             <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33h0a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51h0a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82v0a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" />
           </svg>
           <span className="truncate">
-            {NOUR_LANGUAGE_LABELS[languageMode]} · {speakReplies ? 'auto-read on' : 'auto-read off'} · {playbackMode === 'fast' ? 'fast voice' : `studio · ${NOUR_TTS_VOICE}`}
+            {NOUR_LANGUAGE_LABEL} · {speakReplies ? 'auto-read on' : 'auto-read off'} · {playbackMode === 'fast' ? 'fast voice' : `studio · ${NOUR_TTS_VOICE}`}
           </span>
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
         </button>
@@ -598,8 +599,8 @@ export function PlaygroundChat() {
           <button
             type="button"
             disabled={isThinking}
-            onClick={() => { haptic('tap'); void listenAndSend(languageMode === 'cairo-street' ? 'ar-EG' : 'en-US') }}
-            aria-label={listeningLocale ? 'Stop listening' : `Microphone · ${languageMode === 'cairo-street' ? 'Egyptian Arabic' : 'English'}`}
+            onClick={() => { haptic('tap'); void listenAndSend('en-US') }}
+            aria-label={listeningLocale ? 'Stop listening' : 'Microphone · English + Egyptian'}
             className={cn(
               'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors disabled:opacity-40',
               listeningLocale
@@ -635,15 +636,7 @@ export function PlaygroundChat() {
 
         <BottomSheet open={sessionOpen} onClose={() => setSessionOpen(false)} title="Voice session">
           <div className="flex flex-col gap-4 pt-1">
-            <div>
-              <div className="mb-1.5 text-[12px] font-semibold uppercase tracking-[0.06em] text-[#c6beb5]">Language</div>
-              <SegmentedControl
-                ariaLabel="Noor language mode"
-                options={(Object.entries(NOUR_LANGUAGE_LABELS) as Array<[NourLanguageMode, string]>).map(([mode, label]) => ({ value: mode, label }))}
-                value={languageMode}
-                onChange={(mode) => { haptic('select'); stopVoice(); setLanguageMode(mode) }}
-              />
-            </div>
+            <div className="text-[13px] text-white/50">Dialect: English + Egyptian Arabic — fixed. Noor does not switch modes.</div>
             <div>
               <div className="mb-1.5 text-[12px] font-semibold uppercase tracking-[0.06em] text-[#c6beb5]">Voice engine</div>
               <SegmentedControl
