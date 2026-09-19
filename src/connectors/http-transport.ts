@@ -28,16 +28,26 @@ function toBody(body: string | Uint8Array | undefined): BodyInit | undefined {
   return new Blob([body as BlobPart])
 }
 
+function authenticatedHeaders(url: string, headers: Record<string, string> | undefined) {
+  const next = new Headers(headers)
+  if (url.startsWith('/connectors/')) {
+    const accessToken = useAuthStore.getState().apiKey?.trim()
+    if (accessToken) next.set('X-OpenVenice-Access', accessToken)
+  }
+  return next
+}
+
 async function throwHttpError(response: Response): Promise<never> {
-  const text = await response.text().catch(() => '')
-  throw new Error(`HTTP ${response.status}${text ? `: ${text}` : ''}`)
+  // Do not relay provider diagnostics or account metadata into the model/UI.
+  await response.body?.cancel().catch(() => undefined)
+  throw new Error(`Connector request failed: HTTP ${response.status}`)
 }
 
 export class FetchHttpTransport implements ConnectorHttpTransport {
   async requestJson<T>(url: string, options: HttpRequestOptions = {}): Promise<T> {
     const response = await fetch(url, {
       method: options.method || 'GET',
-      headers: options.headers,
+      headers: authenticatedHeaders(url, options.headers),
       body: toBody(options.body),
       signal: options.signal,
     })
@@ -49,7 +59,7 @@ export class FetchHttpTransport implements ConnectorHttpTransport {
   async requestBinary(url: string, options: HttpRequestOptions = {}): Promise<BinaryHttpResponse> {
     const response = await fetch(url, {
       method: options.method || 'GET',
-      headers: options.headers,
+      headers: authenticatedHeaders(url, options.headers),
       body: toBody(options.body),
       signal: options.signal,
     })
@@ -72,7 +82,7 @@ export class FetchHttpTransport implements ConnectorHttpTransport {
   async *requestSse(url: string, options: HttpRequestOptions = {}): AsyncGenerator<SseMessage, void, void> {
     const response = await fetch(url, {
       method: options.method || 'GET',
-      headers: options.headers,
+      headers: authenticatedHeaders(url, options.headers),
       body: toBody(options.body),
       signal: options.signal,
     })
@@ -106,3 +116,4 @@ export class FetchHttpTransport implements ConnectorHttpTransport {
     }
   }
 }
+import { useAuthStore } from '../stores/auth-store'

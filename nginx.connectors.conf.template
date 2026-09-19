@@ -1,11 +1,16 @@
 # BEGIN github
 location = /connectors/github/health {
+  if ($http_x_openvenice_access != "__OPENVENICE_ACCESS_TOKEN__") { return 401; }
   default_type application/json;
   return 200 '{"ok":true,"configured":true}';
   add_header Cache-Control "no-store" always;
 }
 
 location /connectors/github/ {
+  if ($http_x_openvenice_access != "__OPENVENICE_ACCESS_TOKEN__") { return 401; }
+  if ($uri !~ "^/connectors/github/(user|search/repositories|repos/[^/]+/[^/]+(|/issues(/[0-9]+)?|/pulls(/[0-9]+)?|/commits|/commits/[^/]+/check-runs))$") { return 404; }
+  limit_req zone=openvenice_api burst=10 nodelay;
+  limit_conn openvenice_conn 4;
   limit_except GET HEAD { deny all; }
   proxy_pass https://api.github.com/;
   proxy_ssl_server_name on;
@@ -24,12 +29,17 @@ location /connectors/github/ {
 
 # BEGIN graph
 location = /connectors/graph/health {
+  if ($http_x_openvenice_access != "__OPENVENICE_ACCESS_TOKEN__") { return 401; }
   default_type application/json;
   return 200 '{"ok":true,"configured":true}';
   add_header Cache-Control "no-store" always;
 }
 
 location /connectors/graph/ {
+  if ($http_x_openvenice_access != "__OPENVENICE_ACCESS_TOKEN__") { return 401; }
+  if ($uri !~ "^/connectors/graph/(me|me/messages(/[^/]+)?|me/events|me/calendarView|me/contacts|me/drive/root/children|sites)$") { return 404; }
+  limit_req zone=openvenice_api burst=10 nodelay;
+  limit_conn openvenice_conn 4;
   limit_except GET HEAD { deny all; }
   proxy_pass https://graph.microsoft.com/v1.0/;
   proxy_ssl_server_name on;
@@ -45,12 +55,17 @@ location /connectors/graph/ {
 
 # BEGIN exa
 location = /connectors/exa/health {
+  if ($http_x_openvenice_access != "__OPENVENICE_ACCESS_TOKEN__") { return 401; }
   default_type application/json;
   return 200 '{"ok":true,"configured":true}';
   add_header Cache-Control "no-store" always;
 }
 
 location /connectors/exa/ {
+  if ($http_x_openvenice_access != "__OPENVENICE_ACCESS_TOKEN__") { return 401; }
+  if ($uri !~ "^/connectors/exa/(search|contents)$") { return 404; }
+  limit_req zone=openvenice_api burst=5 nodelay;
+  limit_conn openvenice_conn 2;
   limit_except POST { deny all; }
   proxy_pass https://api.exa.ai/;
   proxy_ssl_server_name on;
@@ -67,12 +82,17 @@ location /connectors/exa/ {
 
 # BEGIN tavily
 location = /connectors/tavily/health {
+  if ($http_x_openvenice_access != "__OPENVENICE_ACCESS_TOKEN__") { return 401; }
   default_type application/json;
   return 200 '{"ok":true,"configured":true}';
   add_header Cache-Control "no-store" always;
 }
 
 location /connectors/tavily/ {
+  if ($http_x_openvenice_access != "__OPENVENICE_ACCESS_TOKEN__") { return 401; }
+  if ($uri !~ "^/connectors/tavily/(search|extract)$") { return 404; }
+  limit_req zone=openvenice_api burst=5 nodelay;
+  limit_conn openvenice_conn 2;
   limit_except POST { deny all; }
   proxy_pass https://api.tavily.com/;
   proxy_ssl_server_name on;

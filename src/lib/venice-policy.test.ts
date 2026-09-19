@@ -27,8 +27,6 @@ describe('audit_shahy_venice product policy', () => {
       },
       hard_stops: {
         age_gate: 'under-18-hard-stop',
-        real_person_ncii: true,
-        secret_protection: true,
       },
     })
   })

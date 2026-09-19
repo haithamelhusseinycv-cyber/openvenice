@@ -274,6 +274,8 @@ export async function voiceTutBlob(body: VoiceTutSpeechRequest, init: { signal?:
     speed: settings.voiceRate,
     response_format: 'wav',
   }
+  const accessToken = useAuthStore.getState().apiKey?.trim()
+  if (!accessToken) throw new VeniceAPIError('API key not set. Connect it before using VoiceTut.', 401)
 
   try {
     // The Android WebView enforces the page CSP, which blocks foreign origins.
@@ -285,6 +287,7 @@ export async function voiceTutBlob(body: VoiceTutSpeechRequest, init: { signal?:
         headers: {
           'Content-Type': 'application/json',
           ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+          'X-OpenVenice-Access': accessToken,
         },
         body: JSON.stringify(payload),
       }, controller.signal)
@@ -310,6 +313,7 @@ export async function voiceTutBlob(body: VoiceTutSpeechRequest, init: { signal?:
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'X-OpenVenice-Access': accessToken,
       },
       body: JSON.stringify(payload),
       signal: controller.signal,
@@ -395,6 +399,8 @@ async function nativeVoiceFetch(
 export async function checkVoiceTutHealth(init: { signal?: AbortSignal } = {}): Promise<VoiceTutHealth> {
   const baseUrl = useVoiceStore.getState().voiceTutBaseUrl.trim().replace(/\/$/, '')
   if (!baseUrl) throw new Error('VoiceTut service URL is not configured')
+  const accessToken = useAuthStore.getState().apiKey?.trim()
+  if (!accessToken) throw new VeniceAPIError('API key not set. Connect it before checking VoiceTut.', 401)
   if (init.signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError')
 
   const controller = new AbortController()
@@ -403,7 +409,7 @@ export async function checkVoiceTutHealth(init: { signal?: AbortSignal } = {}): 
   init.signal?.addEventListener('abort', abortFromCaller, { once: true })
   try {
     if (isNativeOpenVeniceAndroid()) {
-      const nativeResponse = await nativeVoiceFetch(`${baseUrl}/health`, { method: 'GET', headers: { Accept: 'application/json' } }, controller.signal)
+      const nativeResponse = await nativeVoiceFetch(`${baseUrl}/health`, { method: 'GET', headers: { Accept: 'application/json', 'X-OpenVenice-Access': accessToken } }, controller.signal)
       if (nativeResponse.status < 200 || nativeResponse.status >= 300) {
         throw new Error(`VoiceTut health check failed: HTTP ${nativeResponse.status}`)
       }
@@ -414,7 +420,7 @@ export async function checkVoiceTutHealth(init: { signal?: AbortSignal } = {}): 
 
     const response = await fetch(`${baseUrl}/health`, {
       method: 'GET',
-      headers: { Accept: 'application/json' },
+      headers: { Accept: 'application/json', 'X-OpenVenice-Access': accessToken },
       signal: controller.signal,
       cache: 'no-store',
     })

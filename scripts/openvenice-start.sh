@@ -32,6 +32,13 @@ escape_for_nginx_and_sed() {
 
 RAW_VOICE_KEY=${VOICETUT_API_KEY:-}
 UPSTREAM_VALUE=${VOICETUT_UPSTREAM:-}
+RAW_ACCESS_TOKEN=${OPENVENICE_ACCESS_TOKEN:-}
+ACCESS_TOKEN=$(normalize_credential "$RAW_ACCESS_TOKEN")
+if [ ${#ACCESS_TOKEN} -lt 24 ] || printf '%s' "$ACCESS_TOKEN" | LC_ALL=C grep -q '[^A-Za-z0-9._~-]'; then
+  echo 'OPENVENICE_ACCESS_TOKEN must be at least 24 URL-safe characters' >&2
+  exit 1
+fi
+SED_ACCESS_TOKEN=$(escape_for_nginx_and_sed "$ACCESS_TOKEN")
 
 if [ -z "$RAW_VOICE_KEY" ] && [ -z "$UPSTREAM_VALUE" ]; then
   printf '%s\n' \
@@ -85,6 +92,7 @@ else
   sed -e "s|__VOICETUT_UPSTREAM__|$UPSTREAM_VALUE|g" \
       -e "s|__VOICETUT_API_KEY__|$SED_VOICE_KEY|g" \
       -e "s|__RUNPOD_API_KEY__|$SED_RUNPOD_KEY|g" \
+      -e "s|__OPENVENICE_ACCESS_TOKEN__|$SED_ACCESS_TOKEN|g" \
     /etc/nginx/nginx.voicetut.conf.template > /tmp/openvenice-voicetut.conf
 fi
 
@@ -127,7 +135,7 @@ emit_connector() {
   fi
   escaped=$(escape_for_nginx_and_sed "$token")
   awk "/# BEGIN ${section}/,/# END ${section}/" "$CONNECTOR_TEMPLATE" \
-    | sed -e "s|${placeholder}|${escaped}|g" \
+    | sed -e "s|${placeholder}|${escaped}|g" -e "s|__OPENVENICE_ACCESS_TOKEN__|$SED_ACCESS_TOKEN|g" \
     >> "$CONNECTOR_CONF"
   printf 'true'
 }
@@ -140,6 +148,7 @@ TAVILY_JSON=$(emit_connector tavily /connectors/tavily Tavily "${TAVILY_API_KEY:
 
 printf '%s\n' \
   'location = /connectors/status {' \
+  "  if (\$http_x_openvenice_access != \"${ACCESS_TOKEN}\") { return 401; }" \
   '  default_type application/json;' \
   "  return 200 '{\"github\":${GITHUB_JSON},\"graph\":${GRAPH_JSON},\"exa\":${EXA_JSON},\"tavily\":${TAVILY_JSON}}';" \
   '  add_header Cache-Control "no-store" always;' \
@@ -150,4 +159,3 @@ chmod 600 "$CONNECTOR_CONF"
 echo "Shahy connectors: github=${GITHUB_JSON} graph=${GRAPH_JSON} exa=${EXA_JSON} tavily=${TAVILY_JSON}" >&2
 
 exec nginx -c /tmp/openvenice-nginx.conf -g 'daemon off;'
-
