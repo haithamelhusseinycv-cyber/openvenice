@@ -219,18 +219,18 @@ export type SpeakPayload = { display: string; speakText: string; speakLocale: Vo
 /** English on screen; optional [[speak-ar]] / [[speak-en]] trailer for TTS. */
 export function splitSpeakPayload(raw: string, fallbackLocale: VoiceLocale = 'ar-EG'): SpeakPayload {
   const text = String(raw || '')
-  const mAr = text.match(/[[speak-ar]]s*([sS]*)$/i)
-  const mEn = text.match(/[[speak-en]]s*([sS]*)$/i)
+  const mAr = text.match(/\[\[speak-ar\]\]\s*([\s\S]*)$/i)
+  const mEn = text.match(/\[\[speak-en\]\]\s*([\s\S]*)$/i)
   if (mAr) {
     return {
-      display: text.replace(/s*[[speak-ar]][sS]*$/i, '').trim(),
+      display: text.replace(/\s*\[\[speak-ar\]\][\s\S]*$/i, '').trim(),
       speakText: mAr[1].trim(),
       speakLocale: 'ar-EG',
     }
   }
   if (mEn) {
     return {
-      display: text.replace(/s*[[speak-en]][sS]*$/i, '').trim(),
+      display: text.replace(/\s*\[\[speak-en\]\][\s\S]*$/i, '').trim(),
       speakText: mEn[1].trim(),
       speakLocale: 'en-US',
     }
