@@ -8,7 +8,7 @@ import { useAgentModels } from '../../hooks/use-agent-models'
 import { callAgent, DEFAULT_AGENT_MODEL, FALLBACK_AGENT_MODEL } from '../../lib/playground-agent'
 import { runAgentTools, type RunStep } from '../../lib/playground-agent-tools'
 import { shouldUseModelFallback } from '../../lib/model-routing'
-import { cancelVoiceListening, listenForVoice, speakBinaryNative, speakVoice, stopVoiceSpeaking, isNativeAndroid, type VoiceLocale } from '../../lib/voice-chat'
+import { cancelVoiceListening, listenForVoice, speakBinaryNative, speakVoice, stopVoiceSpeaking, isNativeAndroid, splitSpeakPayload, type VoiceLocale } from '../../lib/voice-chat'
 import {
   NOUR_AGE,
   NOUR_LANGUAGE_LABEL,
@@ -159,22 +159,23 @@ export function PlaygroundChat() {
     setSpeakingId(id)
     // Mobile browser speech engines are more reliable with short utterances;
     // studio TTS can use larger chunks because each one is a complete file.
+    const locale = (useVoiceStore.getState().locale || 'ar-EG') as VoiceLocale
+    const payload = splitSpeakPayload(transcript, locale)
+    const speakLocale = payload.speakLocale
     const segments = playbackMode === 'fast'
-      ? splitNourSpeechText(transcript, 180, 280)
-      : splitNourSpeechText(transcript)
+      ? splitNourSpeechText(payload.speakText, 180, 280)
+      : splitNourSpeechText(payload.speakText)
     if (segments.length === 0) {
       stopVoice()
       return
     }
-
-    const locale: VoiceLocale = 'en-US'
     let completedSegments = 0
 
     const speakFast = async (from = 0) => {
       for (let index = from; index < segments.length; index += 1) {
         if (controller.signal.aborted || speechSessionRef.current !== session) return
         setVoiceStatus(`Speaking ${index + 1} of ${segments.length}`)
-        await speakVoice(segments[index], locale, {
+        await speakVoice(segments[index], speakLocale, {
           // voice-store already clamps voiceRate to 0.5..2; honour slower rates
           // instead of forcing fast mode to >= 1.0.
           rate: voiceRate,

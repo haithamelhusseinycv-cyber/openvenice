@@ -76,7 +76,7 @@ public final class VoiceChatPlugin extends Plugin {
                     }
                 });
             }
-        });
+        }, GOOGLE_TTS);
     }
 
     @PluginMethod
