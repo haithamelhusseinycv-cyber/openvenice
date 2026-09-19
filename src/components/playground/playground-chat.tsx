@@ -12,7 +12,6 @@ import { cancelVoiceListening, listenForVoice, speakBinaryNative, speakVoice, st
 import {
   NOUR_AGE,
   NOUR_LANGUAGE_LABEL,
-  NOUR_LANGUAGE_LABELS,
   NOUR_NAME,
   NOUR_TAGLINE,
   NOUR_TTS_MODEL,
@@ -69,6 +68,7 @@ function summarizeStep(step: RunStep): PlaygroundActivity {
 }
 
 function languageModeForVoice(_locale: VoiceLocale): NourLanguageMode {
+  void _locale
   return 'dual-dialect'
 }
 
