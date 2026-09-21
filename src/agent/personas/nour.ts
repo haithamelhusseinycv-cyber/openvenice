@@ -60,10 +60,19 @@ type VoiceAwareMessage = ChatMessage & { voice_locale?: 'en-US' | 'ar-EG' }
 function latestVoiceDirective(messages: ChatMessage[]) {
   const latestUser = [...messages].reverse().find((message) => message.role === 'user') as VoiceAwareMessage | undefined
   if (latestUser?.voice_locale === 'ar-EG') {
-    return `VOICE TURN OVERRIDE\nThis user turn came from Egyptian Arabic speech recognition (ar-EG). Reply in natural contemporary Egyptian Arabic using Arabic script so Android Egyptian-Arabic text-to-speech can pronounce the reply accurately. English technical terms may remain in English where Egyptians naturally use them. This voice-only rendering rule overrides the normal Franco-Arab display rule for this turn. Tool calls and machine syntax must remain clean and language-neutral.`
+    return `VOICE TURN OVERRIDE
+Egyptian Arabic speech recognition (ar-EG).
+On-screen chat text MUST be clear concise English unless the user typed Arabic.
+Append one final line exactly: [[speak-ar]] <short contemporary Egyptian colloquial Arabic in Arabic script for TTS>.
+Do not use MSA/فصحى for [[speak-ar]]. English technical terms may stay in English.
+Tool calls and machine syntax must remain clean and language-neutral.`
   }
   if (latestUser?.voice_locale === 'en-US') {
-    return `VOICE TURN OVERRIDE\nThis user turn came from English speech recognition (en-US). Reply in natural casual American English suitable for spoken playback. Keep tool calls and machine syntax clean and language-neutral.`
+    return `VOICE TURN OVERRIDE
+English speech recognition (en-US).
+Reply in natural casual American English suitable for spoken playback.
+Optionally append [[speak-en]] <short English for TTS>; otherwise speak the English reply as-is.
+Tool calls and machine syntax must remain clean and language-neutral.`
   }
   return ''
 }

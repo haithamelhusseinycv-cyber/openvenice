@@ -40,6 +40,7 @@ import java.util.UUID;
     }
 )
 public final class VoiceChatPlugin extends Plugin {
+    private static final String GOOGLE_TTS = "com.google.android.tts";
     private SpeechRecognizer speechRecognizer;
     private PluginCall activeListenCall;
     private TextToSpeech textToSpeech;
@@ -76,7 +77,7 @@ public final class VoiceChatPlugin extends Plugin {
                     }
                 });
             }
-        });
+        }, GOOGLE_TTS);
     }
 
     @PluginMethod

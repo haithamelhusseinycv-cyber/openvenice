@@ -7,11 +7,11 @@ function voiceMessage(content: string, locale: 'en-US' | 'ar-EG') {
 }
 
 describe('Nour voice turn rendering', () => {
-  it('uses Egyptian Arabic script rendering for ar-EG speech turns', () => {
+  it('uses English on-screen + [[speak-ar]] Egyptian TTS for ar-EG speech turns', () => {
     const prompt = buildNourSystemPrompt('base', [voiceMessage('عامل ايه', 'ar-EG')])
     expect(prompt).toContain('Egyptian Arabic speech recognition (ar-EG)')
-    expect(prompt).toContain('using Arabic script')
-    expect(prompt).toContain('overrides the normal Franco-Arab display rule')
+    expect(prompt).toContain('[[speak-ar]]')
+    expect(prompt).toContain('On-screen chat text MUST be clear concise English')
   })
 
   it('uses natural American English rendering for en-US speech turns', () => {
