@@ -279,6 +279,20 @@ describe('validateVeniceApiKey', () => {
     })
   })
 
+  it('routes a relative VoiceTut URL to Railway from the Android app', async () => {
+    const nativePromise = vi.fn().mockResolvedValue({
+      status: 200,
+      contentType: 'audio/wav',
+      bodyBase64: btoa('RIFF'),
+    })
+    vi.stubGlobal('window', { Capacitor: { isNativePlatform: () => true, nativePromise }, dispatchEvent: vi.fn() })
+    await voiceTutBlob({ input: 'Hello from Noor' })
+    expect(nativePromise).toHaveBeenCalledWith('VoiceChat', 'fetchBinary', expect.objectContaining({
+      url: 'https://openvenice-production.up.railway.app/voicetut/v1/audio/speech',
+      headers: expect.objectContaining({ 'X-OpenVenice-Access': 'host-token-at-least-24-characters' }),
+    }))
+  })
+
   it('rejects a successful non-audio VoiceTut response', async () => {
     fetchMock.mockResolvedValueOnce(new Response('<!doctype html>', {
       status: 200,
