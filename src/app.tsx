@@ -15,6 +15,7 @@ import { haptic } from './lib/haptics'
 import { checkVoiceTutHealth } from './lib/venice-client'
 import { readLastCrashReport, clearLastCrashReport, copyCrashReport } from './lib/crash-report'
 import { toast } from './stores/toast-store'
+import { hydrateProxyAccessTokenFromDevice } from './lib/proxy-access'
 
 const ImagePage = lazy(() => import('./components/image/image-page').then((module) => ({ default: module.ImagePage })))
 const PlaygroundView = lazy(() => import('./components/playground/playground-view').then((module) => ({ default: module.PlaygroundView })))
@@ -102,7 +103,9 @@ export function App() {
   }, [hydrateFromDevice])
 
   useEffect(() => {
-    void checkVoiceTutHealth().catch(() => undefined)
+    void hydrateProxyAccessTokenFromDevice()
+      .then(() => checkVoiceTutHealth())
+      .catch(() => undefined)
   }, [])
 
   useEffect(() => {

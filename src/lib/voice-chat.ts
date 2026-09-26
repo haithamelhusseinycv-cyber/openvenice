@@ -1,3 +1,5 @@
+import { splitNourSpeechText } from './nour-character'
+
 export type VoiceLocale = 'en-US' | 'ar-EG'
 
 export interface VoiceRecognitionResult {
@@ -310,7 +312,6 @@ export async function speakVoiceQueued(
   locale: VoiceLocale,
   options: { rate?: number; pitch?: number; signal?: AbortSignal } = {},
 ) {
-  const { splitNourSpeechText } = await import('./nour-character')
   const payload = splitSpeakPayload(text, locale)
   const speakLocale = payload.speakLocale
   const chunks = splitNourSpeechText(payload.speakText, 140, 220)

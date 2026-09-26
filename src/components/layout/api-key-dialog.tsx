@@ -3,7 +3,7 @@ import { useAuthStore } from '../../stores/auth-store'
 import { VeniceLogo } from '../ui/logo'
 import { toast } from '../../stores/toast-store'
 import { formatVeniceError, validateVeniceApiKey } from '../../lib/venice-client'
-import { getProxyAccessToken, setProxyAccessToken } from '../../lib/proxy-access'
+import { getProxyAccessToken, saveProxyAccessToken } from '../../lib/proxy-access'
 
 const MIN_PASSPHRASE = 8
 
@@ -36,6 +36,7 @@ export function ApiKeyDialog({ open, onClose }: { open: boolean; onClose: () => 
   const [value, setValue] = useState('')
   const [proxyToken, setProxyToken] = useState(() => getProxyAccessToken())
   const [proxyStatus, setProxyStatus] = useState('')
+  const [rememberProxyToken, setRememberProxyToken] = useState(true)
   const [passphrase, setPassphrase] = useState('')
   const [remember, setRemember] = useState(false)
   const [keepSignedIn, setKeepSignedIn] = useState(deviceRemembered)
@@ -302,7 +303,7 @@ export function ApiKeyDialog({ open, onClose }: { open: boolean; onClose: () => 
 
         <div className="mt-5 border-t border-white/[0.1] pt-4">
           <label htmlFor="proxy-access-token" className="block text-[13px] text-white/75">OpenVenice host access token</label>
-          <p className="mt-1 text-[12px] text-white/45">For protected tools and VoiceTut. Get OPENVENICE_ACCESS_TOKEN from your Railway service. This is separate from your Venice API key and is held for this session only.</p>
+          <p className="mt-1 text-[12px] text-white/45">For protected tools and VoiceTut. Get OPENVENICE_ACCESS_TOKEN from your Railway service. This is separate from your Venice API key. Browser sessions do not persist it; Android can keep it in secure device storage.</p>
           <input
             id="proxy-access-token"
             type="password"
@@ -312,13 +313,19 @@ export function ApiKeyDialog({ open, onClose }: { open: boolean; onClose: () => 
             autoComplete="off"
             className="mt-2 w-full rounded-lg border border-white/[0.1] bg-[#0a0a0a] px-3.5 py-2.5 text-[16px] text-white outline-none focus:border-white/[0.25]"
           />
+          {android && (
+            <label className="mt-2 flex items-center gap-2 text-[12px] text-white/55">
+              <input type="checkbox" checked={rememberProxyToken} onChange={(event) => setRememberProxyToken(event.target.checked)} className="accent-white" />
+              Keep host access securely on this device
+            </label>
+          )}
           <button type="button" onClick={() => {
-            try {
-              setProxyAccessToken(proxyToken)
-              setProxyStatus(proxyToken.trim() ? 'Host token saved for this session.' : 'Host token cleared.')
-            } catch (cause) {
-              setProxyStatus(cause instanceof Error ? cause.message : 'Invalid host token')
-            }
+            setProxyStatus('Saving…')
+            void saveProxyAccessToken(proxyToken, android && rememberProxyToken).then(() => {
+              setProxyStatus(proxyToken.trim() ? (android && rememberProxyToken ? 'Host token saved securely on this device.' : 'Host token saved for this session.') : 'Host token cleared.')
+            }).catch((cause) => {
+              setProxyStatus(cause instanceof Error ? cause.message : 'Could not save host token')
+            })
           }} className="mt-2 rounded-md border border-white/[0.2] px-3 py-1.5 text-[13px] text-white/80">Save host token</button>
           {proxyStatus && <p role="status" className="mt-2 text-[12px] text-white/65">{proxyStatus}</p>}
         </div>

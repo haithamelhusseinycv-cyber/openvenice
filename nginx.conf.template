@@ -46,6 +46,13 @@ http {
     include /tmp/openvenice-voicetut.conf;
     include /tmp/openvenice-connectors.conf;
 
+    # Never return the SPA shell for mistyped or unsupported API routes.
+    location /api/ {
+      default_type application/json;
+      return 404 '{"error":"Unknown API route"}';
+      add_header Cache-Control "no-store" always;
+    }
+
     location = / { try_files /index.html =404; }
     location / { try_files $uri $uri/ /index.html; }
   }

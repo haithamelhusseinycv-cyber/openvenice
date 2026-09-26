@@ -113,6 +113,9 @@ jobs:
           grep -q 'registerPlugin(MediaActionsPlugin.class)' android/app/src/main/java/ai/openvenice/app/MainActivity.java
           grep -q 'registerPlugin(VoiceChatPlugin.class)' android/app/src/main/java/ai/openvenice/app/MainActivity.java
           grep -q 'registerPlugin(AuthVaultPlugin.class)' android/app/src/main/java/ai/openvenice/app/MainActivity.java
+          grep -q 'void saveNamed' android/app/src/main/java/ai/openvenice/app/AuthVaultPlugin.java
+          grep -q 'void loadNamed' android/app/src/main/java/ai/openvenice/app/AuthVaultPlugin.java
+          grep -q 'void clearNamed' android/app/src/main/java/ai/openvenice/app/AuthVaultPlugin.java
 
       - name: Build debug APK
         working-directory: android

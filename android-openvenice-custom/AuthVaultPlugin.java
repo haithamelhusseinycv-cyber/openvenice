@@ -41,6 +41,73 @@ public class AuthVaultPlugin extends Plugin {
     private static final String PREF_CT = "ciphertext";
     private static final String PREF_IV = "iv";
 
+    private String namedKey(String prefix, String name) {
+        return prefix + "." + name;
+    }
+
+    private String validatedName(PluginCall call) {
+        String name = call.getString("name");
+        return name != null && name.matches("[A-Za-z0-9_-]{1,40}") ? name : null;
+    }
+
+    @PluginMethod
+    public void saveNamed(PluginCall call) {
+        String name = validatedName(call);
+        String value = call.getString("value");
+        if (name == null || value == null || value.trim().isEmpty()) {
+            call.reject("Missing or invalid credential name/value");
+            return;
+        }
+        try {
+            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+            cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey());
+            byte[] encrypted = cipher.doFinal(value.getBytes(StandardCharsets.UTF_8));
+            prefs().edit()
+                .putString(namedKey(PREF_CT, name), Base64.encodeToString(encrypted, Base64.NO_WRAP))
+                .putString(namedKey(PREF_IV, name), Base64.encodeToString(cipher.getIV(), Base64.NO_WRAP))
+                .apply();
+            JSObject result = new JSObject();
+            result.put("saved", true);
+            call.resolve(result);
+        } catch (Exception error) {
+            call.reject("Could not save named credential securely", error);
+        }
+    }
+
+    @PluginMethod
+    public void loadNamed(PluginCall call) {
+        String name = validatedName(call);
+        if (name == null) { call.reject("Invalid credential name"); return; }
+        String ct = prefs().getString(namedKey(PREF_CT, name), null);
+        String iv = prefs().getString(namedKey(PREF_IV, name), null);
+        JSObject result = new JSObject();
+        if (ct == null || iv == null) { result.put("found", false); call.resolve(result); return; }
+        try {
+            KeyStore keyStore = KeyStore.getInstance(KEYSTORE);
+            keyStore.load(null);
+            if (!keyStore.containsAlias(KEY_ALIAS)) { result.put("found", false); call.resolve(result); return; }
+            SecretKey key = ((KeyStore.SecretKeyEntry) keyStore.getEntry(KEY_ALIAS, null)).getSecretKey();
+            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+            cipher.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(128, Base64.decode(iv, Base64.NO_WRAP)));
+            byte[] plaintext = cipher.doFinal(Base64.decode(ct, Base64.NO_WRAP));
+            result.put("found", true);
+            result.put("value", new String(plaintext, StandardCharsets.UTF_8));
+            call.resolve(result);
+        } catch (Exception error) {
+            call.reject("Could not unlock named credential", error);
+        }
+    }
+
+    @PluginMethod
+    public void clearNamed(PluginCall call) {
+        String name = validatedName(call);
+        if (name == null) { call.reject("Invalid credential name"); return; }
+        prefs().edit().remove(namedKey(PREF_CT, name)).remove(namedKey(PREF_IV, name)).apply();
+        JSObject result = new JSObject();
+        result.put("cleared", true);
+        call.resolve(result);
+    }
+
     private SharedPreferences prefs() {
         return getContext().getSharedPreferences(PREFS, 0);
     }
@@ -129,10 +196,7 @@ public class AuthVaultPlugin extends Plugin {
     @PluginMethod
     public void clear(PluginCall call) {
         try {
-            prefs().edit().clear().apply();
-            KeyStore keyStore = KeyStore.getInstance(KEYSTORE);
-            keyStore.load(null);
-            if (keyStore.containsAlias(KEY_ALIAS)) keyStore.deleteEntry(KEY_ALIAS);
+            prefs().edit().remove(PREF_CT).remove(PREF_IV).apply();
             JSObject result = new JSObject();
             result.put("cleared", true);
             call.resolve(result);
