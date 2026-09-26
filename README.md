@@ -12,7 +12,7 @@ https://github.com/user-attachments/assets/1056682b-80c2-45da-9b57-6572840e8db4
 
 - **Customize everything** — add tools, change layouts, tweak parameters, build features that matter to you. The codebase is intentionally simple and hackable.
 - **Share your API key with family** — host OpenVenice on your own server, enter your key once, and give your family a clean AI interface without them needing their own accounts.
-- **No server, no backend** — it's a static site. Your API key stays in your browser and goes directly to Venice's API. Nothing passes through a middleman.
+- **Direct Venice API calls** — chat and image requests use your Venice API key in the browser. Optional hosted connector and VoiceTut proxies require a separate OpenVenice host access token.
 - **Transparent** — every API call is visible in the source. No telemetry, no analytics, no tracking.
 - **Barebones on purpose** — ships with useful features like visual workflows, but keeps things minimal so you can build on top without fighting existing complexity.
 
@@ -55,7 +55,9 @@ Open `http://localhost:5173`, click **API Key** in the header, paste your [Venic
 
 By default, your key is held in **`sessionStorage`** — meaning it's gone when you close the tab. If you check **Remember across sessions**, the key is encrypted with a passphrase you choose (AES-GCM via PBKDF2, 250k iterations, all in-browser) and stored in `localStorage`. Your passphrase is never persisted; you re-enter it on each new session.
 
-You can disconnect at any time from the API key dialog.
+You can disconnect at any time from the API key dialog. To use hosted GitHub, Microsoft Graph, research, or VoiceTut routes, set `OPENVENICE_ACCESS_TOKEN` on the host and enter **that same token** under **OpenVenice host access token** in the API Key dialog. The host token is kept in browser session storage and is never sent to Venice. Keep the Venice API key and host token distinct; they serve different providers.
+
+The Android app uses its native network bridge for host connectors. It targets `https://openvenice-production.up.railway.app` by default; set `VITE_OPENVENICE_HOST` when building an APK against another deployment. Install the current APK to receive this fix; a Railway web deploy does not update APKs already installed on phones.
 
 ## Self-hosting
 
@@ -84,7 +86,7 @@ docker build -t openvenice .
 docker run -p 8080:8080 openvenice
 ```
 
-VoiceTut is optional. Without runtime configuration, Noor falls back to Venice TTS. To enable the credential-isolating VoiceTut proxy, set both `VOICETUT_UPSTREAM` and `VOICETUT_API_KEY`; see `.env.example`.
+VoiceTut is optional. Without runtime configuration, Noor falls back to Venice TTS. To enable the credential-isolating VoiceTut proxy, set `VOICETUT_UPSTREAM`, `VOICETUT_API_KEY`, and `RUNPOD_API_KEY` for RunPod's gateway; see `.env.example`. Verify speech with an authenticated request; `/healthz` checks only the web server.
 
 Shahy’s GitHub, Microsoft Graph, and research tools are also optional host-side proxies (`/connectors/*`). Set `GITHUB_CONNECTOR_TOKEN`, `MICROSOFT_GRAPH_TOKEN`, `EXA_API_KEY`, and/or `TAVILY_API_KEY` on the host. Tokens are never placed in `VITE_*` variables. See `docs/AGENT_CONNECTORS.md`.
 
