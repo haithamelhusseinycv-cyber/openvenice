@@ -56,3 +56,6 @@ jobs:
           grep -q 'return 401' nginx.voicetut.conf.template
           grep -q 'limit_req zone=openvenice_api' nginx.connectors.conf.template
           grep -q 'limit_req zone=openvenice_api' nginx.voicetut.conf.template
+          grep -q 'location /api/' nginx.conf.template
+          grep -q 'Unknown API route' nginx.conf.template
+          grep -q 'noindex, nofollow, noarchive' index.html
