@@ -26,7 +26,7 @@ describe('validateVeniceApiKey', () => {
 
   beforeEach(() => {
     vi.stubGlobal('fetch', fetchMock)
-    vi.stubGlobal('sessionStorage', { getItem: vi.fn(), setItem: vi.fn(), removeItem: vi.fn() })
+    vi.stubGlobal('sessionStorage', { getItem: vi.fn((key: string) => key === 'openvenice-proxy-access' ? 'host-token-at-least-24-characters' : null), setItem: vi.fn(), removeItem: vi.fn() })
     vi.stubGlobal('localStorage', { getItem: vi.fn(), setItem: vi.fn(), removeItem: vi.fn() })
     useAuthStore.setState({ apiKey: 'sk-test' })
   })
@@ -269,7 +269,7 @@ describe('validateVeniceApiKey', () => {
     expect(url).toBe('/voicetut/v1/audio/speech')
     expect(init.headers).toEqual({
       'Content-Type': 'application/json',
-      'X-OpenVenice-Access': 'sk-test',
+      'X-OpenVenice-Access': 'host-token-at-least-24-characters',
     })
     expect(JSON.parse(String(init.body))).toMatchObject({
       voice: 'Omnia',
