@@ -4,6 +4,7 @@ import { useVoiceStore } from '../stores/voice-store'
 import { isNativeOpenVeniceAndroid } from '../connectors/facefusion/capacitor-facefusion-bridge'
 import { NOUR_TTS_FALLBACK_MODEL, NOUR_TTS_FALLBACK_VOICE } from './nour-character'
 import { applyVeniceRequestPolicy } from './venice-policy'
+import { getProxyAccessToken, HOST_ORIGIN } from './proxy-access'
 
 const ENV_BASE = (import.meta.env.VITE_VENICE_BASE_URL as string | undefined)?.replace(/\/$/, '')
 const BASE_URL = ENV_BASE || (import.meta.env.DEV ? '/venice/api/v1' : 'https://api.venice.ai/api/v1')
@@ -274,19 +275,18 @@ export async function voiceTutBlob(body: VoiceTutSpeechRequest, init: { signal?:
     speed: settings.voiceRate,
     response_format: 'wav',
   }
-  const accessToken = useAuthStore.getState().apiKey?.trim()
-  if (!accessToken) throw new VeniceAPIError('API key not set. Connect it before using VoiceTut.', 401)
+  const accessToken = getProxyAccessToken()
+  if (!accessToken) throw new VeniceAPIError('OpenVenice access token not set. Add it in the API Key dialog before using VoiceTut.', 401)
 
   try {
     // The Android WebView enforces the page CSP, which blocks foreign origins.
     // Route through the native bridge there; keep plain fetch for browsers.
     if (isNativeOpenVeniceAndroid()) {
-      const apiKey = useAuthStore.getState().apiKey
-      const response = await nativeVoiceFetch(`${baseUrl}/v1/audio/speech`, {
+      const nativeBase = baseUrl.startsWith('/') ? `${HOST_ORIGIN}${baseUrl}` : baseUrl
+      const response = await nativeVoiceFetch(`${nativeBase}/v1/audio/speech`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
           'X-OpenVenice-Access': accessToken,
         },
         body: JSON.stringify(payload),
@@ -399,8 +399,8 @@ async function nativeVoiceFetch(
 export async function checkVoiceTutHealth(init: { signal?: AbortSignal } = {}): Promise<VoiceTutHealth> {
   const baseUrl = useVoiceStore.getState().voiceTutBaseUrl.trim().replace(/\/$/, '')
   if (!baseUrl) throw new Error('VoiceTut service URL is not configured')
-  const accessToken = useAuthStore.getState().apiKey?.trim()
-  if (!accessToken) throw new VeniceAPIError('API key not set. Connect it before checking VoiceTut.', 401)
+  const accessToken = getProxyAccessToken()
+  if (!accessToken) throw new VeniceAPIError('OpenVenice access token not set. Add it in the API Key dialog before checking VoiceTut.', 401)
   if (init.signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError')
 
   const controller = new AbortController()
@@ -409,7 +409,8 @@ export async function checkVoiceTutHealth(init: { signal?: AbortSignal } = {}): 
   init.signal?.addEventListener('abort', abortFromCaller, { once: true })
   try {
     if (isNativeOpenVeniceAndroid()) {
-      const nativeResponse = await nativeVoiceFetch(`${baseUrl}/health`, { method: 'GET', headers: { Accept: 'application/json', 'X-OpenVenice-Access': accessToken } }, controller.signal)
+      const nativeBase = baseUrl.startsWith('/') ? `${HOST_ORIGIN}${baseUrl}` : baseUrl
+      const nativeResponse = await nativeVoiceFetch(`${nativeBase}/health`, { method: 'GET', headers: { Accept: 'application/json', 'X-OpenVenice-Access': accessToken } }, controller.signal)
       if (nativeResponse.status < 200 || nativeResponse.status >= 300) {
         throw new Error(`VoiceTut health check failed: HTTP ${nativeResponse.status}`)
       }
