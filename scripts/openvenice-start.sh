@@ -45,7 +45,7 @@ if [ -z "$RAW_VOICE_KEY" ] && [ -z "$UPSTREAM_VALUE" ]; then
     'location = /voicetut/health { default_type application/json; return 503 '\''{"ok":false,"loaded":false,"disabled":true}'\''; add_header Cache-Control "no-store" always; }' \
     'location /voicetut/ { default_type application/json; return 503 '\''{"error":"VoiceTut proxy is disabled"}'\''; add_header Cache-Control "no-store" always; }' \
     > /tmp/openvenice-voicetut.conf
-  echo 'VoiceTut proxy disabled; Noor will use the Venice TTS fallback' >&2
+  echo 'VoiceTut proxy disabled; Noor will use the Venice TTS fallback'
 else
   if [ -z "$RAW_VOICE_KEY" ] || [ -z "$UPSTREAM_VALUE" ]; then
     echo 'VOICETUT_API_KEY and VOICETUT_UPSTREAM must both be set to enable VoiceTut' >&2
@@ -156,6 +156,6 @@ printf '%s\n' \
   >> "$CONNECTOR_CONF"
 
 chmod 600 "$CONNECTOR_CONF"
-echo "Shahy connectors: github=${GITHUB_JSON} graph=${GRAPH_JSON} exa=${EXA_JSON} tavily=${TAVILY_JSON}" >&2
+echo "Shahy connectors: github=${GITHUB_JSON} graph=${GRAPH_JSON} exa=${EXA_JSON} tavily=${TAVILY_JSON}"
 
 exec nginx -c /tmp/openvenice-nginx.conf -g 'daemon off;'
