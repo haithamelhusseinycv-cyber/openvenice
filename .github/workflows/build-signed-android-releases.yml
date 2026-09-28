@@ -68,6 +68,21 @@ jobs:
           chmod +x ./gradlew
           ./gradlew assembleRelease --no-daemon --stacktrace
 
+      - name: Verify and upload OpenVenice release
+        shell: bash
+        run: |
+          apk='android/app/build/outputs/apk/release/app-release.apk'
+          apksigner="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner"
+          "$apksigner" verify --verbose --print-certs "$apk"
+
+      - name: Publish installable OpenVenice APK
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: openvenice-signed-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Clone pinned FaceFusion source
         shell: bash
         run: |
