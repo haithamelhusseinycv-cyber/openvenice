@@ -2,6 +2,16 @@ name: Build signed Android release APKs
 
 on:
   workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/build-signed-android-releases.yml'
+      - 'src/**'
+      - 'android-openvenice-custom/**'
+      - 'android-face-fusion-custom/**'
+      - 'capacitor.config.json'
+      - 'package.json'
+      - 'package-lock.json'
 
 permissions:
   contents: read
