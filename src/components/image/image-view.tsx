@@ -417,13 +417,13 @@ export function ImageView() {
           onClick={() => setSelectedIndex(null)}
         >
           <div className="flex-1 min-h-0 flex items-center justify-center p-3" onClick={(e) => e.stopPropagation()}>
-            <img src={toImageSrc(images[selectedIndex])} alt={`Generated ${selectedIndex + 1}`} className="max-w-full max-h-full object-contain rounded-xl" />
+            <img src={toImageSrc(images[selectedIndex])} alt={`Generated ${selectedIndex + 1}`} className="w-full h-full min-h-0 object-contain rounded-xl" />
           </div>
           <div className="shrink-0 grid grid-cols-3 sm:grid-cols-5 gap-2 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-black/80" onClick={(e) => e.stopPropagation()}>
             <button type="button" onClick={() => sendGenerated('edit', images[selectedIndex], selectedIndex)} className="min-h-12 rounded-lg bg-white text-black text-[15px] font-medium">Edit</button>
             <button type="button" onClick={() => sendGenerated('swap', images[selectedIndex], selectedIndex)} className="min-h-12 rounded-lg bg-white/15 text-white text-[15px] font-medium">Swap</button>
             <button type="button" onClick={() => setUndressTarget({ src: toImageSrc(images[selectedIndex]), name: fileName(selectedIndex ?? undefined) })} className="min-h-12 rounded-lg bg-white/15 text-white text-[15px] font-medium">Undress</button>
-            <button type="button" disabled={mediaBusy === 'save'} onClick={() => { void saveGenerated(images[selectedIndex], selectedIndex) }} className="min-h-12 rounded-lg bg-white/15 text-white text-[15px] font-medium disabled:opacity-50">{mediaBusy === 'save' ? 'Saving…' : 'Save'}</button>
+            <button type="button" disabled={mediaBusy === 'save'} onClick={() => { void saveGenerated(images[selectedIndex], selectedIndex) }} className="min-h-12 rounded-lg bg-white/15 text-white text-[15px] font-medium disabled:opacity-50">{mediaBusy === 'save' ? 'Downloading…' : 'Download'}</button>
             <button type="button" disabled={mediaBusy === 'share'} onClick={() => { void shareGenerated(images[selectedIndex], selectedIndex) }} className="min-h-12 rounded-lg bg-white/15 text-white text-[15px] font-medium disabled:opacity-50 sm:col-span-1 col-span-3">{mediaBusy === 'share' ? 'Sharing…' : 'Share'}</button>
           </div>
           {images.length > 1 && (
@@ -455,7 +455,7 @@ export function ImageView() {
               <div className="grid grid-cols-4 gap-1.5 bg-[#0c0c10] p-2">
                 <button type="button" onClick={() => { haptic('tap'); sendGenerated('edit', img, i) }} className="min-h-11 rounded-lg bg-white/10 text-white text-[13px] font-medium hover:bg-white/[0.16]">Edit</button>
                 <button type="button" onClick={() => { haptic('tap'); sendGenerated('swap', img, i) }} className="min-h-11 rounded-lg bg-white/10 text-white text-[13px] font-medium hover:bg-white/[0.16]">Swap</button>
-                <button type="button" onClick={() => { void saveGenerated(img, i) }} disabled={mediaBusy === 'save'} className="min-h-11 rounded-lg bg-white/10 text-white text-[13px] font-medium hover:bg-white/[0.16] disabled:opacity-50">{mediaBusy === 'save' ? '…' : 'Save'}</button>
+                <button type="button" onClick={() => { void saveGenerated(img, i) }} disabled={mediaBusy === 'save'} className="min-h-11 rounded-lg bg-white/10 text-white text-[13px] font-medium hover:bg-white/[0.16] disabled:opacity-50">{mediaBusy === 'save' ? '…' : 'Download'}</button>
                 <button type="button" onClick={() => { void shareGenerated(img, i) }} disabled={mediaBusy === 'share'} className="min-h-11 rounded-lg bg-white/10 text-white text-[13px] font-medium hover:bg-white/[0.16] disabled:opacity-50">{mediaBusy === 'share' ? '…' : 'Share'}</button>
               </div>
             </div>

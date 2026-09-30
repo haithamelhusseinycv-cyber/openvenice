@@ -49,12 +49,13 @@ function FitImg({ src, alt, className }: { src: string; alt: string; className?:
       src={src}
       alt={alt}
       className={cn('w-full h-auto max-w-full object-contain rounded-lg border border-white/[0.08]', className)}
-      style={{ maxHeight: 'min(70dvh, 720px)', touchAction: 'pinch-zoom' }}
+      style={{ maxHeight: 'min(70dvh, 720px)', touchAction: 'pan-y pinch-zoom' }}
     />
   )
 }
 
 export function ImageTools() {
+  const [viewResult, setViewResult] = useState(false)
   const apiKey = useAuthStore((s) => s.apiKey)
   const { data: availableEditModels, isLoading: modelsLoading, error: modelsError, refetch: reloadModels, isFetching: modelsFetching } = useModels('inpaint')
   const editModelOptions = useMemo(
@@ -570,12 +571,24 @@ export function ImageTools() {
         )}
       </div>
 
-      <div className="flex max-w-full min-h-[30vh] min-w-0 flex-1 flex-col overflow-x-hidden p-3 sm:p-6 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:touch-pan-y">
+      <div className="flex max-w-full min-h-[30vh] min-w-0 shrink-0 lg:shrink flex-1 flex-col overflow-x-hidden p-3 sm:p-6 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:touch-pan-y">
+        {viewResult && resultUrl && (
+          <div role="dialog" aria-modal="true" aria-label="Full image" className="fixed inset-0 z-[70] flex h-[100dvh] flex-col bg-black p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <div className="flex shrink-0 justify-between gap-2 pb-3">
+              <button type="button" onClick={() => setViewResult(false)} className="min-h-12 px-4 bg-white/15 rounded-lg text-white">Close</button>
+              <button type="button" disabled={saving} onClick={() => { void downloadResult() }} className="min-h-12 px-4 bg-white rounded-lg text-black">{saving ? 'Downloading…' : 'Download'}</button>
+            </div>
+            <div className="flex min-h-0 flex-1 items-center justify-center">
+              <img src={resultUrl} alt="Full result" className="h-full w-full object-contain" />
+            </div>
+          </div>
+        )}
         {resultUrl ? (
           <div className="animate-fade-in flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2">
               <Label>Result</Label>
-              <button type="button" onClick={() => { void downloadResult() }} disabled={saving} className="min-h-11 px-3 rounded-lg bg-white text-black text-[15px] font-medium disabled:opacity-50">{saving ? 'Saving…' : 'Save'}</button>
+              <button type="button" onClick={() => setViewResult(true)} className="min-h-11 px-3 rounded-lg bg-white/10 text-white">View full image</button>
+              <button type="button" onClick={() => { void downloadResult() }} disabled={saving} className="min-h-11 px-3 rounded-lg bg-white text-black text-[15px] font-medium disabled:opacity-50">{saving ? 'Downloading…' : 'Download'}</button>
             </div>
             <FitImg src={resultUrl} alt="Result" className={cn(tool === 'remove-bg' && 'bg-[repeating-conic-gradient(#1a1a1a_0%_25%,#111_0%_50%)_0_0/20px_20px]')} />
           </div>
