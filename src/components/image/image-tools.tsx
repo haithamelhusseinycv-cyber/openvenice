@@ -56,7 +56,7 @@ function FitImg({ src, alt, className }: { src: string; alt: string; className?:
 
 export function ImageTools() {
   const apiKey = useAuthStore((s) => s.apiKey)
-  const { data: availableEditModels, isLoading: modelsLoading, error: modelsError } = useModels('inpaint')
+  const { data: availableEditModels, isLoading: modelsLoading, error: modelsError, refetch: reloadModels, isFetching: modelsFetching } = useModels('inpaint')
   const editModelOptions = useMemo(
     () => availableEditModels?.map((m) => ({ value: m.id, label: m.model_spec?.name || m.id })) ?? [],
     [availableEditModels],
@@ -425,9 +425,21 @@ export function ImageTools() {
         {(tool === 'edit' || tool === 'swap' || tool === 'undress') && (
           <div>
             <Label>Model</Label>
-            <Select value={editModel} onChange={setPreferredEditModel} options={editModelOptions} searchable />
-            {modelsLoading && <div className="mt-2 text-[13px] text-white/45" role="status">Loading compatible edit models…</div>}
-            {modelsError && <ErrorText>{formatVeniceError(modelsError)}</ErrorText>}
+            {apiKey ? (
+              <Select value={editModel} onChange={setPreferredEditModel} options={editModelOptions} searchable />
+            ) : (
+              <div className="mt-2 text-[14px] text-white/70" role="status">Tap Key at the top right to connect or unlock your Venice API key and load models.</div>
+            )}
+            {apiKey && !modelsLoading && !modelsError && editModelOptions.length === 0 && (
+              <div className="mt-2 text-[14px] text-white/70" role="status">No compatible edit models are currently available.</div>
+            )}
+            {apiKey && (modelsError || (!modelsLoading && editModelOptions.length === 0)) && (
+              <button type="button" onClick={() => { void reloadModels() }} disabled={modelsFetching} className="mt-2 min-h-11 rounded-lg border border-white/[0.14] px-3 text-[14px] text-white/80 disabled:opacity-50">
+                {modelsFetching ? 'Loading models…' : 'Reload models'}
+              </button>
+            )}
+            {apiKey && modelsLoading && <div className="mt-2 text-[13px] text-white/45" role="status">Loading compatible edit models…</div>}
+            {apiKey && modelsError && <ErrorText>{formatVeniceError(modelsError)}</ErrorText>}
           </div>
         )}
 
