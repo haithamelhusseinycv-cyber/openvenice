@@ -1,3 +1,5 @@
+import { useEffect } from 'react'
+import { useAuthStore } from '../stores/auth-store'
 import { useQuery } from '@tanstack/react-query'
 import { venice } from '../lib/venice-client'
 import {
@@ -56,11 +58,12 @@ function getRank(model: VeniceModel, bucket: VeniceType | null) {
 
 export function useModels(type?: string, enabled = true) {
   const bucket = getBucket(type)
+  const apiKey = useAuthStore((s) => s.apiKey)
 
-  return useQuery({
+  const query = useQuery({
     queryKey: ['models', type],
     queryFn: () => venice<ModelsResponse>(`/models${type ? `?type=${type}` : ''}`),
-    enabled,
+    enabled: enabled && !!apiKey,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnMount: true,
@@ -75,6 +78,15 @@ export function useModels(type?: string, enabled = true) {
           return getModelName(a).localeCompare(getModelName(b))
         }),
   })
+
+  // A key can be connected, unlocked or restored after this screen mounts.
+  // Also reload when a connected key is replaced; never put secrets in cache keys.
+  const { refetch } = query
+  useEffect(() => {
+    if (enabled && apiKey) void refetch()
+  }, [apiKey, enabled, refetch])
+
+  return query
 }
 
 export interface VideoModelGroup {
