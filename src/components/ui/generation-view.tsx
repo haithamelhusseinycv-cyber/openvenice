@@ -21,7 +21,7 @@ export function GenerationView({ controls, output, history, className }: Props) 
           </div>
         )}
       </aside>
-      <main className="max-w-full min-w-0 flex-1 overflow-x-hidden p-3 sm:p-5 lg:overflow-y-auto lg:overscroll-contain lg:touch-pan-y lg:p-7">
+      <main className="max-w-full min-w-0 shrink-0 lg:shrink flex-1 overflow-x-hidden p-3 sm:p-5 lg:overflow-y-auto lg:overscroll-contain lg:touch-pan-y lg:p-7">
         {output}
       </main>
     </div>
