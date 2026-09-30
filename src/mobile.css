@@ -26,7 +26,7 @@ img, video, canvas, svg {
 .touch-pan-y {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
   touch-action: pan-y pinch-zoom;
 }
 
