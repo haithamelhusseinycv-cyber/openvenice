@@ -68,6 +68,7 @@ jobs:
           python3 android-face-fusion-custom/apply_custom.py
           python3 android-face-fusion-custom/fix_downloads_v31.py
           python3 android-face-fusion-custom/apply_agent_bridge.py
+          python3 android-face-fusion-custom/improve_mobile_v42.py
           python3 android-openvenice-custom/pin_debug_signing.py android-face-fusion/app/build.gradle.kts
 
       - name: Verify agent bridge manifest

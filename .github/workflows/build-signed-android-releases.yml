@@ -106,6 +106,7 @@ jobs:
           python3 android-face-fusion-custom/apply_custom.py
           python3 android-face-fusion-custom/fix_downloads_v31.py
           python3 android-face-fusion-custom/apply_agent_bridge.py
+          python3 android-face-fusion-custom/improve_mobile_v42.py
           python3 android-openvenice-custom/configure_release_signing.py android-face-fusion/app/build.gradle.kts
           cd android-face-fusion
           chmod +x ./gradlew
