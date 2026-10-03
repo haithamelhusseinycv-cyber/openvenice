@@ -11,7 +11,7 @@ describe('Local Dream inference readiness', () => {
         if (!url.endsWith('/status')) throw new Error('Unexpected JSON endpoint')
         return { state: 'running' } as T
       }),
-      requestBinary: vi.fn(async (_url: string, _options?: unknown) => ({ ...await health(), data: new Uint8Array(), headers: {} })),
+      requestBinary: vi.fn(async () => ({ ...await health(), data: new Uint8Array(), headers: {} })),
       requestSse: vi.fn(),
     }
     return { connector: new LocalDreamConnector({ transport }), transport }
