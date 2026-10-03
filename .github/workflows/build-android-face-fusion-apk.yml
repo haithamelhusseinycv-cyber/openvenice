@@ -79,6 +79,14 @@ jobs:
           grep -q 'openVeniceStableDebug' android-face-fusion/app/build.gradle.kts
           test -f android-face-fusion/app/src/main/java/com/pv/androidfacefusion/AgentBridgeService.java
 
+      - name: Add on-device processing test
+        run: |
+          mkdir -p android-face-fusion/app/src/androidTest/java/com/pv/androidfacefusion android-face-fusion/app/src/androidTest/assets
+          cp android-face-fusion-custom/FaceFusionSmoke.java android-face-fusion/app/src/androidTest/java/com/pv/androidfacefusion/
+          sed -i '/defaultConfig {/a\            testInstrumentationRunner = "com.pv.androidfacefusion.FaceFusionSmoke"' android-face-fusion/app/build.gradle.kts
+          curl -fL --retry 2 https://raw.githubusercontent.com/scikit-image/scikit-image/v0.19.3/skimage/data/astronaut.png -o android-face-fusion/app/src/androidTest/assets/astronaut.png
+          curl -fL --retry 2 https://raw.githubusercontent.com/matplotlib/matplotlib/v3.9.2/lib/matplotlib/mpl-data/sample_data/grace_hopper.jpg -o android-face-fusion/app/src/androidTest/assets/grace_hopper.jpg
+
       - name: Build debug APK
         working-directory: android-face-fusion
         shell: bash
@@ -86,7 +94,7 @@ jobs:
           OPENVENICE_DEBUG_KEYSTORE: /home/runner/.android/debug.keystore
         run: |
           chmod +x ./gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleDebug assembleDebugAndroidTest --no-daemon --stacktrace
 
       - name: Verify APK and signing identity
         shell: bash
@@ -109,5 +117,13 @@ jobs:
         with:
           name: android-face-fusion-complete-models-apk
           path: android-face-fusion/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload on-device test APK
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: facefusion-on-device-test-apk
+          path: android-face-fusion/app/build/outputs/apk/androidTest/debug/*.apk
           if-no-files-found: error
           retention-days: 14
