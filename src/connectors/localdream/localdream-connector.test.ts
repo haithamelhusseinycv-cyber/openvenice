@@ -31,7 +31,7 @@ describe('Local Dream inference readiness', () => {
     await vi.advanceTimersByTimeAsync(10)
     await expect(ready).resolves.toMatchObject({ state: 'running' })
     expect(transport.requestBinary).toHaveBeenCalledWith(
-      'http://127.0.0.1:8081/health', expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      'http://127.0.0.1:8806/health', expect.objectContaining({ signal: expect.any(AbortSignal) }),
     )
   })
 

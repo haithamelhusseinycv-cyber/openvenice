@@ -136,8 +136,8 @@ export class LocalDreamConnector {
 
   constructor(options: LocalDreamConnectorOptions = {}) {
     this.host = options.host || '127.0.0.1'
-    this.controlPort = options.controlPort || 8808
-    this.generationPort = options.generationPort || 8081
+    this.controlPort = options.controlPort || 8807
+    this.generationPort = options.generationPort || 8806
     this.transport = options.transport || new FetchHttpTransport()
   }
 
