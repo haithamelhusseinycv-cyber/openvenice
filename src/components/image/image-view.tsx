@@ -1,3 +1,4 @@
+import { FullscreenButton } from '../ui/fullscreen-button'
 import { useState, useMemo, useEffect, useRef } from 'react'
 import type { ImageToolId } from '../../stores/image-workspace-store'
 import { useSettingsStore } from '../../stores/settings-store'
@@ -386,7 +387,7 @@ export function ImageView() {
     <>
       {selectedIndex !== null && images[selectedIndex] !== undefined && (
         <div
-          className="fixed inset-0 z-50 flex flex-col bg-black/95 animate-fade-in"
+          role="dialog" aria-modal="true" aria-label="Full image" className="fixed inset-0 z-[70] flex h-[100dvh] flex-col bg-black/95 animate-fade-in"
           onTouchStart={(e) => {
             const touch = e.touches[0]
             viewerTouch.current = { x: touch.clientX, y: touch.clientY }
@@ -408,6 +409,9 @@ export function ImageView() {
           }}
           onClick={() => setSelectedIndex(null)}
         >
+          <div className="flex shrink-0 justify-end p-3 pt-[max(0.75rem,env(safe-area-inset-top))]" onClick={(e) => e.stopPropagation()}>
+            <button type="button" onClick={() => setSelectedIndex(null)} className="min-h-14 min-w-28 rounded-xl bg-white/15 px-5 text-base font-semibold text-white">Close</button>
+          </div>
           <div className="flex-1 min-h-0 flex items-center justify-center p-3" onClick={(e) => e.stopPropagation()}>
             <img src={toImageSrc(images[selectedIndex])} alt={`Generated ${selectedIndex + 1}`} className="w-full h-full min-h-0 object-contain rounded-xl" />
           </div>
@@ -444,6 +448,7 @@ export function ImageView() {
                 className="w-full cursor-pointer"
                 onClick={() => { haptic('tap'); setSelectedIndex(i) }}
               />
+              <div className="bg-[#0c0c10] p-2 pb-0"><FullscreenButton onClick={() => { haptic('tap'); setSelectedIndex(i) }} /></div>
               <div className="grid grid-cols-4 gap-1.5 bg-[#0c0c10] p-2">
                 <button type="button" onClick={() => { haptic('tap'); sendGenerated('edit', img, i) }} className="min-h-11 rounded-lg bg-white/10 text-white text-[13px] font-medium hover:bg-white/[0.16]">Edit</button>
                 <button type="button" onClick={() => { haptic('tap'); sendGenerated('swap', img, i) }} className="min-h-11 rounded-lg bg-white/10 text-white text-[13px] font-medium hover:bg-white/[0.16]">Swap</button>
