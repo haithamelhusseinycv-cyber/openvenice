@@ -105,6 +105,15 @@ public final class AgentBridgeService extends Service {
             final int command = msg.what;
 
             if (replyTo == null) return;
+            // Messenger retains the actual Binder caller UID. Check every
+            // command before allowing even ping/cancel to affect other jobs.
+            if (callerUid != android.os.Process.myUid()
+                    && checkPermission(PERMISSION, -1, callerUid)
+                    != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                replyError(replyTo, command, request,
+                        new SecurityException("Untrusted FaceFusion agent caller"));
+                return;
+            }
 
             if (command == MSG_CANCEL) {
                 cancellationEpoch.incrementAndGet();
