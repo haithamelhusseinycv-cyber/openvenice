@@ -78,6 +78,21 @@ jobs:
           chmod +x ./gradlew
           ./gradlew assembleRelease --no-daemon --stacktrace
 
+      - name: Build release-signed companion bridge smoke
+        shell: bash
+        run: |
+          python3 android-openvenice-custom/prepare_bridge_smoke.py
+          cd android
+          ./gradlew assembleReleaseAndroidTest --no-daemon --stacktrace
+
+      - name: Upload companion bridge test APK
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: openvenice-bridge-test-apk
+          path: android/app/build/outputs/apk/androidTest/release/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Verify and upload OpenVenice release
         shell: bash
         run: |
