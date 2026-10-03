@@ -44,9 +44,9 @@ function getBucket(type?: string): VeniceType | null {
 function isAllowed(model: VeniceModel, bucket: VeniceType | null) {
   if (!bucket) return false
   if (bucket === 'text') return isAllowedChatModel(model.id)
-  if (bucket === 'image') return isAllowedImageModel(model.id)
+  if (bucket === 'image') return isAllowedImageModel(model.id, model.model_spec?.uncensored)
   if (bucket === 'video') return isAllowedVideoModel(model.id)
-  return isAllowedEditModel(model.id)
+  return isAllowedEditModel(model.id, model.model_spec?.uncensored)
 }
 
 function getRank(model: VeniceModel, bucket: VeniceType | null) {

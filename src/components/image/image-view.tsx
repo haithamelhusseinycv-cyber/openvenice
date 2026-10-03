@@ -1,3 +1,5 @@
+import { ImageShapePicker } from '../ui/image-shape-picker'
+import { DEFAULT_IMAGE_SHAPES, shapeLabel, shapePixels } from '../../lib/image-shapes'
 import { FullscreenButton } from '../ui/fullscreen-button'
 import { useState, useMemo, useEffect, useRef } from 'react'
 import type { ImageToolId } from '../../stores/image-workspace-store'
@@ -49,18 +51,11 @@ const DEFAULT_SIZES = [
   { value: '3', label: '1280' },
 ]
 
-function pixelSizeForSelection(prompt: string, sizeIdx: string) {
-  const longEdge = Number(DEFAULT_SIZES.find((size) => size.value === sizeIdx)?.label || 1024)
-  const isCouple = pickAspectFromPrompt(prompt) === '3:2'
-  const shortEdge = Math.max(320, Math.round((longEdge * 0.65) / 64) * 64)
-  return isCouple ? { w: longEdge, h: shortEdge } : { w: shortEdge, h: longEdge }
-}
-
 export function ImageView() {
   const apiKey = useAuthStore((s) => s.apiKey)
   const selectedModel = useSettingsStore((s) => s.selectedModels.image)
   const { data: models } = useModels('image')
-  const allowedImageModels = models?.filter((m) => isAllowedImageModel(m.id))
+  const allowedImageModels = models?.filter((m) => isAllowedImageModel(m.id, m.model_spec?.uncensored))
 
   const model =
     selectedModel &&
@@ -83,7 +78,7 @@ export function ImageView() {
     loadImageNegative(loadSaved('venice-image-negative', ''))
   )
   const [sizeIdx, setSizeIdx] = useState(() => loadSaved('venice-image-size', LOCKED_IMAGE_SIZE_IDX))
-  const [aspectRatio, setAspectRatio] = useState(() => pickAspectFromPrompt(loadImagePrompt(loadSaved('venice-image-prompt', ''))))
+  const [aspectRatio, setAspectRatio] = useState(() => loadSaved('venice-image-aspect', pickAspectFromPrompt(loadImagePrompt(loadSaved('venice-image-prompt', '')))))
   const [resolution, setResolution] = useState(() => loadSaved('venice-image-resolution', ''))
   const [steps, setSteps] = useState(() => {
     const saved = loadSaved('venice-image-steps', '')
@@ -103,7 +98,7 @@ export function ImageView() {
 
   const effectiveAspectRatio = useMemo(() => {
     const suggested = pickAspectFromPrompt(prompt)
-    if (!hasAspectRatios) return suggested
+    if (!hasAspectRatios) return DEFAULT_IMAGE_SHAPES.includes(aspectRatio) ? aspectRatio : suggested
     const supported = constraints?.aspectRatios || []
     if (supported.includes(aspectRatio)) return aspectRatio
     if (supported.includes(suggested)) return suggested
@@ -127,9 +122,6 @@ export function ImageView() {
 
   const updatePrompt = (value: string) => {
     setPrompt(value)
-    const suggested = pickAspectFromPrompt(value)
-    const supported = constraints?.aspectRatios || []
-    if (!hasAspectRatios || supported.includes(suggested)) setAspectRatio(suggested)
   }
 
   useEffect(() => {
@@ -166,10 +158,7 @@ export function ImageView() {
     return () => window.removeEventListener('venice-back', onBack)
   }, [selectedIndex, undressTarget])
 
-  const aspectOptions = useMemo(() => {
-    if (!hasAspectRatios) return []
-    return constraints!.aspectRatios!.map((a) => ({ value: a, label: a }))
-  }, [constraints, hasAspectRatios])
+  const aspectValues = hasAspectRatios ? constraints!.aspectRatios! : DEFAULT_IMAGE_SHAPES
 
   const resolutionOptions = useMemo(() => {
     if (!hasResolutions) return []
@@ -243,7 +232,7 @@ export function ImageView() {
     mutation.reset()
     const seedNum = seed.trim() === '' ? undefined : Number(seed)
     const validSeed = seedNum !== undefined && Number.isFinite(seedNum) ? Math.trunc(seedNum) : undefined
-    const size = pixelSizeForSelection(prompt, sizeIdx)
+    const size = shapePixels(effectiveAspectRatio, Number(DEFAULT_SIZES.find((option) => option.value === sizeIdx)?.label || 1024), constraints?.widthHeightDivisor)
 
     const req: Record<string, unknown> = {
       prompt: prompt.trim(),
@@ -310,6 +299,11 @@ export function ImageView() {
         <TextArea value={prompt} onChange={updatePrompt} placeholder="Describe the image you want to create…" rows={5} maxLength={promptLimit} />
       </div>
 
+      <div>
+        <Label>Image shape</Label>
+        <ImageShapePicker values={aspectValues} value={effectiveAspectRatio} onChange={(value) => { haptic('select'); setAspectRatio(value) }} />
+      </div>
+
       <button
         type="button"
         onClick={() => { haptic('tap'); setParamsOpen(true) }}
@@ -318,7 +312,7 @@ export function ImageView() {
       >
         <span className="font-medium">Parameters</span>
         <span className="flex items-center gap-2 text-[12px] text-white/40">
-          <span>{effectiveAspectRatio || DEFAULT_SIZES.find((s) => s.value === sizeIdx)?.label}</span>
+          <span>{shapeLabel(effectiveAspectRatio)}</span>
           <span>·</span>
           <span>{effectiveSteps} steps</span>
           <span>·</span>
@@ -349,10 +343,8 @@ export function ImageView() {
         <div className="flex flex-col gap-4 pt-1">
           <div><Label>Negative prompt</Label><TextArea value={negativePrompt} onChange={setNegativePrompt} placeholder="blurry, clothes, CGI…" rows={2} /></div>
 
-          {hasAspectRatios ? (
-            <div><Label>Aspect Ratio</Label><PillGroup options={aspectOptions} value={effectiveAspectRatio} onChange={(v) => { haptic('select'); setAspectRatio(v) }} /></div>
-          ) : (
-            <div><Label>Size</Label><PillGroup options={DEFAULT_SIZES} value={sizeIdx} onChange={(v) => { haptic('select'); setSizeIdx(v) }} /></div>
+          {!hasAspectRatios && (
+            <div><Label>Image detail</Label><PillGroup options={DEFAULT_SIZES} value={sizeIdx} onChange={(v) => { haptic('select'); setSizeIdx(v) }} /></div>
           )}
 
           {hasResolutions && (

@@ -1,3 +1,4 @@
+import { imageModelLabel } from '../../lib/image-model-label'
 import { useMemo, useState } from 'react'
 import { useSettingsStore } from '../../stores/settings-store'
 import { useImageWorkspace } from '../../stores/image-workspace-store'
@@ -58,8 +59,8 @@ export function Header({ onOpenApiKey, onOpenDiagnostics, onOpenMobileSidebar }:
   const { data: models } = useModels(hasOwnSelector ? undefined : modelType)
   const currentModel = hasOwnSelector ? '' : (selectedModels[activeTab] || models?.[0]?.id || '')
   const modelOptions = useMemo(
-    () => (hasOwnSelector ? [] : (models?.map((m) => ({ value: m.id, label: m.model_spec?.name || m.id })) ?? [])),
-    [hasOwnSelector, models],
+    () => (hasOwnSelector ? [] : (models?.map((m) => ({ value: m.id, label: modelType === 'image' ? imageModelLabel(m) : (m.model_spec?.name || m.id) })) ?? [])),
+    [hasOwnSelector, models, modelType],
   )
   const [modelSheetOpen, setModelSheetOpen] = useState(false)
   const [modelQuery, setModelQuery] = useState('')

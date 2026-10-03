@@ -1,3 +1,7 @@
+import { ImageShapePicker } from '../ui/image-shape-picker'
+import { DEFAULT_IMAGE_SHAPES } from '../../lib/image-shapes'
+import type { ImageConstraints } from '../../types/venice'
+import { imageModelLabel } from '../../lib/image-model-label'
 import { FullscreenButton } from '../ui/fullscreen-button'
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useAuthStore } from '../../stores/auth-store'
@@ -18,18 +22,6 @@ import { formatVeniceError } from '../../lib/venice-client'
 import { DEFAULT_EDIT_MODEL_ID } from '../../lib/allowed-models'
 
 type Tool = 'edit' | 'swap' | 'undress' | 'upscale' | 'remove-bg'
-
-const SCENE_SIZES = [
-  { value: 'auto', label: 'Scene' },
-  { value: '1:1', label: '1:1' },
-  { value: '2:3', label: '2:3' },
-  { value: '3:4', label: '3:4' },
-  { value: '4:5', label: '4:5' },
-  { value: '9:16', label: '9:16' },
-  { value: '3:2', label: '3:2' },
-  { value: '16:9', label: '16:9' },
-  { value: '21:9', label: '21:9' },
-]
 
 function loadSaved(key: string, fallback: string) {
   try {
@@ -61,7 +53,7 @@ export function ImageTools() {
   const apiKey = useAuthStore((s) => s.apiKey)
   const { data: availableEditModels, isLoading: modelsLoading, error: modelsError, refetch: reloadModels, isFetching: modelsFetching } = useModels('inpaint')
   const editModelOptions = useMemo(
-    () => availableEditModels?.map((m) => ({ value: m.id, label: m.model_spec?.name || m.id })) ?? [],
+    () => availableEditModels?.map((m) => ({ value: m.id, label: imageModelLabel(m) })) ?? [],
     [availableEditModels],
   )
   const [pending] = useState(() => useImageWorkspace.getState().pendingSource)
@@ -95,6 +87,10 @@ export function ImageTools() {
   const editModel = editModelOptions.some((option) => option.value === preferredEditModel)
     ? preferredEditModel
     : editModelOptions[0]?.value || preferredEditModel
+
+  const editConstraints = availableEditModels?.find((model) => model.id === editModel)?.model_spec?.constraints as ImageConstraints | undefined
+  const editAspectValues = editConstraints?.aspectRatios?.length ? editConstraints.aspectRatios : ['auto', ...DEFAULT_IMAGE_SHAPES]
+  const effectiveSceneSize = editAspectValues.includes(sceneSize) ? sceneSize : editAspectValues[0]
 
   useEffect(() => {
     try {
@@ -174,7 +170,7 @@ export function ImageTools() {
   const dualSwapPrompt = (maleKind: SwapKind, femaleKind: SwapKind) =>
     `Reference 1 is the target scene and composition. Reference 2 maps only to the male subject and requires a ${maleKind} swap. Reference 3 maps only to the female subject and requires a ${femaleKind} swap. Preserve the target pose, framing, camera angle, lighting, background, interaction and all non-identity details. Keep both identities separate; never blend, exchange or cross-map them.`
 
-  const aspectRatio = sceneSize || 'auto'
+  const aspectRatio = effectiveSceneSize
 
   const handleProcess = () => {
     resetResult()
@@ -526,22 +522,8 @@ export function ImageTools() {
 
         {(tool === 'edit' || tool === 'swap' || tool === 'undress') && (
           <div>
-            <Label>Output size</Label>
-            <div className="flex flex-wrap gap-1">
-              {SCENE_SIZES.map((s) => (
-                <button
-                  key={s.value}
-                  type="button"
-                  onClick={() => setSceneSize(s.value)}
-                  className={cn(
-                    'px-3 py-2 text-[14px] rounded-md min-h-11',
-                    sceneSize === s.value ? 'bg-white text-black' : 'bg-white/[0.06] text-white/65',
-                  )}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
+            <Label>Image shape</Label>
+            <ImageShapePicker values={editAspectValues} value={effectiveSceneSize} onChange={setSceneSize} />
           </div>
         )}
 
