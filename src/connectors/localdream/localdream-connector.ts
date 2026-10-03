@@ -207,10 +207,10 @@ export class LocalDreamConnector {
           // The control server reports running before the native model opens
           // its inference socket. Ready requires the actual inference health.
           try {
-            const health = await this.transport.requestJson<{ ok?: boolean }>(
+            const health = await this.transport.requestBinary(
               this.generationUrl('/health'), { signal: controller.signal },
             )
-            if (health.ok === true) return status
+            if (health.status >= 200 && health.status < 300) return status
           } catch (error) {
             if (options.signal?.aborted || !retryable(error)) throw error
           }

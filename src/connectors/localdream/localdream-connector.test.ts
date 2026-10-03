@@ -5,20 +5,20 @@ describe('Local Dream inference readiness', () => {
   beforeEach(() => vi.useFakeTimers())
   afterEach(() => vi.useRealTimers())
 
-  function setup(health: () => Promise<{ ok: boolean }>) {
+  function setup(health: () => Promise<{ status: number }>) {
     const transport = {
       requestJson: vi.fn(async <T>(url: string): Promise<T> => {
-        if (url.endsWith('/status')) return { state: 'running' } as T
-        return await health() as T
+        if (!url.endsWith('/status')) throw new Error('Unexpected JSON endpoint')
+        return { state: 'running' } as T
       }),
-      requestBinary: vi.fn(),
+      requestBinary: vi.fn(async (_url: string, _options?: unknown) => ({ ...await health(), data: new Uint8Array(), headers: {} })),
       requestSse: vi.fn(),
     }
     return { connector: new LocalDreamConnector({ transport }), transport }
   }
 
   it('does not treat the early running control state as ready', async () => {
-    const health = vi.fn().mockResolvedValueOnce({ ok: false }).mockResolvedValue({ ok: true })
+    const health = vi.fn().mockRejectedValueOnce(new Error('Connector request failed: HTTP 503')).mockResolvedValue({ status: 200 })
     const { connector, transport } = setup(health)
     let settled = false
     const ready = connector.waitUntilRunning({ intervalMs: 10 }).then((result) => {
@@ -30,14 +30,14 @@ describe('Local Dream inference readiness', () => {
     expect(health).toHaveBeenCalledTimes(1)
     await vi.advanceTimersByTimeAsync(10)
     await expect(ready).resolves.toMatchObject({ state: 'running' })
-    expect(transport.requestJson).toHaveBeenCalledWith(
+    expect(transport.requestBinary).toHaveBeenCalledWith(
       'http://127.0.0.1:8081/health', expect.objectContaining({ signal: expect.any(AbortSignal) }),
     )
   })
 
   it('waits through connection refusal while the native socket starts', async () => {
     const health = vi.fn().mockRejectedValueOnce(new TypeError('Failed to fetch'))
-      .mockResolvedValue({ ok: true })
+      .mockResolvedValue({ status: 200 })
     const { connector } = setup(health)
     const ready = connector.waitUntilRunning({ intervalMs: 10 })
     await vi.advanceTimersByTimeAsync(10)
@@ -50,7 +50,7 @@ describe('Local Dream inference readiness', () => {
   })
 
   it('honors caller cancellation before polling', async () => {
-    const { connector } = setup(async () => ({ ok: true }))
+    const { connector } = setup(async () => ({ status: 200 }))
     const controller = new AbortController()
     controller.abort()
     await expect(connector.waitUntilRunning({ signal: controller.signal })).rejects.toMatchObject({
@@ -59,7 +59,7 @@ describe('Local Dream inference readiness', () => {
   })
 
   it('times out when control is running but inference never becomes healthy', async () => {
-    const { connector } = setup(async () => ({ ok: false }))
+    const { connector } = setup(async () => { throw new Error('Connector request failed: HTTP 503') })
     const ready = expect(connector.waitUntilRunning({ timeoutMs: 30, intervalMs: 10 }))
       .rejects.toThrow('inference health')
     await vi.advanceTimersByTimeAsync(30)
