@@ -31,7 +31,8 @@ def handler_for(upstream_port, routes):
                 self.send_header("Access-Control-Allow-Origin", origin)
                 self.send_header("Vary", "Origin")
                 self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-                self.send_header("Access-Control-Allow-Headers", "Content-Type")
+                self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Image-Width, X-Image-Height, X-Upscaler-Path, X-Use-OpenCL")
+                self.send_header("Access-Control-Expose-Headers", "X-Output-Width, X-Output-Height, X-Duration-MS")
                 self.send_header("Access-Control-Allow-Private-Network", "true")
                 self.send_header("Access-Control-Max-Age", "600")
             self.send_header("Cache-Control", "no-store")
@@ -78,6 +79,9 @@ def handler_for(upstream_port, routes):
             headers = {"Accept-Encoding": "identity"}
             if self.headers.get("Content-Type"):
                 headers["Content-Type"] = self.headers["Content-Type"]
+            for key in ("X-Image-Width", "X-Image-Height", "X-Upscaler-Path", "X-Use-OpenCL"):
+                if self.headers.get(key):
+                    headers[key] = self.headers[key]
             upstream_path = path.path + ("?" + path.query if path.query else "")
             started = False
             try:

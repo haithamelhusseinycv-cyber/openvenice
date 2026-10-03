@@ -8,6 +8,7 @@ from localdream_webbridge import make_server, CONTROL_ROUTES, GENERATION_ROUTES
 
 class Upstream(BaseHTTPRequestHandler):
     cancelled = threading.Event()
+    upscale_headers = {}
     def log_message(self, *_args):
         pass
     def do_GET(self):
@@ -21,6 +22,9 @@ class Upstream(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/event-stream" if self.path == "/generate" else "image/png")
         self.end_headers()
         if self.path != "/generate":
+            if self.path == "/upscale":
+                type(self).upscale_headers = {key: self.headers.get(key) for key in
+                    ("X-Image-Width", "X-Image-Height", "X-Upscaler-Path", "X-Use-OpenCL")}
             self.wfile.write(body)
             return
         try:
@@ -76,8 +80,21 @@ class BrowserBridgeTests(unittest.TestCase):
         image_bytes = bytes(range(256)) * 3
         response = requests.post(self.generation_url + "/upscale", data=image_bytes, headers={
             **self.origin, "Content-Type": "application/octet-stream",
+            "X-Image-Width": "16", "X-Image-Height": "16",
+            "X-Upscaler-Path": "/models/upscale.bin", "X-Use-OpenCL": "true",
         }, timeout=3)
         self.assertEqual(response.content, image_bytes)
+        self.assertEqual(Upstream.upscale_headers["X-Image-Width"], "16")
+        self.assertEqual(Upstream.upscale_headers["X-Image-Height"], "16")
+        self.assertEqual(Upstream.upscale_headers["X-Upscaler-Path"], "/models/upscale.bin")
+        self.assertEqual(Upstream.upscale_headers["X-Use-OpenCL"], "true")
+        preflight = requests.options(self.generation_url + "/upscale", headers={
+            **self.origin, "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type,x-image-width,x-image-height,x-upscaler-path,x-use-opencl",
+        }, timeout=3)
+        self.assertEqual(preflight.status_code, 204)
+        self.assertIn("X-Upscaler-Path", preflight.headers["Access-Control-Allow-Headers"])
+        self.assertIn("X-Output-Width", response.headers["Access-Control-Expose-Headers"])
 
     def test_browser_stream_close_closes_upstream(self):
         Upstream.cancelled.clear()
