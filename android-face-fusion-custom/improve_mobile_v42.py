@@ -215,4 +215,53 @@ p = root / "app/build.gradle.kts"
 s = re.sub(r'versionCode = \d+', 'versionCode = 42', p.read_text())
 s = re.sub(r'versionName = "[^"]+"', 'versionName = "4.2"', s)
 p.write_text(s)
+
+p = java / "MainActivity.java"
+s = p.read_text()
+s = replace(s, "    private void showError(String message) {", """    private void safeRunOnUiThread(Runnable action) {
+        if (isFinishing() || isDestroyed()) return;
+        super.runOnUiThread(() -> {
+            if (!isFinishing() && !isDestroyed()) action.run();
+        });
+    }
+
+    private void showError(String message) {
+        if (isFinishing() || isDestroyed()) return;""")
+s = s.replace("runOnUiThread(", "safeRunOnUiThread(")
+s = s.replace("super.safeRunOnUiThread(", "super.runOnUiThread(")
+s = replace(s, """        executorService.shutdown();
+
+        if (faceDetector != null) faceDetector.close();
+        if (faceEmbedder != null) faceEmbedder.close();
+        if (faceSwapper != null) faceSwapper.close();
+
+        if (sourceBitmap != null) sourceBitmap.recycle();
+        if (targetBitmap != null) targetBitmap.recycle();
+        if (libraryTargetBitmap != null) libraryTargetBitmap.recycle();
+        if (resultBitmap != null) resultBitmap.recycle();""", """        Runnable release = () -> {
+            if (faceDetector != null) faceDetector.close();
+            if (faceEmbedder != null) faceEmbedder.close();
+            if (faceSwapper != null) faceSwapper.close();
+            if (sourceBitmap != null && !sourceBitmap.isRecycled()) sourceBitmap.recycle();
+            if (targetBitmap != null && !targetBitmap.isRecycled()) targetBitmap.recycle();
+            if (libraryTargetBitmap != null && !libraryTargetBitmap.isRecycled()) libraryTargetBitmap.recycle();
+            if (resultBitmap != null && !resultBitmap.isRecycled()) resultBitmap.recycle();
+        };
+        if (executorService == null) {
+            release.run();
+        } else {
+            executorService.execute(release);
+            executorService.shutdown();
+        }""")
+s = replace(s, """                resultBitmap.compress(Bitmap.CompressFormat.JPEG, 95, out);
+                out.close();""", """                try (OutputStream stream = out) {
+                    if (!resultBitmap.compress(Bitmap.CompressFormat.JPEG, 95, stream))
+                        throw new java.io.IOException("Image could not be prepared for sharing");
+                }""")
+p.write_text(s)
+p = root / "app/build.gradle.kts"
+s = re.sub(r'versionCode = \d+', 'versionCode = 43', p.read_text())
+s = re.sub(r'versionName = "[^"]+"', 'versionName = "4.3"', s)
+p.write_text(s)
+
 print("FaceFusion mobile usability and download fixes applied")
