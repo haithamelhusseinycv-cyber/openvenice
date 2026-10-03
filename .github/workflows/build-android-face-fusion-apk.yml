@@ -83,7 +83,7 @@ jobs:
         run: |
           mkdir -p android-face-fusion/app/src/androidTest/java/com/pv/androidfacefusion android-face-fusion/app/src/androidTest/assets
           cp android-face-fusion-custom/FaceFusionSmoke.java android-face-fusion/app/src/androidTest/java/com/pv/androidfacefusion/
-          sed -i '/defaultConfig {/a\            testInstrumentationRunner = "com.pv.androidfacefusion.FaceFusionSmoke"' android-face-fusion/app/build.gradle.kts
+          sed -i 's/testInstrumentationRunner = .*/testInstrumentationRunner = "com.pv.androidfacefusion.FaceFusionSmoke"/' android-face-fusion/app/build.gradle.kts
           curl -fL --retry 2 https://raw.githubusercontent.com/scikit-image/scikit-image/v0.19.3/skimage/data/astronaut.png -o android-face-fusion/app/src/androidTest/assets/astronaut.png
           curl -fL --retry 2 https://raw.githubusercontent.com/matplotlib/matplotlib/v3.9.2/lib/matplotlib/mpl-data/sample_data/grace_hopper.jpg -o android-face-fusion/app/src/androidTest/assets/grace_hopper.jpg
 
