@@ -180,18 +180,49 @@ export class LocalDreamConnector {
   }
 
   async waitUntilRunning(options: { timeoutMs?: number; intervalMs?: number; signal?: AbortSignal } = {}) {
-    const timeoutMs = options.timeoutMs ?? 45_000
-    const intervalMs = options.intervalMs ?? 500
+    const timeoutMs = options.timeoutMs ?? 120_000
+    const intervalMs = Math.max(1, options.intervalMs ?? 500)
     const started = Date.now()
+    const retryable = (error: unknown) => {
+      if (error instanceof TypeError) return true // connection refused while native backend starts
+      if (error instanceof DOMException && error.name === 'AbortError') return true
+      return error instanceof Error && /HTTP (408|429|5\d\d)\b/.test(error.message)
+    }
 
     while (Date.now() - started < timeoutMs) {
       if (options.signal?.aborted) throw new DOMException('Aborted', 'AbortError')
-      const status = await this.status(options.signal)
-      if (status.state === 'running') return status
-      if (status.state === 'error') throw new Error(status.message || 'Local Dream backend failed to start')
-      await new Promise((resolve) => setTimeout(resolve, intervalMs))
+      const controller = new AbortController()
+      const abort = () => controller.abort()
+      options.signal?.addEventListener('abort', abort, { once: true })
+      const timer = setTimeout(abort, Math.min(5_000, timeoutMs - (Date.now() - started)))
+      try {
+        let status: LocalDreamStatus | undefined
+        try {
+          status = await this.status(controller.signal)
+        } catch (error) {
+          if (options.signal?.aborted || !retryable(error)) throw error
+        }
+        if (status?.state === 'error') throw new Error(status.message || 'Local Dream backend failed to start')
+        if (status?.state === 'running') {
+          // The control server reports running before the native model opens
+          // its inference socket. Ready requires the actual inference health.
+          try {
+            const health = await this.transport.requestJson<{ ok?: boolean }>(
+              this.generationUrl('/health'), { signal: controller.signal },
+            )
+            if (health.ok === true) return status
+          } catch (error) {
+            if (options.signal?.aborted || !retryable(error)) throw error
+          }
+        }
+      } finally {
+        clearTimeout(timer)
+        options.signal?.removeEventListener('abort', abort)
+      }
+      if (options.signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+      await new Promise((resolve) => setTimeout(resolve, Math.min(intervalMs, Math.max(0, timeoutMs - (Date.now() - started)))))
     }
-    throw new Error('Timed out waiting for Local Dream backend')
+    throw new Error('Timed out waiting for Local Dream inference health')
   }
 
   async *generate(
