@@ -7,9 +7,9 @@ describe('Local Dream inference readiness', () => {
 
   function setup(health: () => Promise<{ ok: boolean }>) {
     const transport = {
-      requestJson: vi.fn(async (url: string) => {
-        if (url.endsWith('/status')) return { state: 'running' }
-        return health()
+      requestJson: vi.fn(async <T>(url: string): Promise<T> => {
+        if (url.endsWith('/status')) return { state: 'running' } as T
+        return await health() as T
       }),
       requestBinary: vi.fn(),
       requestSse: vi.fn(),
