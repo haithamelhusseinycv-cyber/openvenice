@@ -3,3 +3,15 @@ dist
 .DS_Store
 .env*
 !.env.example
+
+# Local credentials, model weights and generated media
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.jks
+*.keystore
+*.gguf
+*.safetensors
+*.log
