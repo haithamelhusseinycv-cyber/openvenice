@@ -353,7 +353,7 @@ export function ImageTools() {
               type="button"
               onClick={() => fileRef.current?.click()}
               disabled={isPreparing}
-              className="w-full border border-dashed border-white/[0.14] hover:border-white/[0.28] rounded-lg py-8 text-center min-h-24"
+              className="w-full border border-dashed border-white/[0.14] hover:border-white/[0.28] rounded-lg py-5 text-center min-h-20"
             >
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
                 const file = e.target.files?.[0]
@@ -394,7 +394,7 @@ export function ImageTools() {
                 type="button"
                 onClick={() => idFileRef.current?.click()}
                 disabled={isPreparing}
-                className="w-full border border-dashed border-white/[0.14] hover:border-white/[0.28] rounded-lg py-8 text-center min-h-24"
+                className="w-full border border-dashed border-white/[0.14] hover:border-white/[0.28] rounded-lg py-5 text-center min-h-20"
               >
                 <input ref={idFileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
                   const file = e.target.files?.[0]
@@ -418,7 +418,7 @@ export function ImageTools() {
                 <span className="text-[13px] text-white/45 mt-1 block truncate">{secondIdName}{uploadInfo.identity2 ? ` · ${uploadInfo.identity2}` : ''}</span>
               </div>
             ) : (
-              <button type="button" onClick={() => secondIdFileRef.current?.click()} disabled={isPreparing} className="w-full border border-dashed border-white/[0.14] hover:border-white/[0.28] rounded-lg py-8 text-center min-h-24 disabled:opacity-45">
+              <button type="button" onClick={() => secondIdFileRef.current?.click()} disabled={isPreparing} className="w-full border border-dashed border-white/[0.14] hover:border-white/[0.28] rounded-lg py-5 text-center min-h-20 disabled:opacity-45">
                 <input ref={secondIdFileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
                   const file = e.target.files?.[0]
                   if (!file) return

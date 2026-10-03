@@ -1,5 +1,5 @@
 import { ImageShapePicker } from '../ui/image-shape-picker'
-import { DEFAULT_IMAGE_SHAPES, shapeLabel, shapePixels } from '../../lib/image-shapes'
+import { DEFAULT_IMAGE_SHAPES, shapePixels } from '../../lib/image-shapes'
 import { FullscreenButton } from '../ui/fullscreen-button'
 import { useState, useMemo, useEffect, useRef } from 'react'
 import type { ImageToolId } from '../../stores/image-workspace-store'
@@ -277,7 +277,8 @@ export function ImageView() {
             </button>
           </div>
         </div>
-        <div className="mb-2 grid max-w-full grid-cols-3 gap-2" aria-label="Prompt presets">
+        <details className="mb-2"><summary className="flex min-h-11 cursor-pointer items-center text-[13px] text-white/50">Prompt ideas</summary>
+        <div className="grid max-w-full grid-cols-3 gap-2" aria-label="Prompt presets">
           {[
             ['Portrait', 'Photorealistic full-body portrait, natural skin texture, realistic lighting, sharp eyes, accurate anatomy'],
             ['Couple', 'Photorealistic adult couple together, natural interaction, both identities clear, realistic skin and anatomy'],
@@ -296,7 +297,8 @@ export function ImageView() {
             </button>
           ))}
         </div>
-        <TextArea value={prompt} onChange={updatePrompt} placeholder="Describe the image you want to create…" rows={5} maxLength={promptLimit} />
+        </details>
+        <TextArea value={prompt} onChange={updatePrompt} placeholder="Describe the image you want to create…" rows={4} maxLength={promptLimit} />
       </div>
 
       <div>
@@ -310,26 +312,15 @@ export function ImageView() {
         aria-expanded={paramsOpen}
         className="flex min-h-11 w-full items-center justify-between rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 text-[14px] text-white/75 transition-colors hover:border-white/[0.16] hover:text-white"
       >
-        <span className="font-medium">Parameters</span>
+        <span className="font-medium">Advanced options</span>
         <span className="flex items-center gap-2 text-[12px] text-white/40">
-          <span>{shapeLabel(effectiveAspectRatio)}</span>
-          <span>·</span>
-          <span>{effectiveSteps} steps</span>
-          <span>·</span>
-          <span>{seed.trim() === '' ? 'random seed' : `seed ${seed}`}</span>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
         </span>
       </button>
 
-      <div
-        className={promptTooLong ? 'text-[14px] leading-relaxed text-red-300/95' : 'text-[14px] leading-relaxed text-white/60'}
-        role="status"
-        aria-live="polite"
-      >
-        {promptTooLong
-          ? `Prompt is ${prompt.length - promptLimit} characters over this model’s limit.`
-          : prompt.trim() ? `Ready with ${model}` : 'Enter a prompt or choose a preset.'}
-      </div>
+      {promptTooLong && <div className="text-[13px] text-red-300/95" role="alert">
+        Prompt is {prompt.length - promptLimit} characters over this model’s limit.
+      </div>}
 
       <PrimaryButton onClick={handleGenerate} disabled={!prompt.trim() || promptTooLong || !apiKey} loading={mutation.isPending} size="lg">
         {mutation.isPending ? 'Generating…' : 'Generate'}
