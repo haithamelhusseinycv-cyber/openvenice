@@ -72,6 +72,7 @@ jobs:
       - name: Verify web app
         run: |
           npm run lint
+          npm run test:run
           npm run build
 
       # Capacitor is a packaging dependency for the Android artifact. It stays

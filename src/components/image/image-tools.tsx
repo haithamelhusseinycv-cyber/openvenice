@@ -1,3 +1,4 @@
+import { FullscreenButton } from '../ui/fullscreen-button'
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useAuthStore } from '../../stores/auth-store'
 import { useImageWorkspace } from '../../stores/image-workspace-store'
@@ -9,7 +10,7 @@ import { TaskProgress } from '../ui/task-progress'
 import { cn } from '../../lib/utils'
 import { toast } from '../../stores/toast-store'
 import { haptic } from '../../lib/haptics'
-import { saveImage } from '../../lib/native-media'
+import { saveImage, shareImage } from '../../lib/native-media'
 import { buildSwapPrompt, UNDRESS_PROMPT, type SwapKind, type SwapPerson } from '../../lib/tool-prompts'
 import { prepareImage, formatBytes, type ImagePreparationStage, type PreparedImage } from '../../lib/image-input'
 import { useModels } from '../../hooks/use-models'
@@ -43,11 +44,12 @@ function clearFileInput(input: HTMLInputElement | null) {
   if (input) input.value = ''
 }
 
-function FitImg({ src, alt, className }: { src: string; alt: string; className?: string }) {
+function FitImg({ src, alt, className, onDimensions }: { src: string; alt: string; className?: string; onDimensions?: (width: number, height: number) => void }) {
   return (
     <img
       src={src}
       alt={alt}
+      onLoad={(event) => onDimensions?.(event.currentTarget.naturalWidth, event.currentTarget.naturalHeight)}
       className={cn('w-full h-auto max-w-full object-contain rounded-lg border border-white/[0.08]', className)}
       style={{ maxHeight: 'min(70dvh, 720px)', touchAction: 'pan-y pinch-zoom' }}
     />
@@ -254,6 +256,20 @@ export function ImageTools() {
           : bgRemoveMutation.error
 
   const [saving, setSaving] = useState(false)
+  const [sharing, setSharing] = useState(false)
+  const [resultDimensions, setResultDimensions] = useState<{ url: string; width: number; height: number } | null>(null)
+  const shareResult = async () => {
+    if (!resultUrl || sharing) return
+    setSharing(true)
+    try {
+      const result = await shareImage(resultUrl, 'image/png', `venice-${tool}-result-${Date.now()}.png`)
+      if (result === 'saved') toast.success('Saved image', 'Sharing is unavailable here; the image was saved instead.')
+    } catch (error) {
+      toast.fromError(error, 'Could not share result')
+    } finally {
+      setSharing(false)
+    }
+  }
   const downloadResult = async () => {
     if (!resultUrl) return
     setSaving(true)
@@ -576,6 +592,7 @@ export function ImageTools() {
           <div role="dialog" aria-modal="true" aria-label="Full image" className="fixed inset-0 z-[70] flex h-[100dvh] flex-col bg-black p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <div className="flex shrink-0 justify-between gap-2 pb-3">
               <button type="button" onClick={() => setViewResult(false)} className="min-h-12 px-4 bg-white/15 rounded-lg text-white">Close</button>
+              <button type="button" disabled={sharing} onClick={() => { void shareResult() }} className="min-h-14 rounded-lg bg-white/15 px-4 text-base text-white disabled:opacity-50">{sharing ? 'Sharing…' : 'Share'}</button>
               <button type="button" disabled={saving} onClick={() => { void downloadResult() }} className="min-h-12 px-4 bg-white rounded-lg text-black">{saving ? 'Downloading…' : 'Download'}</button>
             </div>
             <div className="flex min-h-0 flex-1 items-center justify-center">
@@ -585,12 +602,13 @@ export function ImageTools() {
         )}
         {resultUrl ? (
           <div className="animate-fade-in flex flex-col gap-3">
-            <div className="flex items-center justify-between gap-2">
-              <Label>Result</Label>
-              <button type="button" onClick={() => setViewResult(true)} className="min-h-11 px-3 rounded-lg bg-white/10 text-white">View full image</button>
+            <div className="flex flex-col gap-2">
+              <Label>Result{resultDimensions?.url === resultUrl ? ` · ${resultDimensions.width} × ${resultDimensions.height} px` : ''}</Label>
+              <FullscreenButton onClick={() => setViewResult(true)} />
+              <button type="button" disabled={sharing} onClick={() => { void shareResult() }} className="min-h-14 rounded-lg bg-white/15 px-4 text-base text-white disabled:opacity-50">{sharing ? 'Sharing…' : 'Share'}</button>
               <button type="button" onClick={() => { void downloadResult() }} disabled={saving} className="min-h-11 px-3 rounded-lg bg-white text-black text-[15px] font-medium disabled:opacity-50">{saving ? 'Downloading…' : 'Download'}</button>
             </div>
-            <FitImg src={resultUrl} alt="Result" className={cn(tool === 'remove-bg' && 'bg-[repeating-conic-gradient(#1a1a1a_0%_25%,#111_0%_50%)_0_0/20px_20px]')} />
+            <FitImg src={resultUrl} alt="Result" onDimensions={(width, height) => setResultDimensions({ url: resultUrl, width, height })} className={cn(tool === 'remove-bg' && 'bg-[repeating-conic-gradient(#1a1a1a_0%_25%,#111_0%_50%)_0_0/20px_20px]')} />
           </div>
         ) : (
           <EmptyState>
