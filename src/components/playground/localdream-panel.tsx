@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { LocalDreamConnector, type LocalDreamCatalog, type LocalDreamStatus } from '../../connectors/localdream/localdream-connector'
 import { BottomSheet } from '../ui/bottom-sheet'
 import { rawRgbPreview } from '../../lib/localdream-preview'
+import { ArtifactActions } from '../chat/artifact-actions'
 
 const connector = new LocalDreamConnector()
 const buttonClass = 'min-h-11 rounded-xl border border-white/20 px-4 py-2 text-[15px] font-medium disabled:opacity-40'
@@ -141,10 +142,10 @@ export function LocalDreamPanel() {
         <label className="flex flex-col gap-1">Prompt<textarea aria-label="Local Dream prompt" value={prompt} disabled={Boolean(busy)} onChange={(event) => setPrompt(event.target.value)} rows={3} className="rounded-xl bg-[#24242c] p-3 text-[16px]" /></label>
         <label className="flex items-center gap-3">Steps<input aria-label="Local Dream steps" type="number" min={1} max={50} value={steps} disabled={Boolean(busy)} onChange={(event) => setSteps(Math.max(1, Math.min(50, Number(event.target.value) || 1)))} className="min-h-11 w-24 rounded-xl bg-[#24242c] p-2 text-[16px]" /></label>
         <button type="button" className={buttonClass} disabled={Boolean(busy) || !online || !prompt.trim()} onClick={() => { void generate() }}>Generate locally</button>
-        {preview && <figure><img src={preview} alt="Local Dream generated image" className="w-full rounded-xl" /><figcaption>{raw?.width} × {raw?.height}</figcaption><a className="inline-flex min-h-11 items-center underline" href={preview} download="localdream-generated.png">Save generated image</a></figure>}
+        {preview && <figure><img src={preview} alt="Local Dream generated image" className="w-full rounded-xl" /><figcaption>{raw?.width} × {raw?.height}</figcaption><ArtifactActions artifact={{ id: 'localdream-generated', kind: 'image', url: preview, mimeType: 'image/png', format: 'png', width: raw?.width, height: raw?.height, sourceTool: 'localdream.generate' }} /></figure>}
         <label className="flex flex-col gap-1">Downloaded upscaler<select aria-label="Local Dream upscaler" value={upscaler} disabled={Boolean(busy)} onChange={(event) => setUpscaler(event.target.value)} className="min-h-11 rounded-xl bg-[#24242c] p-2 text-[16px]">{catalog?.upscalers.map((item) => <option key={item.id} value={item.id}>{item.id}</option>)}</select></label>
         <button type="button" className={buttonClass} disabled={Boolean(busy) || !online || !raw || !upscaler} onClick={() => { void upscale() }}>Upscale 4×</button>
-        {upscaled && <figure><img src={upscaled.image} alt="Local Dream upscaled image" className="w-full rounded-xl" /><figcaption>{upscaled.width} × {upscaled.height}</figcaption><a className="inline-flex min-h-11 items-center underline" href={upscaled.image} download="localdream-upscaled.jpg">Save upscaled image</a></figure>}
+        {upscaled && <figure><img src={upscaled.image} alt="Local Dream upscaled image" className="w-full rounded-xl" /><figcaption>{upscaled.width} × {upscaled.height}</figcaption><ArtifactActions artifact={{ id: 'localdream-upscaled', kind: 'image', url: upscaled.image, mimeType: 'image/jpeg', format: 'jpeg', width: upscaled.width, height: upscaled.height, sourceTool: 'localdream.upscale' }} /></figure>}
         <p aria-live="polite">{progress}</p><p>{timing}</p>
         {error && <p role="alert" className="break-words text-rose-300">{error}</p>}
         {busy && <button type="button" className={buttonClass} onClick={() => operation.current?.abort()}>Cancel request</button>}
