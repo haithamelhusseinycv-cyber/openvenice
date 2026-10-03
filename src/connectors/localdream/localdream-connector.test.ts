@@ -7,10 +7,10 @@ describe('Local Dream inference readiness', () => {
 
   function setup(health: () => Promise<{ status: number }>) {
     const transport = {
-      requestJson: vi.fn(async <T>(url: string): Promise<T> => {
+      requestJson: async <T>(url: string): Promise<T> => {
         if (!url.endsWith('/status')) throw new Error('Unexpected JSON endpoint')
         return { state: 'running' } as T
-      }),
+      },
       requestBinary: vi.fn(async () => ({ ...await health(), data: new Uint8Array(), headers: {} })),
       requestSse: vi.fn(),
     }
