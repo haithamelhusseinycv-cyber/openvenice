@@ -74,7 +74,10 @@ public final class AgentBridgeService extends Service {
 
     @Override
     public IBinder onBind(Intent intent) {
-        enforceCallingOrSelfPermission(PERMISSION, "OpenVenice FaceFusion agent permission required");
+        // Android has already checked the exported service's manifest
+        // permission for the real binding UID. onBind is a lifecycle callback
+        // on our own process, so a self-permission check here is incorrect.
+        // Every Messenger request is checked against its actual sendingUid.
         return messenger.getBinder();
     }
 
