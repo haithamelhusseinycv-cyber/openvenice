@@ -27,6 +27,8 @@ jobs:
     steps:
       - name: Checkout OpenVenice
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Setup Node 24
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
@@ -75,12 +77,7 @@ jobs:
           npm run test:run
           npm run build
 
-      # Capacitor is a packaging dependency for the Android artifact. It stays
-      # outside the web runtime dependency graph so the existing PWA build and
-      # package lock remain stable.
-      - name: Install Capacitor packaging toolchain
-        run: npm install --no-save --package-lock=false @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7
-
+      # Capacitor packaging versions are pinned in package-lock.json.
       - name: Generate Capacitor Android project
         shell: bash
         env:
