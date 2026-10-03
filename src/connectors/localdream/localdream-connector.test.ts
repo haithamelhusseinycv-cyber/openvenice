@@ -66,3 +66,27 @@ describe('Local Dream inference readiness', () => {
     await ready
   })
 })
+
+describe('Local Dream endpoint compatibility', () => {
+  it('uses the browser bridge on every default construction without stored configuration', () => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      expect(new LocalDreamConnector()).toMatchObject({
+        host: '127.0.0.1', controlPort: 8807, generationPort: 8806,
+      })
+    }
+  })
+
+  it('preserves explicit Easy, remote, and custom endpoints without mutating caller options', () => {
+    const profiles = [
+      { host: '127.0.0.1', controlPort: 8808, generationPort: 18081 },
+      { host: 'example.invalid', controlPort: 8808, generationPort: 8081 },
+      { host: 'localhost', controlPort: 12345, generationPort: 12346 },
+    ]
+    for (const profile of profiles) {
+      const options = Object.freeze({ ...profile })
+      expect(new LocalDreamConnector(options)).toMatchObject(profile)
+      expect(new LocalDreamConnector(options)).toMatchObject(profile)
+      expect(options).toEqual(profile)
+    }
+  })
+})
