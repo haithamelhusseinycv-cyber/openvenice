@@ -6,7 +6,6 @@ import {
   DEFAULT_CHAT_MODEL_ID,
   DEFAULT_IMAGE_MODEL_ID,
   isAllowedChatModel,
-  isAllowedImageModel,
   isVisibleTab,
 } from '../lib/allowed-models'
 
@@ -15,7 +14,7 @@ export type Tab = 'chat' | 'image' | 'audio' | 'music' | 'video' | 'embeddings' 
 export function sanitizeSelectedModels(selected: Record<string, string> | undefined): Record<string, string> {
   const next = { ...(selected || {}) }
   if (!isAllowedChatModel(next.chat)) next.chat = DEFAULT_CHAT_MODEL_ID
-  if (!isAllowedImageModel(next.image)) next.image = DEFAULT_IMAGE_MODEL_ID
+  if (!next.image?.trim()) next.image = DEFAULT_IMAGE_MODEL_ID
   return next
 }
 

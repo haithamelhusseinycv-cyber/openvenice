@@ -21,7 +21,7 @@ export async function checkVeniceModels(): Promise<DiagnosticResult> {
       veniceWithTimeout<ModelsResponse>('/models?type=image', 8_000),
     ])
     const textModels = text.data.filter((model) => !model.model_spec?.offline && isAllowedChatModel(model.id))
-    const imageModels = image.data.filter((model) => !model.model_spec?.offline && isAllowedImageModel(model.id))
+    const imageModels = image.data.filter((model) => !model.model_spec?.offline && isAllowedImageModel(model.id, model.model_spec?.uncensored))
     const ready = textModels.length > 0 && imageModels.length > 0
     return {
       id: 'venice',

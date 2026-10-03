@@ -58,6 +58,7 @@ export interface VeniceModel {
     maxCompletionTokens?: number
     capabilities?: ModelCapabilities
     traits?: ModelTrait[]
+    uncensored?: boolean
     offline?: boolean
     name?: string
     description?: string

@@ -1,3 +1,4 @@
+import { imageModelLabel } from '../../lib/image-model-label'
 import { useMemo, useState } from 'react'
 import { useSettingsStore } from '../../stores/settings-store'
 import { useImageWorkspace } from '../../stores/image-workspace-store'
@@ -58,8 +59,8 @@ export function Header({ onOpenApiKey, onOpenDiagnostics, onOpenMobileSidebar }:
   const { data: models } = useModels(hasOwnSelector ? undefined : modelType)
   const currentModel = hasOwnSelector ? '' : (selectedModels[activeTab] || models?.[0]?.id || '')
   const modelOptions = useMemo(
-    () => (hasOwnSelector ? [] : (models?.map((m) => ({ value: m.id, label: m.model_spec?.name || m.id })) ?? [])),
-    [hasOwnSelector, models],
+    () => (hasOwnSelector ? [] : (models?.map((m) => ({ value: m.id, label: modelType === 'image' ? imageModelLabel(m) : (m.model_spec?.name || m.id) })) ?? [])),
+    [hasOwnSelector, models, modelType],
   )
   const [modelSheetOpen, setModelSheetOpen] = useState(false)
   const [modelQuery, setModelQuery] = useState('')
@@ -130,7 +131,11 @@ export function Header({ onOpenApiKey, onOpenDiagnostics, onOpenMobileSidebar }:
         />
       )}
 
-      <div className="flex shrink-0 items-center justify-end gap-1 sm:ml-auto">
+      <details className="relative shrink-0 sm:ml-auto">
+        <summary aria-label="Account and device options" title="Account and device options" className="flex h-11 w-11 cursor-pointer list-none items-center justify-center rounded-lg text-white/60 hover:bg-white/[0.06] [&::-webkit-details-marker]:hidden">
+          <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="12" cy="19" r="1.8" /></svg>
+        </summary>
+        <div className="absolute right-0 top-full z-50 mt-2 flex w-max max-w-[85vw] items-center gap-2 rounded-xl border border-white/10 bg-[#15151b] p-3 shadow-xl">
         <BillingBar />
         <button
           onClick={onOpenDiagnostics}
@@ -150,7 +155,8 @@ export function Header({ onOpenApiKey, onOpenDiagnostics, onOpenMobileSidebar }:
             {apiKey ? 'Ready' : 'Key'}
           </span>
         </button>
-      </div>
+        </div>
+      </details>
 
       <BottomSheet open={modelSheetOpen} onClose={() => { setModelSheetOpen(false); setModelQuery('') }} title="Choose model">
         <div className="sticky -top-4 z-10 -mx-4 bg-[#15151b] px-4 pb-3 pt-1">
