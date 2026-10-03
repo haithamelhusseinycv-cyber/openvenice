@@ -1,0 +1,116 @@
+name: Build FaceFusion on-device test APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout OpenVenice customization source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Java 21
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # Keep the same debug signing identity so Android can update previous
+      # companion builds in place and OpenVenice can use signature IPC.
+      - name: Restore stable debug signing key
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ~/.android/debug.keystore
+          key: android-face-fusion-debug-keystore-v2
+
+      - name: Ensure shared signing key exists
+        shell: bash
+        run: |
+          mkdir -p ~/.android
+          if [ ! -f ~/.android/debug.keystore ]; then
+            keytool -genkeypair -v \
+              -keystore ~/.android/debug.keystore \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname 'CN=Android Debug,O=Android,C=US'
+          fi
+          keytool -list -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey | grep 'SHA256:'
+
+      - name: Clone pinned Android Face Fusion
+        shell: bash
+        env:
+          FACEFUSION_UPSTREAM_SHA: f38a70e4bacaab4132538421c471f9d4d3ccac00
+        run: |
+          git clone --no-checkout https://github.com/Parasaran-Python/android-face-fusion.git android-face-fusion
+          git -C android-face-fusion checkout --detach "$FACEFUSION_UPSTREAM_SHA"
+          test "$(git -C android-face-fusion rev-parse HEAD)" = "$FACEFUSION_UPSTREAM_SHA"
+
+      - name: Apply Complete Models customization
+        shell: bash
+        env:
+          OPENVENICE_DEBUG_KEYSTORE: /home/runner/.android/debug.keystore
+        run: |
+          python3 android-face-fusion-custom/apply_custom.py
+          python3 android-face-fusion-custom/fix_downloads_v31.py
+          python3 android-face-fusion-custom/apply_agent_bridge.py
+          python3 android-face-fusion-custom/improve_mobile_v42.py
+          python3 android-openvenice-custom/pin_debug_signing.py android-face-fusion/app/build.gradle.kts
+
+      - name: Verify agent bridge manifest
+        shell: bash
+        run: |
+          grep -q 'ai.openvenice.permission.FACEFUSION_AGENT' android-face-fusion/app/src/main/AndroidManifest.xml
+          grep -q 'AgentBridgeService' android-face-fusion/app/src/main/AndroidManifest.xml
+          grep -q 'openVeniceStableDebug' android-face-fusion/app/build.gradle.kts
+          test -f android-face-fusion/app/src/main/java/com/pv/androidfacefusion/AgentBridgeService.java
+
+      - name: Add on-device processing test
+        run: |
+          mkdir -p android-face-fusion/app/src/androidTest/java/com/pv/androidfacefusion android-face-fusion/app/src/androidTest/assets
+          cp android-face-fusion-custom/FaceFusionSmoke.java android-face-fusion/app/src/androidTest/java/com/pv/androidfacefusion/
+          sed -i '/defaultConfig {/a\            testInstrumentationRunner = "com.pv.androidfacefusion.FaceFusionSmoke"' android-face-fusion/app/build.gradle.kts
+          curl -fL --retry 2 https://raw.githubusercontent.com/scikit-image/scikit-image/v0.19.3/skimage/data/astronaut.png -o android-face-fusion/app/src/androidTest/assets/astronaut.png
+          curl -fL --retry 2 https://raw.githubusercontent.com/matplotlib/matplotlib/v3.9.2/lib/matplotlib/mpl-data/sample_data/grace_hopper.jpg -o android-face-fusion/app/src/androidTest/assets/grace_hopper.jpg
+
+      - name: Build debug APK
+        working-directory: android-face-fusion
+        shell: bash
+        env:
+          OPENVENICE_DEBUG_KEYSTORE: /home/runner/.android/debug.keystore
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleDebug assembleDebugAndroidTest --no-daemon --stacktrace
+
+      - name: Verify APK and signing identity
+        shell: bash
+        run: |
+          apk='android-face-fusion/app/build/outputs/apk/debug/app-debug.apk'
+          apksigner="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner"
+          test -f "$apk"
+          ls -lh "$apk"
+          "$apksigner" verify --print-certs "$apk"
+
+          expected=$(keytool -list -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey | awk '/SHA256:/{print $2; exit}' | tr -d ':' | tr '[:upper:]' '[:lower:]')
+          actual=$("$apksigner" verify --print-certs "$apk" | awk '/certificate SHA-256 digest:/{print $NF; exit}' | tr '[:upper:]' '[:lower:]')
+          echo "Expected signer: $expected"
+          echo "APK signer:      $actual"
+          test -n "$expected"
+          test "$expected" = "$actual"
+
+      - name: Upload Complete Models APK
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: facefusion-on-device-test-apk
+          path: android-face-fusion/app/build/outputs/apk/androidTest/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
