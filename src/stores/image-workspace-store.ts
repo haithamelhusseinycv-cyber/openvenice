@@ -10,6 +10,8 @@ interface PendingSource {
 }
 
 interface ImageWorkspaceState {
+  generatedImages: string[]
+  addGeneratedImages: (images: string[]) => void
   imageSubTab: ImageSubTab
   setImageSubTab: (tab: ImageSubTab) => void
   pendingSource: PendingSource | null
@@ -20,6 +22,11 @@ interface ImageWorkspaceState {
 }
 
 export const useImageWorkspace = create<ImageWorkspaceState>((set, get) => ({
+  // Keep a small gallery in memory across Generate/Tools navigation.
+  generatedImages: [],
+  addGeneratedImages: (images) => set((state) => ({
+    generatedImages: [...images, ...state.generatedImages].slice(0, 2),
+  })),
   imageSubTab: 'generate',
   setImageSubTab: (tab) => set({ imageSubTab: tab }),
   pendingSource: null,

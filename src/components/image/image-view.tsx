@@ -24,8 +24,6 @@ import { BottomSheet } from '../ui/bottom-sheet'
 import { TaskProgress } from '../ui/task-progress'
 import type { ImageConstraints } from '../../types/venice'
 
-const GALLERY_MAX = 2
-
 function loadSaved(key: string, fallback: string) {
   try {
     const saved = localStorage.getItem(key)
@@ -93,7 +91,7 @@ export function ImageView() {
   })
   const [seed, setSeed] = useState(() => loadSaved('venice-image-seed', ''))
   const [variants, setVariants] = useState(LOCKED_IMAGE_VARIANTS)
-  const [images, setImages] = useState<string[]>([])
+  const images = useImageWorkspace((s) => s.generatedImages)
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
   const [paramsOpen, setParamsOpen] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -272,12 +270,6 @@ export function ImageView() {
 
     mutation.mutate(
       req as unknown as Parameters<typeof mutation.mutate>[0],
-      {
-        onSuccess: (data) => {
-          const newImages = data.images.map((img) => typeof img === 'string' ? img : img.b64_json)
-          setImages((prev) => [...newImages, ...prev].slice(0, GALLERY_MAX))
-        },
-      },
     )
   }
 
