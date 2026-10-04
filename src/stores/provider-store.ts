@@ -9,7 +9,9 @@ const QWEN_SESSION_KEY = 'openvenice-qwen-api-key'
 
 function sessionValue(key: string) {
   try {
-    return sessionStorage.getItem(key) || ''
+    const value = sessionStorage.getItem(key) || ''
+    sessionStorage.removeItem(key)
+    return value
   } catch {
     return ''
   }
@@ -44,10 +46,9 @@ export const useProviderStore = create<ProviderState>()(
       setQwenModelId: (qwenModelId) => set({ qwenModelId: qwenModelId.trim() || DEFAULT_QWEN_MODEL_ID }),
       setQwenApiKey: (qwenApiKey) => {
         try {
-          if (qwenApiKey) sessionStorage.setItem(QWEN_SESSION_KEY, qwenApiKey)
-          else sessionStorage.removeItem(QWEN_SESSION_KEY)
+          sessionStorage.removeItem(QWEN_SESSION_KEY)
         } catch {
-          // Session persistence is optional; in-memory state still works.
+          // Provider credentials remain in memory; only non-secret settings persist.
         }
         set({ qwenApiKey })
       },

@@ -130,17 +130,24 @@ async function clearDeviceKey() {
   try { localStorage.removeItem(DEVICE_MARKER_KEY) } catch { /* ignore marker failures */ }
 }
 
+function clearPlaintextSessionKey() {
+  try { sessionStorage.removeItem(SESSION_KEY) } catch { /* storage may be unavailable */ }
+}
+
 const initialKey = (() => {
   try {
     const session = sessionStorage.getItem(SESSION_KEY)
-    if (session) return session
+    if (session) {
+      sessionStorage.removeItem(SESSION_KEY)
+      return session
+    }
     const legacy = localStorage.getItem(SESSION_KEY)
     if (legacy) {
       try {
         const parsed = JSON.parse(legacy) as { state?: { apiKey?: string | null } }
         const key = parsed?.state?.apiKey ?? null
         localStorage.removeItem(SESSION_KEY)
-        if (key) sessionStorage.setItem(SESSION_KEY, key)
+        // Legacy plaintext is migrated to memory only.
         return key
       } catch {
         localStorage.removeItem(SESSION_KEY)
@@ -174,7 +181,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
   deviceRemembered: initialDeviceRemembered,
 
   setApiKey: async (key, remember) => {
-    sessionStorage.setItem(SESSION_KEY, key)
+    clearPlaintextSessionKey()
 
     if (remember?.device) {
       await saveDeviceKey(key)
@@ -201,7 +208,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
     if (!raw) return false
     try {
       const key = await decrypt(JSON.parse(raw) as EncryptedBlob, passphrase)
-      sessionStorage.setItem(SESSION_KEY, key)
+      clearPlaintextSessionKey()
       set({ apiKey: key })
       return true
     } catch {
@@ -210,7 +217,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
   },
 
   hydrateFromDevice: async () => {
-    if (sessionStorage.getItem(SESSION_KEY)) return true
+    if (useAuthStore.getState().apiKey) return true
     const key = await loadDeviceKey()
     if (!key) {
       if (initialDeviceRemembered) {
@@ -219,13 +226,13 @@ export const useAuthStore = create<AuthState>()((set) => ({
       }
       return false
     }
-    sessionStorage.setItem(SESSION_KEY, key)
+    clearPlaintextSessionKey()
     set({ apiKey: key, deviceRemembered: true })
     return true
   },
 
   clearApiKey: () => {
-    sessionStorage.removeItem(SESSION_KEY)
+    clearPlaintextSessionKey()
     localStorage.removeItem(ENCRYPTED_KEY)
     void clearDeviceKey()
     set({ apiKey: null, hasEncrypted: false, deviceRemembered: false })
