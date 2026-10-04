@@ -2,8 +2,6 @@ name: Shahy Runtime Smoke
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "17 5 * * *"
 
 concurrency:
   group: shahy-runtime-smoke
