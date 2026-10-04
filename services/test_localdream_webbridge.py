@@ -2,6 +2,7 @@
 import threading
 import time
 import unittest
+from unittest.mock import MagicMock, patch
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import requests
 from localdream_webbridge import make_server, CONTROL_ROUTES, GENERATION_ROUTES
@@ -95,6 +96,27 @@ class BrowserBridgeTests(unittest.TestCase):
         self.assertEqual(preflight.status_code, 204)
         self.assertIn("X-Upscaler-Path", preflight.headers["Access-Control-Allow-Headers"])
         self.assertIn("X-Output-Width", response.headers["Access-Control-Expose-Headers"])
+
+    def test_invalid_upstream_headers_are_dropped_without_losing_payload(self):
+        upstream = MagicMock()
+        upstream.status_code = 200
+        upstream.headers = {
+            "Content-Type": "image/png", "X-Output-Width": "16",
+            "X-Bad": "safe\r\nInjected: yes", "Bad\nName": "value",
+            "X-Nul": "bad\x00value", "X-Del": "bad\x7fvalue",
+            "X-Unicode": "\u0100", "X-Tab": "left\tright",
+            "Content-Length": "9999",
+        }
+        upstream.__enter__.return_value = upstream
+        upstream.iter_content.return_value = [b"payload"]
+        with patch("localdream_webbridge.requests.request", return_value=upstream):
+            response = requests.get(self.control_url + "/info", headers=self.origin, timeout=3)
+        self.assertEqual(response.content, b"payload")
+        self.assertEqual(response.headers["X-Output-Width"], "16")
+        self.assertEqual(response.headers["X-Tab"], "left\tright")
+        self.assertEqual(response.headers["Access-Control-Allow-Origin"], "https://localhost")
+        for name in ("X-Bad", "Injected", "Bad", "X-Nul", "X-Del", "X-Unicode", "Content-Length"):
+            self.assertNotIn(name, response.headers)
 
     def test_browser_stream_close_closes_upstream(self):
         Upstream.cancelled.clear()

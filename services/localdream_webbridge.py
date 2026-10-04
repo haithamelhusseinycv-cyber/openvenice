@@ -1,5 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/python
 """Loopback-only browser transport for the existing Local Dream Android host."""
+import re
 import signal
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -13,6 +14,13 @@ GENERATION_ROUTES = frozenset({"/health", "/generate", "/upscale"})
 HOP_HEADERS = frozenset({"connection", "keep-alive", "transfer-encoding", "upgrade",
                          "proxy-authenticate", "proxy-authorization", "te", "trailer",
                          "content-length", "content-encoding", "access-control-allow-origin"})
+
+def safe_response_header(name, value):
+    """Only forward HTTP token names and printable Latin-1 header values."""
+    return (isinstance(name, str) and isinstance(value, str)
+            and re.fullmatch(r"[!#$%&'*+.^_`|~0-9A-Za-z-]+", name) is not None
+            and all(char == "\t" or 32 <= ord(char) <= 255 and ord(char) != 127
+                    for char in value))
 
 def handler_for(upstream_port, routes):
     class Handler(BaseHTTPRequestHandler):
@@ -28,7 +36,7 @@ def handler_for(upstream_port, routes):
         def cors_headers(self):
             origin = self.headers.get("Origin")
             if origin in ALLOWED_ORIGINS:
-                self.send_header("Access-Control-Allow-Origin", origin)
+                self.send_header("Access-Control-Allow-Origin", "https://localhost")
                 self.send_header("Vary", "Origin")
                 self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
                 self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Image-Width, X-Image-Height, X-Upscaler-Path, X-Use-OpenCL")
@@ -92,7 +100,7 @@ def handler_for(upstream_port, routes):
                 ) as response:
                     self.send_response(response.status_code)
                     for key, value in response.headers.items():
-                        if key.lower() not in HOP_HEADERS:
+                        if safe_response_header(key, value) and key.lower() not in HOP_HEADERS:
                             self.send_header(key, value)
                     self.cors_headers()
                     self.end_headers()
