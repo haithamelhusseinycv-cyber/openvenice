@@ -15,7 +15,7 @@ class AuthenticationTests(unittest.TestCase):
     def test_accepts_valid_bearer_without_exposing_key(self):
         auth = ApiKeyAuthenticator(("secret-one",))
         principal = auth.authenticate("Bearer secret-one")
-        self.assertEqual(len(principal), 16)
+        self.assertEqual(len(principal), 32)
         self.assertNotIn("secret", principal)
 
     def test_rejects_missing_or_invalid_key(self):
@@ -30,6 +30,13 @@ class AuthenticationTests(unittest.TestCase):
         with self.assertRaises(ConfigurationError):
             auth.authenticate(None)
 
+    def test_principals_are_stable_per_key_and_distinct_between_keys(self):
+        auth = ApiKeyAuthenticator(("secret-one", "secret-two"))
+        principal = auth.authenticate("Bearer secret-one")
+        self.assertEqual(principal, auth.authenticate(None, "secret-one"))
+        self.assertNotEqual(principal, auth.authenticate("Bearer secret-two"))
+        self.assertNotIn("secret-one", principal)
+
     def test_unauthenticated_mode_is_explicit(self):
         auth = ApiKeyAuthenticator((), allow_unauthenticated=True)
         self.assertEqual(auth.authenticate(None), "development")
@@ -37,7 +44,7 @@ class AuthenticationTests(unittest.TestCase):
     def test_environment_supports_key_rotation(self):
         with patch.dict(os.environ, {"VOICETUT_API_KEYS": "old,new"}, clear=False):
             auth = ApiKeyAuthenticator.from_environment()
-        self.assertEqual(len(auth.authenticate("Bearer new")), 16)
+        self.assertEqual(len(auth.authenticate("Bearer new")), 32)
 
 
 class QuotaTests(unittest.TestCase):
