@@ -101,7 +101,9 @@ def handler_for(upstream_port, routes):
                     self.send_response(response.status_code)
                     for key, value in response.headers.items():
                         if safe_response_header(key, value) and key.lower() not in HOP_HEADERS:
-                            self.send_header(key, value)
+                            # Sanitize at the sink as well as rejecting invalid headers above.
+                            self.send_header(key.replace("\r", "").replace("\n", ""),
+                                             value.replace("\r", "").replace("\n", ""))
                     self.cors_headers()
                     self.end_headers()
                     started = True
