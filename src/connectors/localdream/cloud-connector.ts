@@ -18,7 +18,7 @@ export interface CloudJob {
 }
 export interface CloudVersion { id: string; role: string; filename: string; url: string }
 type Persistence = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
-type Pending = { body: CloudRequest & { token: string; quality: 'high'; speed: 'quality' }; id?: string }
+type Pending = { body: CloudRequest & { token: string; quality: 'high'; speed: 'quality' }; id?: string; cancelRequested?: boolean; cancelConfirmed?: boolean }
 const KEY = 'localdream.cloud.pending.v2'
 const TERMINAL = new Set(['complete', 'needs_review', 'needs_input', 'failed', 'cancelled'])
 
@@ -38,7 +38,7 @@ export class LocalDreamCloudConnector {
     return value
   }
   capabilities(signal?: AbortSignal) {
-    return this.request<{ protocol: number; profile: string; operations: Array<{ id: CloudOperation; acceptance: string }> }>('/api/capabilities', undefined, signal)
+    return this.request<{ protocol: number; profile: string; cancel_by_token: boolean; operations: Array<{ id: CloudOperation; acceptance: string }> }>('/api/capabilities', undefined, signal)
   }
   async upload(base64: string, signal?: AbortSignal) {
     return this.request<{ filename: string; width: number; height: number }>('/api/upload', { image: base64 }, signal)
@@ -51,7 +51,7 @@ export class LocalDreamCloudConnector {
     const existing = this.pending()
     if (existing) throw new Error('Reconnect to the existing cloud job before submitting another.')
     const capabilities = await this.capabilities(signal)
-    if (capabilities.protocol !== 2 || capabilities.profile !== 'Best' || !capabilities.operations.some((op) => op.id === input.operation)) {
+    if (capabilities.protocol !== 2 || capabilities.profile !== 'Best' || !capabilities.cancel_by_token || !capabilities.operations.some((op) => op.id === input.operation)) {
       throw new Error('The gateway does not support this Best workflow.')
     }
     const pending: Pending = { body: { ...input, token: crypto.randomUUID().replaceAll('-', ''), quality: 'high', speed: 'quality' } }
@@ -61,17 +61,25 @@ export class LocalDreamCloudConnector {
   async reconnect(signal?: AbortSignal): Promise<CloudJob> {
     const pending = this.pending()
     if (!pending) throw new Error('No pending cloud request')
+    if (pending.cancelRequested && !pending.cancelConfirmed) return this.cancel(signal)
+    if (pending.cancelConfirmed && !pending.id) return { id: '', state: 'cancelled', message: 'Cancelled before acceptance', images: [] }
     // A lost POST response is retried only with the SAME durable idempotency token.
     const job = pending.id
       ? await this.request<CloudJob>('/api/jobs/' + pending.id, undefined, signal)
       : await this.request<CloudJob>('/api/jobs', pending.body, signal)
-    pending.id = job.id
-    this.storage.setItem(KEY, JSON.stringify(pending))
+    const latest = this.pending()
+    if (!latest || latest.body.token !== pending.body.token) throw new Error('The pending request changed while reconnecting.')
+    this.storage.setItem(KEY, JSON.stringify({ ...latest, id: job.id }))
     return job
   }
   async cancel(signal?: AbortSignal) {
-    const job = await this.reconnect(signal)
-    return this.request<CloudJob>('/api/jobs/' + job.id + '/cancel', {}, signal)
+    const pending = this.pending()
+    if (!pending) throw new Error('No pending cloud request')
+    this.storage.setItem(KEY, JSON.stringify({ ...pending, cancelRequested: true }))
+    const result = await this.request<{ cancelled: boolean; job_id: string | null }>('/api/cancel-token', { token: pending.body.token }, signal)
+    if (!result.cancelled) throw new Error('Cancellation was not confirmed')
+    this.storage.setItem(KEY, JSON.stringify({ ...pending, id: result.job_id ?? pending.id, cancelRequested: true, cancelConfirmed: true }))
+    return this.reconnect(signal)
   }
   async resume(id: string, signal?: AbortSignal) {
     return this.request<CloudJob>('/api/jobs/' + id + '/resume', {}, signal)

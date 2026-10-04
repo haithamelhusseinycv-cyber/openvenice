@@ -12,7 +12,7 @@ function fixture() {
 describe('Shared cloud channel', () => {
   it('recovers a lost submission using exactly the saved token', async () => {
     const f = fixture()
-    f.fetcher.mockResolvedValueOnce(f.response({ protocol: 2, profile: 'Best', operations: [{ id: 'create' }] })).mockRejectedValueOnce(new Error('lost reply'))
+    f.fetcher.mockResolvedValueOnce(f.response({ protocol: 2, profile: 'Best', cancel_by_token: true, operations: [{ id: 'create' }] })).mockRejectedValueOnce(new Error('lost reply'))
     await expect(f.client.submit({ operation: 'create', prompt: 'A ceramic mug' })).rejects.toThrow('lost reply')
     const body = f.fetcher.mock.calls[1][1]?.body
     expect(f.client.pending()?.body.quality).toBe('high')
@@ -26,7 +26,7 @@ describe('Shared cloud channel', () => {
   })
   it('does not overwrite an active pending request', async () => {
     const f = fixture()
-    f.fetcher.mockResolvedValueOnce(f.response({ protocol: 2, profile: 'Best', operations: [{ id: 'create' }] })).mockResolvedValueOnce(f.response({ id: 'job1', state: 'processing', images: [] }))
+    f.fetcher.mockResolvedValueOnce(f.response({ protocol: 2, profile: 'Best', cancel_by_token: true, operations: [{ id: 'create' }] })).mockResolvedValueOnce(f.response({ id: 'job1', state: 'processing', images: [] }))
     await f.client.submit({ operation: 'create', prompt: 'A mug' })
     await expect(f.client.submit({ operation: 'create', prompt: 'A vase' })).rejects.toThrow('Reconnect')
     expect(f.fetcher).toHaveBeenCalledTimes(2)
@@ -40,7 +40,7 @@ describe('Shared cloud channel', () => {
   })
   it('keeps pending state until a terminal result is acknowledged', async () => {
     const f = fixture()
-    f.fetcher.mockResolvedValueOnce(f.response({ protocol: 2, profile: 'Best', operations: [{ id: 'create' }] })).mockResolvedValueOnce(f.response({ id: 'job1', state: 'processing', images: [] }))
+    f.fetcher.mockResolvedValueOnce(f.response({ protocol: 2, profile: 'Best', cancel_by_token: true, operations: [{ id: 'create' }] })).mockResolvedValueOnce(f.response({ id: 'job1', state: 'processing', images: [] }))
     await f.client.submit({ operation: 'create', prompt: 'A mug' })
     f.fetcher.mockResolvedValueOnce(f.response({ id: 'job1', state: 'processing', images: [] }))
     await expect(f.client.acknowledge()).rejects.toThrow('still active')
@@ -49,4 +49,29 @@ describe('Shared cloud channel', () => {
     await f.client.acknowledge()
     expect(f.client.pending()).toBeUndefined()
   })
+  it('cancels an unknown job ID without creating another paid submission', async () => {
+    const f = fixture()
+    f.fetcher.mockResolvedValueOnce(f.response({ protocol: 2, profile: 'Best', cancel_by_token: true, operations: [{ id: 'create' }] })).mockRejectedValueOnce(new Error('lost reply'))
+    await expect(f.client.submit({ operation: 'create', prompt: 'A mug' })).rejects.toThrow()
+    const token = f.client.pending()?.body.token
+    f.fetcher.mockResolvedValueOnce(f.response({ cancelled: true, job_id: null }))
+    expect((await f.client.cancel()).state).toBe('cancelled')
+    expect(f.fetcher.mock.calls[2][0]).toContain('/api/cancel-token')
+    expect(JSON.parse(String(f.fetcher.mock.calls[2][1]?.body))).toEqual({ token })
+    await f.client.acknowledge()
+    expect(f.client.pending()).toBeUndefined()
+    expect(f.fetcher).toHaveBeenCalledTimes(3)
+  })
+  it('retries interrupted cancellation rather than paid submission after reload', async () => {
+    const f = fixture()
+    f.fetcher.mockResolvedValueOnce(f.response({ protocol: 2, profile: 'Best', cancel_by_token: true, operations: [{ id: 'create' }] })).mockRejectedValueOnce(new Error('lost reply'))
+    await expect(f.client.submit({ operation: 'create', prompt: 'A mug' })).rejects.toThrow()
+    f.fetcher.mockRejectedValueOnce(new Error('cancel reply lost'))
+    await expect(f.client.cancel()).rejects.toThrow('cancel reply lost')
+    const loaded = new LocalDreamCloudConnector(f.storage, f.fetcher)
+    f.fetcher.mockResolvedValueOnce(f.response({ cancelled: true, job_id: null }))
+    expect((await loaded.reconnect()).state).toBe('cancelled')
+    expect(f.fetcher.mock.calls[3][0]).toContain('/api/cancel-token')
+  })
+
 })
