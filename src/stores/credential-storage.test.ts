@@ -14,6 +14,14 @@ describe('provider credential storage',()=>{
   expect(useAuthStore.getState().apiKey).toBe('legacy-test-key')
   expect(session.getItem('venice-auth')).toBeNull()
  })
+ it('cleans both plaintext stores when legacy copies coexist',async()=>{
+  session.setItem('venice-auth','session-test-key')
+  local.setItem('venice-auth',JSON.stringify({state:{apiKey:'legacy-disk-test-key'}}))
+  const {useAuthStore}=await import('./auth-store')
+  expect(useAuthStore.getState().apiKey).toBe('session-test-key')
+  expect(session.getItem('venice-auth')).toBeNull()
+  expect(local.getItem('venice-auth')).toBeNull()
+ })
  it('keeps ordinary Venice keys in memory only',async()=>{
   const {useAuthStore}=await import('./auth-store')
   await useAuthStore.getState().setApiKey('test-provider-secret')

@@ -135,25 +135,21 @@ function clearPlaintextSessionKey() {
 }
 
 const initialKey = (() => {
+  let session: string | null = null
+  let legacy: string | null = null
   try {
-    const session = sessionStorage.getItem(SESSION_KEY)
-    if (session) {
-      sessionStorage.removeItem(SESSION_KEY)
-      return session
-    }
-    const legacy = localStorage.getItem(SESSION_KEY)
-    if (legacy) {
-      try {
-        const parsed = JSON.parse(legacy) as { state?: { apiKey?: string | null } }
-        const key = parsed?.state?.apiKey ?? null
-        localStorage.removeItem(SESSION_KEY)
-        // Legacy plaintext is migrated to memory only.
-        return key
-      } catch {
-        localStorage.removeItem(SESSION_KEY)
-      }
-    }
-    return null
+    session = sessionStorage.getItem(SESSION_KEY)
+    sessionStorage.removeItem(SESSION_KEY)
+  } catch { /* session storage may be unavailable */ }
+  try {
+    legacy = localStorage.getItem(SESSION_KEY)
+    localStorage.removeItem(SESSION_KEY)
+  } catch { /* local storage may be unavailable */ }
+  if (session) return session
+  if (!legacy) return null
+  try {
+    const parsed = JSON.parse(legacy) as { state?: { apiKey?: unknown } }
+    return typeof parsed?.state?.apiKey === 'string' ? parsed.state.apiKey : null
   } catch {
     return null
   }
