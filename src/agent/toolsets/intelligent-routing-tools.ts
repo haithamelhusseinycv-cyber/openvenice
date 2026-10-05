@@ -9,7 +9,7 @@ const objectSchema = (properties: Record<string, unknown>, required: string[] = 
   additionalProperties: false,
 })
 
-export function createIntelligentRoutingTools(cloudConnector = new LocalDreamCloudConnector()): AgentTool[] {
+export function createIntelligentRoutingTools(cloudConnector = new LocalDreamCloudConnector(localStorage)): AgentTool[] {
   return [
     {
       id: 'intelligent.analyze_and_route',

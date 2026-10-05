@@ -102,7 +102,7 @@ export function createResearchPlugin(connector = new ResearchConnector()): Agent
   }
 }
 
-export function createIntelligentRoutingPlugin(cloudConnector = new LocalDreamCloudConnector()): AgentPluginDefinition {
+export function createIntelligentRoutingPlugin(cloudConnector = new LocalDreamCloudConnector(localStorage)): AgentPluginDefinition {
   return {
     manifest: {
       id: 'intelligent-routing',
