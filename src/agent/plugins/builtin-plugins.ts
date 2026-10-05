@@ -1,4 +1,5 @@
 import { LocalDreamConnector } from '../../connectors/localdream/localdream-connector'
+import { LocalDreamCloudConnector } from '../../connectors/localdream/cloud-connector'
 import { FaceFusionConnector } from '../../connectors/facefusion/facefusion-connector'
 import { GithubConnector } from '../../connectors/github/github-connector'
 import { GraphConnector } from '../../connectors/microsoft-graph/graph-connector'
@@ -8,6 +9,7 @@ import { createFaceFusionTools } from '../toolsets/facefusion-tools'
 import { createGithubTools } from '../toolsets/github-tools'
 import { createGraphTools } from '../toolsets/graph-tools'
 import { createResearchTools } from '../toolsets/research-tools'
+import { createIntelligentRoutingTools } from '../toolsets/intelligent-routing-tools'
 import type { AgentPluginDefinition } from './plugin-types'
 
 export function createLocalDreamPlugin(connector = new LocalDreamConnector()): AgentPluginDefinition {
@@ -96,6 +98,24 @@ export function createResearchPlugin(connector = new ResearchConnector()): Agent
       requiresNative: false,
     },
     createTools: () => createResearchTools(connector),
+    enabledByDefault: true,
+  }
+}
+
+export function createIntelligentRoutingPlugin(cloudConnector = new LocalDreamCloudConnector()): AgentPluginDefinition {
+  return {
+    manifest: {
+      id: 'intelligent-routing',
+      name: 'Intelligent Router',
+      version: 'builtin',
+      description: 'Analyzes user intent from prompts and images, then automatically selects the optimal workflow, quality tier, and settings. Routes to local or cloud generation. Zero censorship, minimal user input required.',
+      capabilities: ['intent-detection', 'auto-routing', 'quality-selection', 'nsfw-aware'],
+      permissions: ['network', 'local-app-control'],
+      entrypoint: 'builtin:intelligent-routing',
+      builtIn: true,
+      requiresNative: false,
+    },
+    createTools: () => createIntelligentRoutingTools(cloudConnector),
     enabledByDefault: true,
   }
 }

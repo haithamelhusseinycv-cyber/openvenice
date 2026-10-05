@@ -11,6 +11,7 @@ import {
   createGraphPlugin,
   createLocalDreamPlugin,
   createResearchPlugin,
+  createIntelligentRoutingPlugin,
 } from './plugins/builtin-plugins'
 import { createPluginManagementTools } from './toolsets/plugin-tools'
 
@@ -33,6 +34,7 @@ export function createAgentRuntime(options: AgentRuntimeOptions = {}): AgentRunt
   const plugins = new AgentPluginManager(registry)
 
   plugins.register(createLocalDreamPlugin())
+  plugins.register(createIntelligentRoutingPlugin())
   plugins.register(createGithubPlugin(options.github ?? new GithubConnector()))
   plugins.register(createGraphPlugin(options.graph ?? new GraphConnector()))
   plugins.register(createResearchPlugin(options.research ?? new ResearchConnector()))
