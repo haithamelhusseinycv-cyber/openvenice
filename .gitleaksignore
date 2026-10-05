@@ -1,0 +1,5 @@
+# Reviewed historical findings only; no file-wide or rule-wide exclusions.
+# Test fixtures, noncredential Java/UI strings, documentation placeholders,
+# upstream Firebase client identifiers and WhatsApp protocol dictionary tokens.
+# Firebase project owners must maintain API restrictions, Rules and App Check.
+ad6c7ce65955c9dad829228744cf97d6b7e83e73:android-face-fusion-custom/ModelCatalogActivityV2.java:generic-api-key:160

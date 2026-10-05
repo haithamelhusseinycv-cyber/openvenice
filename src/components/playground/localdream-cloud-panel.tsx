@@ -102,6 +102,11 @@ export function LocalDreamCloudPanel() {
         <label className="flex flex-col gap-1">GPU estimate limit<select className={field} value={budget} disabled={busy || pending} onChange={(e) => setBudget(Number(e.target.value))}>{[0.1, 0.25, 0.5, 1].map((value) => <option key={value} value={value}>${value.toFixed(2)}</option>)}</select></label>
         <button type="button" className={button} disabled={!canSubmit} onClick={() => { void submit() }}>Analyze and run · Best</button>
         {job && <><p role="status" aria-live="polite">{job.message}{job.estimated_cost_usd === undefined ? '' : ' · estimated $' + job.estimated_cost_usd.toFixed(3)}</p>{job.review?.issues.map((issue, index) => <p key={index} className="text-amber-200">{issue}</p>)}</>}
+        {(job?.plan?.reason || job?.routing?.reasons?.length) && <section aria-label="Workflow decisions" className="flex flex-col gap-1 rounded-xl border border-white/10 bg-white/5 p-3">
+          <p className="text-white/60">Why this run was set up this way</p>
+          {job?.plan?.reason && <p>{labels[job.plan.operation]}{job.plan.target ? ' · ' + job.plan.target : ''}: {job.plan.reason}</p>}
+          {job?.routing?.reasons?.map((reason, index) => <p key={index}>{reason}</p>)}
+        </section>}
         {active && <button type="button" className={button} disabled={busy} onClick={() => { void work(async () => { setJob(await client.cancel()) }) }}>Cancel cloud job</button>}
         {versions.length > 0 && <label className="flex flex-col gap-1">Versions and Undo<select className={field} value={version?.id || ''} disabled={busy} onChange={(e) => { const next = versions.find((v) => v.id === e.target.value); if (next) void work(async () => { setVersion(await client.selectVersion(job!.id, next.id)) }) }}>{versions.map((v) => <option key={v.id} value={v.id}>{v.role} · {v.id}</option>)}</select></label>}
         {selectedUrl && <figure><img src={selectedUrl} alt="Saved Local Dream version" className="w-full rounded-xl" /><ArtifactActions artifact={{ id: 'localdream-cloud-' + job?.id, kind: 'image', url: selectedUrl, mimeType: 'image/png', format: 'png', sourceTool: 'localdream.cloud' }} /></figure>}

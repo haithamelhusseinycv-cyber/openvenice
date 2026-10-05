@@ -2,8 +2,6 @@ name: Shahy Runtime Smoke
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "17 5 * * *"
 
 concurrency:
   group: shahy-runtime-smoke
@@ -19,6 +17,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Verify Shahy public runtime
         run: bash open-webui-workstation/scripts/verify_runtime.sh

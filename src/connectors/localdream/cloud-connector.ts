@@ -15,6 +15,8 @@ export interface CloudJob {
   images: Array<{ filename: string }>
   estimated_cost_usd?: number
   review?: { passed: boolean; issues: string[] }
+  plan?: { operation: CloudOperation; reason?: string; target?: string; faces?: string; framing?: string; quality?: string }
+  routing?: { shape?: number[]; pre?: Array<{ stage: string; model: string }>; post?: Array<{ stage: string; model: string }>; reasons?: string[] }
 }
 export interface CloudVersion { id: string; role: string; filename: string; url: string }
 type Persistence = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>

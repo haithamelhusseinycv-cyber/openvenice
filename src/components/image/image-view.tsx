@@ -1,3 +1,6 @@
+import { ImageShapePicker } from '../ui/image-shape-picker'
+import { DEFAULT_IMAGE_SHAPES, shapePixels } from '../../lib/image-shapes'
+import { FullscreenButton } from '../ui/fullscreen-button'
 import { useState, useMemo, useEffect, useRef } from 'react'
 import type { ImageToolId } from '../../stores/image-workspace-store'
 import { useSettingsStore } from '../../stores/settings-store'
@@ -48,18 +51,11 @@ const DEFAULT_SIZES = [
   { value: '3', label: '1280' },
 ]
 
-function pixelSizeForSelection(prompt: string, sizeIdx: string) {
-  const longEdge = Number(DEFAULT_SIZES.find((size) => size.value === sizeIdx)?.label || 1024)
-  const isCouple = pickAspectFromPrompt(prompt) === '3:2'
-  const shortEdge = Math.max(320, Math.round((longEdge * 0.65) / 64) * 64)
-  return isCouple ? { w: longEdge, h: shortEdge } : { w: shortEdge, h: longEdge }
-}
-
 export function ImageView() {
   const apiKey = useAuthStore((s) => s.apiKey)
   const selectedModel = useSettingsStore((s) => s.selectedModels.image)
   const { data: models } = useModels('image')
-  const allowedImageModels = models?.filter((m) => isAllowedImageModel(m.id))
+  const allowedImageModels = models?.filter((m) => isAllowedImageModel(m.id, m.model_spec?.uncensored))
 
   const model =
     selectedModel &&
@@ -82,7 +78,7 @@ export function ImageView() {
     loadImageNegative(loadSaved('venice-image-negative', ''))
   )
   const [sizeIdx, setSizeIdx] = useState(() => loadSaved('venice-image-size', LOCKED_IMAGE_SIZE_IDX))
-  const [aspectRatio, setAspectRatio] = useState(() => pickAspectFromPrompt(loadImagePrompt(loadSaved('venice-image-prompt', ''))))
+  const [aspectRatio, setAspectRatio] = useState(() => loadSaved('venice-image-aspect', pickAspectFromPrompt(loadImagePrompt(loadSaved('venice-image-prompt', '')))))
   const [resolution, setResolution] = useState(() => loadSaved('venice-image-resolution', ''))
   const [steps, setSteps] = useState(() => {
     const saved = loadSaved('venice-image-steps', '')
@@ -102,7 +98,7 @@ export function ImageView() {
 
   const effectiveAspectRatio = useMemo(() => {
     const suggested = pickAspectFromPrompt(prompt)
-    if (!hasAspectRatios) return suggested
+    if (!hasAspectRatios) return DEFAULT_IMAGE_SHAPES.includes(aspectRatio) ? aspectRatio : suggested
     const supported = constraints?.aspectRatios || []
     if (supported.includes(aspectRatio)) return aspectRatio
     if (supported.includes(suggested)) return suggested
@@ -126,9 +122,6 @@ export function ImageView() {
 
   const updatePrompt = (value: string) => {
     setPrompt(value)
-    const suggested = pickAspectFromPrompt(value)
-    const supported = constraints?.aspectRatios || []
-    if (!hasAspectRatios || supported.includes(suggested)) setAspectRatio(suggested)
   }
 
   useEffect(() => {
@@ -165,10 +158,7 @@ export function ImageView() {
     return () => window.removeEventListener('venice-back', onBack)
   }, [selectedIndex, undressTarget])
 
-  const aspectOptions = useMemo(() => {
-    if (!hasAspectRatios) return []
-    return constraints!.aspectRatios!.map((a) => ({ value: a, label: a }))
-  }, [constraints, hasAspectRatios])
+  const aspectValues = hasAspectRatios ? constraints!.aspectRatios! : DEFAULT_IMAGE_SHAPES
 
   const resolutionOptions = useMemo(() => {
     if (!hasResolutions) return []
@@ -242,7 +232,7 @@ export function ImageView() {
     mutation.reset()
     const seedNum = seed.trim() === '' ? undefined : Number(seed)
     const validSeed = seedNum !== undefined && Number.isFinite(seedNum) ? Math.trunc(seedNum) : undefined
-    const size = pixelSizeForSelection(prompt, sizeIdx)
+    const size = shapePixels(effectiveAspectRatio, Number(DEFAULT_SIZES.find((option) => option.value === sizeIdx)?.label || 1024), constraints?.widthHeightDivisor)
 
     const req: Record<string, unknown> = {
       prompt: prompt.trim(),
@@ -287,7 +277,8 @@ export function ImageView() {
             </button>
           </div>
         </div>
-        <div className="mb-2 grid max-w-full grid-cols-3 gap-2" aria-label="Prompt presets">
+        <details className="mb-2"><summary className="flex min-h-11 cursor-pointer items-center text-[13px] text-white/50">Prompt ideas</summary>
+        <div className="grid max-w-full grid-cols-3 gap-2" aria-label="Prompt presets">
           {[
             ['Portrait', 'Photorealistic full-body portrait, natural skin texture, realistic lighting, sharp eyes, accurate anatomy'],
             ['Couple', 'Photorealistic adult couple together, natural interaction, both identities clear, realistic skin and anatomy'],
@@ -306,7 +297,13 @@ export function ImageView() {
             </button>
           ))}
         </div>
-        <TextArea value={prompt} onChange={updatePrompt} placeholder="Describe the image you want to create…" rows={5} maxLength={promptLimit} />
+        </details>
+        <TextArea value={prompt} onChange={updatePrompt} placeholder="Describe the image you want to create…" rows={4} maxLength={promptLimit} />
+      </div>
+
+      <div>
+        <Label>Image shape</Label>
+        <ImageShapePicker values={aspectValues} value={effectiveAspectRatio} onChange={(value) => { haptic('select'); setAspectRatio(value) }} />
       </div>
 
       <button
@@ -315,26 +312,15 @@ export function ImageView() {
         aria-expanded={paramsOpen}
         className="flex min-h-11 w-full items-center justify-between rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 text-[14px] text-white/75 transition-colors hover:border-white/[0.16] hover:text-white"
       >
-        <span className="font-medium">Parameters</span>
+        <span className="font-medium">Advanced options</span>
         <span className="flex items-center gap-2 text-[12px] text-white/40">
-          <span>{effectiveAspectRatio || DEFAULT_SIZES.find((s) => s.value === sizeIdx)?.label}</span>
-          <span>·</span>
-          <span>{effectiveSteps} steps</span>
-          <span>·</span>
-          <span>{seed.trim() === '' ? 'random seed' : `seed ${seed}`}</span>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
         </span>
       </button>
 
-      <div
-        className={promptTooLong ? 'text-[14px] leading-relaxed text-red-300/95' : 'text-[14px] leading-relaxed text-white/60'}
-        role="status"
-        aria-live="polite"
-      >
-        {promptTooLong
-          ? `Prompt is ${prompt.length - promptLimit} characters over this model’s limit.`
-          : prompt.trim() ? `Ready with ${model}` : 'Enter a prompt or choose a preset.'}
-      </div>
+      {promptTooLong && <div className="text-[13px] text-red-300/95" role="alert">
+        Prompt is {prompt.length - promptLimit} characters over this model’s limit.
+      </div>}
 
       <PrimaryButton onClick={handleGenerate} disabled={!prompt.trim() || promptTooLong || !apiKey} loading={mutation.isPending} size="lg">
         {mutation.isPending ? 'Generating…' : 'Generate'}
@@ -348,10 +334,8 @@ export function ImageView() {
         <div className="flex flex-col gap-4 pt-1">
           <div><Label>Negative prompt</Label><TextArea value={negativePrompt} onChange={setNegativePrompt} placeholder="blurry, clothes, CGI…" rows={2} /></div>
 
-          {hasAspectRatios ? (
-            <div><Label>Aspect Ratio</Label><PillGroup options={aspectOptions} value={effectiveAspectRatio} onChange={(v) => { haptic('select'); setAspectRatio(v) }} /></div>
-          ) : (
-            <div><Label>Size</Label><PillGroup options={DEFAULT_SIZES} value={sizeIdx} onChange={(v) => { haptic('select'); setSizeIdx(v) }} /></div>
+          {!hasAspectRatios && (
+            <div><Label>Image detail</Label><PillGroup options={DEFAULT_SIZES} value={sizeIdx} onChange={(v) => { haptic('select'); setSizeIdx(v) }} /></div>
           )}
 
           {hasResolutions && (
@@ -386,7 +370,7 @@ export function ImageView() {
     <>
       {selectedIndex !== null && images[selectedIndex] !== undefined && (
         <div
-          className="fixed inset-0 z-50 flex flex-col bg-black/95 animate-fade-in"
+          role="dialog" aria-modal="true" aria-label="Full image" className="fixed inset-0 z-[70] flex h-[100dvh] flex-col bg-black/95 animate-fade-in"
           onTouchStart={(e) => {
             const touch = e.touches[0]
             viewerTouch.current = { x: touch.clientX, y: touch.clientY }
@@ -408,6 +392,9 @@ export function ImageView() {
           }}
           onClick={() => setSelectedIndex(null)}
         >
+          <div className="flex shrink-0 justify-end p-3 pt-[max(0.75rem,env(safe-area-inset-top))]" onClick={(e) => e.stopPropagation()}>
+            <button type="button" onClick={() => setSelectedIndex(null)} className="min-h-14 min-w-28 rounded-xl bg-white/15 px-5 text-base font-semibold text-white">Close</button>
+          </div>
           <div className="flex-1 min-h-0 flex items-center justify-center p-3" onClick={(e) => e.stopPropagation()}>
             <img src={toImageSrc(images[selectedIndex])} alt={`Generated ${selectedIndex + 1}`} className="w-full h-full min-h-0 object-contain rounded-xl" />
           </div>
@@ -444,6 +431,7 @@ export function ImageView() {
                 className="w-full cursor-pointer"
                 onClick={() => { haptic('tap'); setSelectedIndex(i) }}
               />
+              <div className="bg-[#0c0c10] p-2 pb-0"><FullscreenButton onClick={() => { haptic('tap'); setSelectedIndex(i) }} /></div>
               <div className="grid grid-cols-4 gap-1.5 bg-[#0c0c10] p-2">
                 <button type="button" onClick={() => { haptic('tap'); sendGenerated('edit', img, i) }} className="min-h-11 rounded-lg bg-white/10 text-white text-[13px] font-medium hover:bg-white/[0.16]">Edit</button>
                 <button type="button" onClick={() => { haptic('tap'); sendGenerated('swap', img, i) }} className="min-h-11 rounded-lg bg-white/10 text-white text-[13px] font-medium hover:bg-white/[0.16]">Swap</button>

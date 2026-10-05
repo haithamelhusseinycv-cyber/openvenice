@@ -1,3 +1,8 @@
+import { ImageShapePicker } from '../ui/image-shape-picker'
+import { DEFAULT_IMAGE_SHAPES } from '../../lib/image-shapes'
+import type { ImageConstraints } from '../../types/venice'
+import { imageModelLabel } from '../../lib/image-model-label'
+import { FullscreenButton } from '../ui/fullscreen-button'
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useAuthStore } from '../../stores/auth-store'
 import { useImageWorkspace } from '../../stores/image-workspace-store'
@@ -9,7 +14,7 @@ import { TaskProgress } from '../ui/task-progress'
 import { cn } from '../../lib/utils'
 import { toast } from '../../stores/toast-store'
 import { haptic } from '../../lib/haptics'
-import { saveImage } from '../../lib/native-media'
+import { saveImage, shareImage } from '../../lib/native-media'
 import { buildSwapPrompt, UNDRESS_PROMPT, type SwapKind, type SwapPerson } from '../../lib/tool-prompts'
 import { prepareImage, formatBytes, type ImagePreparationStage, type PreparedImage } from '../../lib/image-input'
 import { useModels } from '../../hooks/use-models'
@@ -17,18 +22,6 @@ import { formatVeniceError } from '../../lib/venice-client'
 import { DEFAULT_EDIT_MODEL_ID } from '../../lib/allowed-models'
 
 type Tool = 'edit' | 'swap' | 'undress' | 'upscale' | 'remove-bg'
-
-const SCENE_SIZES = [
-  { value: 'auto', label: 'Scene' },
-  { value: '1:1', label: '1:1' },
-  { value: '2:3', label: '2:3' },
-  { value: '3:4', label: '3:4' },
-  { value: '4:5', label: '4:5' },
-  { value: '9:16', label: '9:16' },
-  { value: '3:2', label: '3:2' },
-  { value: '16:9', label: '16:9' },
-  { value: '21:9', label: '21:9' },
-]
 
 function loadSaved(key: string, fallback: string) {
   try {
@@ -43,11 +36,12 @@ function clearFileInput(input: HTMLInputElement | null) {
   if (input) input.value = ''
 }
 
-function FitImg({ src, alt, className }: { src: string; alt: string; className?: string }) {
+function FitImg({ src, alt, className, onDimensions }: { src: string; alt: string; className?: string; onDimensions?: (width: number, height: number) => void }) {
   return (
     <img
       src={src}
       alt={alt}
+      onLoad={(event) => onDimensions?.(event.currentTarget.naturalWidth, event.currentTarget.naturalHeight)}
       className={cn('w-full h-auto max-w-full object-contain rounded-lg border border-white/[0.08]', className)}
       style={{ maxHeight: 'min(70dvh, 720px)', touchAction: 'pan-y pinch-zoom' }}
     />
@@ -59,7 +53,7 @@ export function ImageTools() {
   const apiKey = useAuthStore((s) => s.apiKey)
   const { data: availableEditModels, isLoading: modelsLoading, error: modelsError, refetch: reloadModels, isFetching: modelsFetching } = useModels('inpaint')
   const editModelOptions = useMemo(
-    () => availableEditModels?.map((m) => ({ value: m.id, label: m.model_spec?.name || m.id })) ?? [],
+    () => availableEditModels?.map((m) => ({ value: m.id, label: imageModelLabel(m) })) ?? [],
     [availableEditModels],
   )
   const [pending] = useState(() => useImageWorkspace.getState().pendingSource)
@@ -93,6 +87,10 @@ export function ImageTools() {
   const editModel = editModelOptions.some((option) => option.value === preferredEditModel)
     ? preferredEditModel
     : editModelOptions[0]?.value || preferredEditModel
+
+  const editConstraints = availableEditModels?.find((model) => model.id === editModel)?.model_spec?.constraints as ImageConstraints | undefined
+  const editAspectValues = editConstraints?.aspectRatios?.length ? editConstraints.aspectRatios : ['auto', ...DEFAULT_IMAGE_SHAPES]
+  const effectiveSceneSize = editAspectValues.includes(sceneSize) ? sceneSize : editAspectValues[0]
 
   useEffect(() => {
     try {
@@ -172,7 +170,7 @@ export function ImageTools() {
   const dualSwapPrompt = (maleKind: SwapKind, femaleKind: SwapKind) =>
     `Reference 1 is the target scene and composition. Reference 2 maps only to the male subject and requires a ${maleKind} swap. Reference 3 maps only to the female subject and requires a ${femaleKind} swap. Preserve the target pose, framing, camera angle, lighting, background, interaction and all non-identity details. Keep both identities separate; never blend, exchange or cross-map them.`
 
-  const aspectRatio = sceneSize || 'auto'
+  const aspectRatio = effectiveSceneSize
 
   const handleProcess = () => {
     resetResult()
@@ -254,6 +252,20 @@ export function ImageTools() {
           : bgRemoveMutation.error
 
   const [saving, setSaving] = useState(false)
+  const [sharing, setSharing] = useState(false)
+  const [resultDimensions, setResultDimensions] = useState<{ url: string; width: number; height: number } | null>(null)
+  const shareResult = async () => {
+    if (!resultUrl || sharing) return
+    setSharing(true)
+    try {
+      const result = await shareImage(resultUrl, 'image/png', `venice-${tool}-result-${Date.now()}.png`)
+      if (result === 'saved') toast.success('Saved image', 'Sharing is unavailable here; the image was saved instead.')
+    } catch (error) {
+      toast.fromError(error, 'Could not share result')
+    } finally {
+      setSharing(false)
+    }
+  }
   const downloadResult = async () => {
     if (!resultUrl) return
     setSaving(true)
@@ -341,7 +353,7 @@ export function ImageTools() {
               type="button"
               onClick={() => fileRef.current?.click()}
               disabled={isPreparing}
-              className="w-full border border-dashed border-white/[0.14] hover:border-white/[0.28] rounded-lg py-8 text-center min-h-24"
+              className="w-full border border-dashed border-white/[0.14] hover:border-white/[0.28] rounded-lg py-5 text-center min-h-20"
             >
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
                 const file = e.target.files?.[0]
@@ -382,7 +394,7 @@ export function ImageTools() {
                 type="button"
                 onClick={() => idFileRef.current?.click()}
                 disabled={isPreparing}
-                className="w-full border border-dashed border-white/[0.14] hover:border-white/[0.28] rounded-lg py-8 text-center min-h-24"
+                className="w-full border border-dashed border-white/[0.14] hover:border-white/[0.28] rounded-lg py-5 text-center min-h-20"
               >
                 <input ref={idFileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
                   const file = e.target.files?.[0]
@@ -406,7 +418,7 @@ export function ImageTools() {
                 <span className="text-[13px] text-white/45 mt-1 block truncate">{secondIdName}{uploadInfo.identity2 ? ` · ${uploadInfo.identity2}` : ''}</span>
               </div>
             ) : (
-              <button type="button" onClick={() => secondIdFileRef.current?.click()} disabled={isPreparing} className="w-full border border-dashed border-white/[0.14] hover:border-white/[0.28] rounded-lg py-8 text-center min-h-24 disabled:opacity-45">
+              <button type="button" onClick={() => secondIdFileRef.current?.click()} disabled={isPreparing} className="w-full border border-dashed border-white/[0.14] hover:border-white/[0.28] rounded-lg py-5 text-center min-h-20 disabled:opacity-45">
                 <input ref={secondIdFileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
                   const file = e.target.files?.[0]
                   if (!file) return
@@ -510,22 +522,8 @@ export function ImageTools() {
 
         {(tool === 'edit' || tool === 'swap' || tool === 'undress') && (
           <div>
-            <Label>Output size</Label>
-            <div className="flex flex-wrap gap-1">
-              {SCENE_SIZES.map((s) => (
-                <button
-                  key={s.value}
-                  type="button"
-                  onClick={() => setSceneSize(s.value)}
-                  className={cn(
-                    'px-3 py-2 text-[14px] rounded-md min-h-11',
-                    sceneSize === s.value ? 'bg-white text-black' : 'bg-white/[0.06] text-white/65',
-                  )}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
+            <Label>Image shape</Label>
+            <ImageShapePicker values={editAspectValues} value={effectiveSceneSize} onChange={setSceneSize} />
           </div>
         )}
 
@@ -576,6 +574,7 @@ export function ImageTools() {
           <div role="dialog" aria-modal="true" aria-label="Full image" className="fixed inset-0 z-[70] flex h-[100dvh] flex-col bg-black p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <div className="flex shrink-0 justify-between gap-2 pb-3">
               <button type="button" onClick={() => setViewResult(false)} className="min-h-12 px-4 bg-white/15 rounded-lg text-white">Close</button>
+              <button type="button" disabled={sharing} onClick={() => { void shareResult() }} className="min-h-14 rounded-lg bg-white/15 px-4 text-base text-white disabled:opacity-50">{sharing ? 'Sharing…' : 'Share'}</button>
               <button type="button" disabled={saving} onClick={() => { void downloadResult() }} className="min-h-12 px-4 bg-white rounded-lg text-black">{saving ? 'Downloading…' : 'Download'}</button>
             </div>
             <div className="flex min-h-0 flex-1 items-center justify-center">
@@ -585,12 +584,13 @@ export function ImageTools() {
         )}
         {resultUrl ? (
           <div className="animate-fade-in flex flex-col gap-3">
-            <div className="flex items-center justify-between gap-2">
-              <Label>Result</Label>
-              <button type="button" onClick={() => setViewResult(true)} className="min-h-11 px-3 rounded-lg bg-white/10 text-white">View full image</button>
+            <div className="flex flex-col gap-2">
+              <Label>Result{resultDimensions?.url === resultUrl ? ` · ${resultDimensions.width} × ${resultDimensions.height} px` : ''}</Label>
+              <FullscreenButton onClick={() => setViewResult(true)} />
+              <button type="button" disabled={sharing} onClick={() => { void shareResult() }} className="min-h-14 rounded-lg bg-white/15 px-4 text-base text-white disabled:opacity-50">{sharing ? 'Sharing…' : 'Share'}</button>
               <button type="button" onClick={() => { void downloadResult() }} disabled={saving} className="min-h-11 px-3 rounded-lg bg-white text-black text-[15px] font-medium disabled:opacity-50">{saving ? 'Downloading…' : 'Download'}</button>
             </div>
-            <FitImg src={resultUrl} alt="Result" className={cn(tool === 'remove-bg' && 'bg-[repeating-conic-gradient(#1a1a1a_0%_25%,#111_0%_50%)_0_0/20px_20px]')} />
+            <FitImg src={resultUrl} alt="Result" onDimensions={(width, height) => setResultDimensions({ url: resultUrl, width, height })} className={cn(tool === 'remove-bg' && 'bg-[repeating-conic-gradient(#1a1a1a_0%_25%,#111_0%_50%)_0_0/20px_20px]')} />
           </div>
         ) : (
           <EmptyState>

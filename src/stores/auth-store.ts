@@ -130,23 +130,26 @@ async function clearDeviceKey() {
   try { localStorage.removeItem(DEVICE_MARKER_KEY) } catch { /* ignore marker failures */ }
 }
 
+function clearPlaintextSessionKey() {
+  try { sessionStorage.removeItem(SESSION_KEY) } catch { /* storage may be unavailable */ }
+}
+
 const initialKey = (() => {
+  let session: string | null = null
+  let legacy: string | null = null
   try {
-    const session = sessionStorage.getItem(SESSION_KEY)
-    if (session) return session
-    const legacy = localStorage.getItem(SESSION_KEY)
-    if (legacy) {
-      try {
-        const parsed = JSON.parse(legacy) as { state?: { apiKey?: string | null } }
-        const key = parsed?.state?.apiKey ?? null
-        localStorage.removeItem(SESSION_KEY)
-        if (key) sessionStorage.setItem(SESSION_KEY, key)
-        return key
-      } catch {
-        localStorage.removeItem(SESSION_KEY)
-      }
-    }
-    return null
+    session = sessionStorage.getItem(SESSION_KEY)
+    sessionStorage.removeItem(SESSION_KEY)
+  } catch { /* session storage may be unavailable */ }
+  try {
+    legacy = localStorage.getItem(SESSION_KEY)
+    localStorage.removeItem(SESSION_KEY)
+  } catch { /* local storage may be unavailable */ }
+  if (session) return session
+  if (!legacy) return null
+  try {
+    const parsed = JSON.parse(legacy) as { state?: { apiKey?: unknown } }
+    return typeof parsed?.state?.apiKey === 'string' ? parsed.state.apiKey : null
   } catch {
     return null
   }
@@ -174,7 +177,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
   deviceRemembered: initialDeviceRemembered,
 
   setApiKey: async (key, remember) => {
-    sessionStorage.setItem(SESSION_KEY, key)
+    clearPlaintextSessionKey()
 
     if (remember?.device) {
       await saveDeviceKey(key)
@@ -201,7 +204,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
     if (!raw) return false
     try {
       const key = await decrypt(JSON.parse(raw) as EncryptedBlob, passphrase)
-      sessionStorage.setItem(SESSION_KEY, key)
+      clearPlaintextSessionKey()
       set({ apiKey: key })
       return true
     } catch {
@@ -210,7 +213,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
   },
 
   hydrateFromDevice: async () => {
-    if (sessionStorage.getItem(SESSION_KEY)) return true
+    if (useAuthStore.getState().apiKey) return true
     const key = await loadDeviceKey()
     if (!key) {
       if (initialDeviceRemembered) {
@@ -219,13 +222,13 @@ export const useAuthStore = create<AuthState>()((set) => ({
       }
       return false
     }
-    sessionStorage.setItem(SESSION_KEY, key)
+    clearPlaintextSessionKey()
     set({ apiKey: key, deviceRemembered: true })
     return true
   },
 
   clearApiKey: () => {
-    sessionStorage.removeItem(SESSION_KEY)
+    clearPlaintextSessionKey()
     localStorage.removeItem(ENCRYPTED_KEY)
     void clearDeviceKey()
     set({ apiKey: null, hasEncrypted: false, deviceRemembered: false })

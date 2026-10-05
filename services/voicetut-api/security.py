@@ -1,7 +1,7 @@
 """Dependency-free security, quota and metrics primitives for VoiceTut."""
 from __future__ import annotations
 
-import hashlib
+import secrets
 import hmac
 import os
 import threading
@@ -24,6 +24,7 @@ class ConfigurationError(Exception):
 class ApiKeyAuthenticator:
     def __init__(self, keys: tuple[str, ...], allow_unauthenticated: bool = False):
         self._keys = keys
+        self._principals = {key: secrets.token_hex(16) for key in keys}
         self._allow_unauthenticated = allow_unauthenticated
 
     @classmethod
@@ -50,7 +51,7 @@ class ApiKeyAuthenticator:
                 candidate = value.strip()
         if not candidate or not any(hmac.compare_digest(candidate, key) for key in self._keys):
             raise AuthenticationError("Invalid or missing API key")
-        return hashlib.sha256(candidate.encode("utf-8")).hexdigest()[:16]
+        return self._principals[candidate]
 
 
 @dataclass(frozen=True)
