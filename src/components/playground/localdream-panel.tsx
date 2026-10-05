@@ -1,3 +1,4 @@
+import { LocalDreamCloudPanel } from './localdream-cloud-panel'
 import { useEffect, useRef, useState } from 'react'
 import { LocalDreamConnector, type LocalDreamCatalog, type LocalDreamStatus } from '../../connectors/localdream/localdream-connector'
 import { BottomSheet } from '../ui/bottom-sheet'
@@ -133,6 +134,7 @@ export function LocalDreamPanel() {
 
   const close = () => { if (!busy) setOpen(false) }
   return <>
+    <LocalDreamCloudPanel />
     <button type="button" onClick={() => setOpen(true)} className="mx-3 mt-2 min-h-11 shrink-0 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-left text-[15px] text-white" aria-label="Open Local Dream controls">Local Dream · start, create, upscale, stop</button>
     <BottomSheet open={open} onClose={close} title="Local Dream">
       <div className="flex flex-col gap-4 pb-5 text-[15px] text-white">
