@@ -47,13 +47,13 @@ jobs:
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       with:
         name: chili-android-apk
-        path: android/app/build/outputs/apk/release/app-release-unsigned.apk
+        path: android/app/build/outputs/apk/release/app-release.apk
         retention-days: 30
 
     - name: Upload APK to releases (on tag)
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@26994186c0ac3ef5cae75ac16aa32e8153525f77
       with:
-        files: android/app/build/outputs/apk/release/app-release-unsigned.apk
+        files: android/app/build/outputs/apk/release/app-release.apk
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
