@@ -63,8 +63,12 @@ export function LocalDreamCloudPanel() {
       setAvailable(value.operations.map((op) => op.id))
     }).catch((reason: unknown) => { if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'Cloud gateway unavailable.') })
     void refresh()
-    const timer = window.setInterval(() => { void refresh() }, 2500)
-    return () => { controller.abort(); window.clearInterval(timer) }
+    const unsubscribe = client.onWebSocketEvent((event) => {
+      if (controller.signal.aborted) return
+      if (event.type === 'job_update' && event.job_id) void refresh()
+    })
+    const fallback = window.setInterval(() => { void refresh() }, 10000)
+    return () => { controller.abort(); unsubscribe(); window.clearInterval(fallback) }
   }, [open, client])
   const work = async (task: () => Promise<void>) => {
     if (busy) return

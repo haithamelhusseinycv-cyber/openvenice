@@ -24,10 +24,25 @@ type Pending = { body: CloudRequest & { token: string; quality: 'high'; speed: '
 const KEY = 'localdream.cloud.pending.v2'
 const TERMINAL = new Set(['complete', 'needs_review', 'needs_input', 'failed', 'cancelled'])
 
+export type CloudWsEvent = {
+  type: 'job_update' | 'gpu_status' | 'progress'
+  job_id?: string
+  state?: string
+  message?: string
+  progress?: number
+  updated?: number
+  [key: string]: unknown
+}
+type WsListener = (event: CloudWsEvent) => void
+
 export class LocalDreamCloudConnector {
   readonly base = 'http://127.0.0.1:8298'
   private readonly storage: Persistence
   private readonly fetcher: typeof fetch
+  private ws: WebSocket | null = null
+  private wsListeners = new Set<WsListener>()
+  private wsReconnectTimer: ReturnType<typeof setTimeout> | null = null
+  private wsClosed = false
   constructor(storage: Persistence, fetcher: typeof fetch = fetch) { this.storage = storage; this.fetcher = fetcher }
   private async request<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
     const response = await this.fetcher(this.base + path, {
@@ -96,5 +111,33 @@ export class LocalDreamCloudConnector {
     const job = await this.reconnect()
     if (!TERMINAL.has(job.state)) throw new Error('The cloud job is still active.')
     this.storage.removeItem(KEY)
+  }
+  connectWebSocket(): void {
+    if (this.ws || typeof WebSocket === 'undefined') return
+    this.wsClosed = false
+    const ws = new WebSocket('ws://127.0.0.1:8299')
+    this.ws = ws
+    ws.onopen = () => { ws.send(JSON.stringify({ type: 'subscribe', channels: ['job_update', 'gpu_status', 'progress'] })) }
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(String(event.data)) as CloudWsEvent
+        for (const listener of this.wsListeners) listener(data)
+      } catch { /* ignore malformed frames */ }
+    }
+    ws.onclose = () => {
+      this.ws = null
+      if (!this.wsClosed) this.wsReconnectTimer = setTimeout(() => this.connectWebSocket(), 3000)
+    }
+    ws.onerror = () => { try { ws.close() } catch { /* already closing */ } }
+  }
+  disconnectWebSocket(): void {
+    this.wsClosed = true
+    if (this.wsReconnectTimer) { clearTimeout(this.wsReconnectTimer); this.wsReconnectTimer = null }
+    if (this.ws) { try { this.ws.close() } catch { /* already closing */ } this.ws = null }
+  }
+  onWebSocketEvent(listener: WsListener): () => void {
+    this.wsListeners.add(listener)
+    if (!this.ws) this.connectWebSocket()
+    return () => { this.wsListeners.delete(listener); if (this.wsListeners.size === 0) this.disconnectWebSocket() }
   }
 }

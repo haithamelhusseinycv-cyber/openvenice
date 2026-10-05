@@ -28,6 +28,10 @@ import { haptic } from '../../lib/haptics'
 import { BottomSheet } from '../ui/bottom-sheet'
 import { LocalDreamPanel } from './localdream-panel'
 import { SegmentedControl } from '../ui/segmented-control'
+import { SmartActionBar } from './smart-action-bar'
+import { CloudJobStatus } from './cloud-job-status'
+import type { RoutingDecision } from '../../agent/intelligent-router'
+import type { CloudJob } from '../../connectors/localdream/cloud-connector'
 
 const STARTER_PROMPTS = [
   'Create a polished 9:16 portrait from my idea and prepare it for generation',
@@ -95,6 +99,7 @@ export function PlaygroundChat() {
   const [voiceStatus, setVoiceStatus] = useState<string | null>(null)
   const [listeningLocale, setListeningLocale] = useState<VoiceLocale | null>(null)
   const [sessionOpen, setSessionOpen] = useState(false)
+  const [activeCloudJob, setActiveCloudJob] = useState<CloudJob | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const shouldStickToBottomRef = useRef(true)
   const abortRef = useRef<AbortController | null>(null)
@@ -446,6 +451,11 @@ export function PlaygroundChat() {
     abortRef.current?.abort()
   }
 
+  const handleSmartRoute = (decision: RoutingDecision, enhancedPrompt: string) => {
+    const contextPrefix = `[Smart Route: ${decision.intent.replace(/_/g, ' ')} | ${decision.useCloud ? 'Cloud GPU' : 'Local'} | ${decision.quality} quality | operation: ${decision.operation}]\n\n`
+    void send(contextPrefix + enhancedPrompt)
+  }
+
   return (
     <div className="flex h-full max-w-full min-w-0 flex-col overflow-hidden bg-[#0c0c10]">
       <LocalDreamPanel />
@@ -564,6 +574,16 @@ export function PlaygroundChat() {
             ))}
           </div>
         )}
+      </div>
+
+      {activeCloudJob && (
+        <div className="shrink-0 px-3 pt-2">
+          <CloudJobStatus job={activeCloudJob} onJobUpdate={setActiveCloudJob} />
+        </div>
+      )}
+
+      <div className="shrink-0 px-3 pt-2">
+        <SmartActionBar onRoute={handleSmartRoute} disabled={isThinking} />
       </div>
 
       <div className="max-w-full min-w-0 shrink-0 overflow-x-hidden border-t border-white/[0.06] px-3 pt-2 pb-[max(0.75rem,var(--keyboard-inset,0px))]">

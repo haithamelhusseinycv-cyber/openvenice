@@ -21,9 +21,8 @@
     "zustand": "^5.0.11"
   },
   "devDependencies": {
-    "@capacitor/android": "7.6.9",
-    "@capacitor/cli": "7.6.9",
-    "@capacitor/core": "7.6.9",
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/cli": "^8.5.2",
     "@eslint/js": "^9.39.1",
     "@tailwindcss/vite": "^4.2.1",
     "@types/node": "^24.10.1",
