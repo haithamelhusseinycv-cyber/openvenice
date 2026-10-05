@@ -27,6 +27,8 @@ jobs:
 
     - name: Set up Android SDK
       uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
+      with:
+        packages: 'platform-tools build-tools;34.0.0 platforms;android-34'
 
     - name: Install dependencies
       run: npm ci
