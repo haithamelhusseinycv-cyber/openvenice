@@ -59,7 +59,6 @@ public final class FaceFusionBridgeSmoke extends Instrumentation {
             if(SystemClock.elapsedRealtime()-began>5000)throw new Exception("Native deadline did not settle promptly");
             timeout.setLong(plugin,10000);silent.quitSafely();
             if(invoke(bridge,"FaceFusionAgent","ping",new JSObject()).getInt("protocol")!=1)throw new Exception("Deadline recovery failed");
-            Messenger actual=(Messenger)remote.get(plugin);
             HandlerThread cancelled=new HandlerThread("CancelledCompanion");cancelled.start();
             CountDownLatch sent=new CountDownLatch(1);
             remote.set(plugin,new Messenger(new Handler(cancelled.getLooper()) {
@@ -71,7 +70,12 @@ public final class FaceFusionBridgeSmoke extends Instrumentation {
             invoke(bridge,"FaceFusionAgent","cancel",new JSObject());
             try { interrupted.await();throw new Exception("Cancelled request succeeded"); }
             catch(Exception expected){if(!expected.getMessage().contains("cancelled"))throw expected;}
-            remote.set(plugin,actual);cancelled.quitSafely();
+            java.lang.reflect.Field jobDeadline=plugin.getClass().getDeclaredField("jobTimeoutMs");
+            jobDeadline.setAccessible(true);jobDeadline.setLong(plugin,500);
+            try { invoke(bridge,"FaceFusionAgent","detectFaces",image);throw new Exception("Silent image job succeeded"); }
+            catch(Exception expected){if(!expected.getMessage().contains("timed out"))throw expected;}
+            jobDeadline.setLong(plugin,180000);cancelled.quitSafely();
+            if(invoke(bridge,"FaceFusionAgent","ping",new JSObject()).getInt("protocol")!=1)throw new Exception("Image deadline recovery failed");
             android.graphics.Bitmap big=android.graphics.Bitmap.createBitmap(3000,3000,android.graphics.Bitmap.Config.ARGB_8888);
             java.io.ByteArrayOutputStream out=new java.io.ByteArrayOutputStream();
             big.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);big.recycle();
@@ -120,7 +124,7 @@ public final class FaceFusionBridgeSmoke extends Instrumentation {
         if (testHardening) {
             java.io.File[] files=new java.io.File(getTargetContext().getCacheDir(),"agent_inputs").listFiles();
             if(files!=null&&files.length!=0)throw new Exception("Completed-job input files remain");
-            processing+=" SILENT_DEADLINE_RECOVERY_PASS NATIVE_CANCEL_PASS OVERSIZE_REJECTION_PASS INPUT_CLEANUP_PASS";
+            processing+=" SILENT_DEADLINE_RECOVERY_PASS IMAGE_DEADLINE_RECOVERY_PASS NATIVE_CANCEL_PASS OVERSIZE_REJECTION_PASS INPUT_CLEANUP_PASS";
         }
         return "VAULT_ENCRYPTED_ROUNDTRIP_PASS MEDIASTORE_SAVE_PASS VOICE_AVAILABILITY "+voice.toString()+processing;
     }
