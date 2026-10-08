@@ -20,6 +20,7 @@ public class FaceFusionSmoke extends Instrumentation {
         long start = android.os.SystemClock.elapsedRealtime();
         try {
             Context context = getTargetContext();
+            {
             AgentBridgeService service = new AgentBridgeService();
             java.lang.reflect.Method attach = android.content.ContextWrapper.class.getDeclaredMethod("attachBaseContext", Context.class);
             attach.setAccessible(true); attach.invoke(service, context);
@@ -48,6 +49,7 @@ public class FaceFusionSmoke extends Instrumentation {
             if(retained>48L*1024*1024)throw new Exception("Output quota was exceeded");
             for(File f:dir.listFiles())if(f.getName().startsWith("agent-quota-smoke-"))f.delete();
             System.out.println("OUTPUT_ACK_OWNER_CHECK_PASS OUTPUT_STALE_SWEEP_PASS OUTPUT_QUOTA_PASS");
+            }
             Bitmap source, target;
             try (InputStream in = getContext().getAssets().open("grace_hopper.jpg")) {
                 source = BitmapFactory.decodeStream(in);
