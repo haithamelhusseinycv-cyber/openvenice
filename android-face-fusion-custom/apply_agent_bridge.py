@@ -34,7 +34,7 @@ if '.AgentBridgeService' not in text:
 # signature permission enforcement and the installed FaceFusion identity.
 values = root / 'app/src/main/res/values'
 values.mkdir(parents=True, exist_ok=True)
-(values / 'openvenice_known_certs.xml').write_text('<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string-array name="openvenice_known_certs">\n        <item>2411BB5A182814F12798350EA77D5D922B27BDEF9076D4F0E0C1D02CF8090B48</item>\n    </string-array>\n</resources>\n', encoding='utf-8')
+(values / 'openvenice_known_certs.xml').write_text('<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string-array name="openvenice_known_certs">\n        <item>2411BB5A182814F12798350EA77D5D922B27BDEF9076D4F0E0C1D02CF8090B48</item>\n        <item>199E28A4FFACFAE81EBCBCD21E09691751CF2F77FE79B951BF043722C88734F2</item>\n    </string-array>\n</resources>\n', encoding='utf-8')
 manifest.write_text(text, encoding='utf-8')
 
 # Bridge release follows Complete Models v3 and keeps the package/signing

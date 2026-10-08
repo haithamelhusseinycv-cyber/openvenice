@@ -72,7 +72,10 @@ export class LocalDreamCloudConnector {
         if (signal?.aborted) throw new DOMException('Cancelled', 'AbortError')
         const error = err instanceof Error ? err : new Error(String(err))
         retry = retry || error instanceof TypeError || controller.signal.aborted
-        if (!retry || attempt === this.maxRetries - 1) throw error
+        if (!retry || attempt === this.maxRetries - 1) {
+          if (error instanceof TypeError) throw new Error('Cannot reach Local Dream on this device. Start the gateway and allow local network access in your browser site settings.', { cause: error })
+          throw error
+        }
       } finally { clearTimeout(timeoutId); signal?.removeEventListener('abort', forward) }
       await new Promise<void>((resolve, reject) => {
         const aborted = () => { clearTimeout(timer); reject(new DOMException('Cancelled', 'AbortError')) }
