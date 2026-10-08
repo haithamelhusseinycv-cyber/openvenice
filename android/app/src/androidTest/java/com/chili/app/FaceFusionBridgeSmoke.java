@@ -76,6 +76,17 @@ public final class FaceFusionBridgeSmoke extends Instrumentation {
             catch(Exception expected){if(!expected.getMessage().contains("timed out"))throw expected;}
             jobDeadline.setLong(plugin,180000);cancelled.quitSafely();
             if(invoke(bridge,"FaceFusionAgent","ping",new JSObject()).getInt("protocol")!=1)throw new Exception("Image deadline recovery failed");
+            java.lang.reflect.Field workerField=plugin.getClass().getDeclaredField("imageWorker");workerField.setAccessible(true);
+            java.util.concurrent.ExecutorService worker=(java.util.concurrent.ExecutorService)workerField.get(plugin);
+            CountDownLatch blocked=new CountDownLatch(1), releaseWorker=new CountDownLatch(1);
+            worker.execute(() -> { blocked.countDown();try { releaseWorker.await(); } catch(InterruptedException ex) { Thread.currentThread().interrupt(); } });
+            if(!blocked.await(5,TimeUnit.SECONDS))throw new Exception("Preparation blocker failed");
+            ResultCall preparingCall=new ResultCall("FaceFusionAgent","detectFaces",image);
+            plugin.getClass().getMethod("detectFaces",PluginCall.class).invoke(plugin,preparingCall);
+            invoke(bridge,"FaceFusionAgent","cancel",new JSObject());
+            try { preparingCall.await();throw new Exception("Preparation cancellation succeeded unexpectedly"); }
+            catch(Exception expected){if(!expected.getMessage().contains("cancelled"))throw expected;}
+            finally { releaseWorker.countDown(); }
             android.graphics.Bitmap big=android.graphics.Bitmap.createBitmap(3000,3000,android.graphics.Bitmap.Config.ARGB_8888);
             java.io.ByteArrayOutputStream out=new java.io.ByteArrayOutputStream();
             big.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);big.recycle();
@@ -124,7 +135,7 @@ public final class FaceFusionBridgeSmoke extends Instrumentation {
         if (testHardening) {
             java.io.File[] files=new java.io.File(getTargetContext().getCacheDir(),"agent_inputs").listFiles();
             if(files!=null&&files.length!=0)throw new Exception("Completed-job input files remain");
-            processing+=" SILENT_DEADLINE_RECOVERY_PASS IMAGE_DEADLINE_RECOVERY_PASS NATIVE_CANCEL_PASS OVERSIZE_REJECTION_PASS INPUT_CLEANUP_PASS";
+            processing+=" SILENT_DEADLINE_RECOVERY_PASS IMAGE_DEADLINE_RECOVERY_PASS NATIVE_CANCEL_PASS PREPARATION_CANCEL_PASS OVERSIZE_REJECTION_PASS INPUT_CLEANUP_PASS";
         }
         return "VAULT_ENCRYPTED_ROUNDTRIP_PASS MEDIASTORE_SAVE_PASS VOICE_AVAILABILITY "+voice.toString()+processing;
     }

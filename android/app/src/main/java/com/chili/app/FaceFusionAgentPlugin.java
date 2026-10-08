@@ -69,6 +69,8 @@ public final class FaceFusionAgentPlugin extends Plugin {
     private final Map<PluginCall, List<Uri>> grants = new HashMap<>();
     private final Map<PluginCall, List<File>> inputs = new HashMap<>();
     private final ThreadLocal<PluginCall> preparing = new ThreadLocal<>();
+    private final java.util.Set<PluginCall> finishedCalls =
+            java.util.Collections.newSetFromMap(new java.util.WeakHashMap<>());
     private PluginCall activeImage;
     private volatile boolean destroyed;
     private final Runnable bindTimeout = () -> closeLostConnection("FaceFusion connection timed out.");
@@ -149,6 +151,7 @@ public final class FaceFusionAgentPlugin extends Plugin {
             activeImage = call;
         }
         imageWorker.execute(() -> {
+            synchronized (lock) { if (finishedCalls.contains(call)) return; }
             preparing.set(call);
             try { 
         String input = call.getString("imageUri");
@@ -176,6 +179,7 @@ public final class FaceFusionAgentPlugin extends Plugin {
             activeImage = call;
         }
         imageWorker.execute(() -> {
+            synchronized (lock) { if (finishedCalls.contains(call)) return; }
             preparing.set(call);
             try { 
         String source = call.getString("sourceUri");
@@ -216,6 +220,7 @@ public final class FaceFusionAgentPlugin extends Plugin {
             activeImage = call;
         }
         imageWorker.execute(() -> {
+            synchronized (lock) { if (finishedCalls.contains(call)) return; }
             preparing.set(call);
             try { 
         String input = call.getString("imageUri");
@@ -243,6 +248,9 @@ public final class FaceFusionAgentPlugin extends Plugin {
         List<String> ids;
         synchronized (lock) { ids = new ArrayList<>(pending.keySet()); }
         for (String id : ids) rejectPending(id, "FaceFusion operation cancelled.");
+        PluginCall preparation;
+        synchronized (lock) { preparation = activeImage; }
+        if (preparation != null) rejectPrepared(preparation, "FaceFusion operation cancelled.");
         call.resolve();
     }
 
@@ -256,6 +264,7 @@ public final class FaceFusionAgentPlugin extends Plugin {
 
     private void sendCommand(PluginCall call, int command, Bundle data) {
         if (destroyed) { rejectPrepared(call, "FaceFusion bridge is closed."); return; }
+        synchronized (lock) { if (finishedCalls.contains(call)) { cleanup(call); return; } }
         final String requestId = UUID.randomUUID().toString();
         data.putString("requestId", requestId);
         synchronized (lock) {
@@ -469,6 +478,7 @@ public final class FaceFusionAgentPlugin extends Plugin {
 
     private void rejectPrepared(PluginCall call, String message) {
         cleanup(call);
+        synchronized (lock) { if (!finishedCalls.add(call)) return; }
         call.reject(message);
     }
 
