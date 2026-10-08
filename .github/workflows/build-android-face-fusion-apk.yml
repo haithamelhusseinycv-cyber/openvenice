@@ -65,6 +65,7 @@ jobs:
         working-directory: android-face-fusion
         shell: bash
         run: |
+          rm -f gradle/gradle-daemon-jvm.properties
           chmod +x ./gradlew
           ./gradlew assembleRelease assembleDebugAndroidTest --no-daemon --stacktrace
 
