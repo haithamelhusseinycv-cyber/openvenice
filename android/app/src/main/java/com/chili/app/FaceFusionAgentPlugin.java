@@ -251,7 +251,7 @@ public final class FaceFusionAgentPlugin extends Plugin {
             boolean started = getContext().bindService(intent, connection, Context.BIND_AUTO_CREATE);
             if (!started) failConnectionQueue("Android could not bind to FaceFusion AgentBridgeService.");
         } catch (SecurityException error) {
-            failConnectionQueue("FaceFusion signature permission mismatch. Install OpenVenice and FaceFusion builds signed with the same key.");
+            failConnectionQueue("FaceFusion signature permission mismatch. Install Chilli and FaceFusion builds signed with the same key.");
         } catch (Exception error) {
             failConnectionQueue("Could not bind to FaceFusion: " + error.getMessage());
         }

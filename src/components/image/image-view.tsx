@@ -722,7 +722,7 @@ export function ImageView() {
                   <Label>Negative prompt</Label>
                   <SmartNegativeSuggester prompt={prompt} onSuggest={(neg) => setNegativePrompt(neg)} />
                 </div>
-                <TextArea value={negativePrompt} onChange={setNegativePrompt} placeholder="blurry, clothes, CGI…" rows={2} />
+                <TextArea value={negativePrompt} onChange={setNegativePrompt} placeholder="blurry, artifacts, CGI…" rows={2} />
               </div>
 
               {!hasAspectRatios && (
