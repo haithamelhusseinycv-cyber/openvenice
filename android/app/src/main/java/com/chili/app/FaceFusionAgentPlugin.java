@@ -110,6 +110,21 @@ public final class FaceFusionAgentPlugin extends Plugin {
         }
     };
 
+    @Override
+    public void load() {
+        imageWorker.execute(() -> {
+            File dir = new File(getContext().getCacheDir(), "agent_inputs");
+            File[] files = dir.listFiles();
+            if (files != null) for (File file : files) {
+                try {
+                    Uri uri = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", file);
+                    getContext().revokeUriPermission(FACEFUSION_PACKAGE, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                } catch (IllegalArgumentException ignored) {}
+                file.delete();
+            }
+        });
+    }
+
     @PluginMethod
     public void isAvailable(PluginCall call) {
         JSObject result = new JSObject();

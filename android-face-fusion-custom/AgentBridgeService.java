@@ -82,6 +82,15 @@ public final class AgentBridgeService extends Service {
     private final Messenger messenger = new Messenger(new IncomingHandler(Looper.getMainLooper()));
 
     @Override
+    public void onCreate() {
+        super.onCreate();
+        // A previous service instance cannot own an active request here.
+        File dir = new File(getCacheDir(), "shared_images");
+        File[] files = dir.listFiles((d, name) -> name.startsWith("agent-"));
+        if (files != null) for (File file : files) file.delete();
+    }
+
+    @Override
     public IBinder onBind(Intent intent) {
         // Android has already checked the exported service's manifest
         // permission for the real binding UID. onBind is a lifecycle callback
