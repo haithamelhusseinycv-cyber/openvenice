@@ -1,12 +1,19 @@
 from pathlib import Path
 import time, os, configparser, hashlib, json, mimetypes, re, requests
+from urllib.parse import urlsplit
 root=Path(__file__).resolve().parents[1]
 home=Path('/data/data/com.termux/files/home')
 config=configparser.ConfigParser()
 config.read(home/'.config/rclone/rclone.conf')
 endpoints=[config.get(section,'endpoint',fallback='') for section in config.sections()]
-endpoint=next(value for value in endpoints if '.r2.cloudflarestorage.com' in value)
-account=endpoint.split('://')[-1].split('.')[0]
+account=None
+for endpoint in endpoints:
+ parsed=urlsplit(endpoint)
+ match=re.fullmatch(r'([0-9a-f]{32})[.]r2[.]cloudflarestorage[.]com',parsed.hostname or '')
+ if parsed.scheme=='https' and match and not parsed.username and not parsed.password and parsed.port in (None,443) and parsed.path in ('','/') and not parsed.query and not parsed.fragment:
+  account=match.group(1)
+  break
+if account is None:raise ValueError('No valid Cloudflare R2 account endpoint configured')
 token=(home/'.config/cloudflare-workers-token').read_text().strip()
 headers={'Authorization':'Bearer '+token}
 name=os.environ.get('CHILLI_WORKER_NAME','chilli-production')

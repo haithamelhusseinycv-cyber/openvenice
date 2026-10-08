@@ -101,15 +101,18 @@ public final class AgentBridgeService extends Service {
 
     @Override
     public void onDestroy() {
-        executor.shutdownNow();
-        synchronized (runtimeLock) {
-            if (faceSwapper != null) faceSwapper.close();
-            if (faceEmbedder != null) faceEmbedder.close();
-            if (faceDetector != null) faceDetector.close();
-            faceSwapper = null;
-            faceEmbedder = null;
-            faceDetector = null;
-        }
+        cancellationEpoch.incrementAndGet();
+        // Do not close an ONNX session while its worker is still using it.
+        // Queued jobs observe cancellation; runtime disposal is the last task.
+        executor.execute(() -> {
+            synchronized (runtimeLock) {
+                if (faceSwapper != null) faceSwapper.close();
+                if (faceEmbedder != null) faceEmbedder.close();
+                if (faceDetector != null) faceDetector.close();
+                faceSwapper = null; faceEmbedder = null; faceDetector = null;
+            }
+        });
+        executor.shutdown();
         super.onDestroy();
     }
 
@@ -430,7 +433,9 @@ public final class AgentBridgeService extends Service {
         if (owner == null || owner != callerUid) return;
         outputOwners.remove(value);
         Uri uri = Uri.parse(value);
-        File file = new File(new File(getCacheDir(), "shared_images"), uri.getLastPathSegment());
+        String name = uri.getLastPathSegment();
+        if (name == null || !name.matches("agent-[A-Za-z0-9-]+[.]jpg")) return;
+        File file = new File(new File(getCacheDir(), "shared_images"), name);
         if (file.getName().startsWith("agent-")) file.delete();
         revokeUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
     }
