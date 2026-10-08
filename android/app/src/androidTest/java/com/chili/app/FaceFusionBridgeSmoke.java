@@ -18,7 +18,7 @@ public final class FaceFusionBridgeSmoke extends Instrumentation {
         @Override public void resolve(JSObject data) { result=data; done.countDown(); }
         @Override public void resolve() { result=new JSObject(); done.countDown(); }
         @Override public void reject(String msg,String code,Exception ex,JSObject data) { failure=msg; done.countDown(); }
-        JSObject await() throws Exception { if(!done.await(15,TimeUnit.SECONDS))throw new Exception("Native call timed out: "+getMethodName()); if(failure!=null)throw new Exception(failure); return result; }
+        JSObject await() throws Exception { if(!done.await(90,TimeUnit.SECONDS))throw new Exception("Native call timed out: "+getMethodName()); if(failure!=null)throw new Exception(failure); return result; }
     }
     private JSObject invoke(Bridge bridge,String plugin,String method,JSObject data) throws Exception {
         PluginHandle handle=bridge.getPlugin(plugin); if(handle==null)throw new Exception("Plugin missing: "+plugin);
@@ -44,9 +44,35 @@ public final class FaceFusionBridgeSmoke extends Instrumentation {
         try(java.io.InputStream in=getTargetContext().getContentResolver().openInputStream(uri)) { if(in==null||in.read()<0)throw new Exception("Saved media unreadable"); }
         getTargetContext().getContentResolver().delete(uri,null,null);
         JSObject voice=invoke(bridge,"VoiceChat","isAvailable",new JSObject());
-        return "VAULT_ENCRYPTED_ROUNDTRIP_PASS MEDIASTORE_SAVE_PASS VOICE_AVAILABILITY "+voice.toString();
+        String processing = "";
+        if (testProcessing) {
+            byte[] sourceBytes, targetBytes;
+            try (java.io.InputStream in=getContext().getAssets().open("grace_hopper.jpg")) { sourceBytes=readBytes(in); }
+            try (java.io.InputStream in=getContext().getAssets().open("astronaut.png")) { targetBytes=readBytes(in); }
+            JSObject job=new JSObject();
+            job.put("sourceUri","data:image/jpeg;base64,"+android.util.Base64.encodeToString(sourceBytes,android.util.Base64.NO_WRAP));
+            job.put("targetUri","data:image/png;base64,"+android.util.Base64.encodeToString(targetBytes,android.util.Base64.NO_WRAP));
+            JSObject result=invoke(bridge,"FaceFusionAgent","swap",job);
+            byte[] encoded=android.util.Base64.decode(result.getString("image"),android.util.Base64.DEFAULT);
+            android.graphics.Bitmap output=android.graphics.BitmapFactory.decodeByteArray(encoded,0,encoded.length);
+            android.graphics.Bitmap target=android.graphics.BitmapFactory.decodeByteArray(targetBytes,0,targetBytes.length);
+            if(output==null||output.getWidth()!=target.getWidth()||output.getHeight()!=target.getHeight())throw new Exception("Chilli swap result dimensions invalid");
+            int changed=0;
+            for(int y=0;y<target.getHeight();y++)for(int x=0;x<target.getWidth();x++)if(output.getPixel(x,y)!=target.getPixel(x,y))changed++;
+            if(changed<100)throw new Exception("Chilli swap returned unchanged image");
+            processing=" CHILLI_FACEFUSION_PROCESSING_PASS pixels="+changed+" size="+output.getWidth()+"x"+output.getHeight();
+            output.recycle();target.recycle();
+        }
+        return "VAULT_ENCRYPTED_ROUNDTRIP_PASS MEDIASTORE_SAVE_PASS VOICE_AVAILABILITY "+voice.toString()+processing;
     }
-    @Override public void onCreate(Bundle args) { super.onCreate(args); start(); }
+    private static byte[] readBytes(java.io.InputStream in) throws Exception {
+        java.io.ByteArrayOutputStream out=new java.io.ByteArrayOutputStream();
+        byte[] buffer=new byte[8192];int n;
+        while((n=in.read(buffer))!=-1)out.write(buffer,0,n);
+        return out.toByteArray();
+    }
+    private boolean testProcessing;
+    @Override public void onCreate(Bundle args) { super.onCreate(args); testProcessing = args != null && "true".equals(args.getString("processing")); start(); }
     @Override public void onStart() {
         Bundle report = new Bundle();
         HandlerThread receiver = new HandlerThread("BridgeSmokeReplies");
@@ -114,7 +140,7 @@ public final class FaceFusionBridgeSmoke extends Instrumentation {
             if (!bound) throw new Exception("Companion did not bind");
             if (!complete.await(30, TimeUnit.SECONDS)) throw new Exception("Companion IPC timed out");
             if (error[0] != null) throw new Exception(error[0]);
-            report.putString("stream", "\nFACEFUSION_BRIDGE_SMOKE_PASS\n"
+            report.putString("stream", "\n"+report.getString("native","")+"\nFACEFUSION_BRIDGE_SMOKE_PASS\n"
                     + payload[0] + "\n" + payload[1]);
             finish(-1, report);
         } catch (Throwable failure) {
