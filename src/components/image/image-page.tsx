@@ -1,3 +1,5 @@
+import { useEffect } from 'react'
+import { getSavedImages } from '../../lib/image-persistence'
 import { ImageView } from './image-view'
 import { ImageTools } from './image-tools'
 import { useImageWorkspace, type ImageSubTab } from '../../stores/image-workspace-store'
@@ -12,6 +14,14 @@ const TABS: { value: ImageSubTab; label: string }[] = [
 export function ImagePage() {
   const tab = useImageWorkspace((s) => s.imageSubTab)
   const setTab = useImageWorkspace((s) => s.setImageSubTab)
+
+  useEffect(() => {
+    let mounted = true
+    void getSavedImages().then(images => {
+      if (mounted && !useImageWorkspace.getState().generatedImages.length) useImageWorkspace.getState().addGeneratedImages(images.slice(0, 2).map(image => image.uri))
+    }).catch(() => undefined)
+    return () => { mounted = false }
+  }, [])
 
   return (
     <div className="flex h-full max-w-full min-h-0 min-w-0 flex-col overflow-hidden">

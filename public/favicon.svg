@@ -1,23 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="7" fill="#0a0a0a"/>
-  <g fill="white">
-    <rect x="6.2" y="7.5" width="1.6" height="18" rx="0.8" transform="rotate(-42 6.2 7.5)"/>
-    <rect x="24.2" y="6.3" width="1.6" height="18" rx="0.8" transform="rotate(42 24.2 6.3)"/>
-    <polygon points="7.2,8.8 3.8,7.2 4.5,5.5 8.5,7.2"/>
-    <polygon points="24.8,8.8 28.2,7.2 27.5,5.5 23.5,7.2"/>
-    <rect x="14.3" y="14.3" width="3.4" height="3.4" rx="0.4" transform="rotate(45 16 16)"/>
-    <circle cx="9.2" cy="24.5" r="4"/>
-    <circle cx="9.2" cy="24.5" r="1.7" fill="#0a0a0a"/>
-    <circle cx="9.2" cy="22.9" r="0.9" fill="#0a0a0a"/>
-    <circle cx="9.2" cy="26.1" r="0.9" fill="#0a0a0a"/>
-    <circle cx="7.6" cy="24.5" r="0.9" fill="#0a0a0a"/>
-    <circle cx="10.8" cy="24.5" r="0.9" fill="#0a0a0a"/>
-    <circle cx="22.8" cy="24.5" r="4"/>
-    <circle cx="22.8" cy="24.5" r="1.7" fill="#0a0a0a"/>
-    <circle cx="22.8" cy="22.9" r="0.9" fill="#0a0a0a"/>
-    <circle cx="22.8" cy="26.1" r="0.9" fill="#0a0a0a"/>
-    <circle cx="21.2" cy="24.5" r="0.9" fill="#0a0a0a"/>
-    <circle cx="24.4" cy="24.5" r="0.9" fill="#0a0a0a"/>
-    <path d="M16 5.5L12.5 8.5V12.5L16 10.5L19.5 12.5V8.5Z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1a0a0a"/>
+      <stop offset="100%" stop-color="#0a0a0c"/>
+    </radialGradient>
+    <linearGradient id="pepper" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff2d2d"/>
+      <stop offset="40%" stop-color="#e01010"/>
+      <stop offset="100%" stop-color="#b80000"/>
+    </linearGradient>
+    <linearGradient id="highlight" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ff6b4a" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#ff2d2d" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="stem" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#4a9e3f"/>
+      <stop offset="100%" stop-color="#2d6b25"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <g transform="translate(256,270) rotate(-15)">
+    <path d="M-20,-160 C-25,-155 -35,-130 -40,-100 C-50,-50 -55,10 -50,60 C-45,100 -35,140 -15,170 C0,190 20,195 35,180 C55,155 65,120 68,80 C72,30 65,-30 50,-80 C40,-115 25,-145 10,-160 C0,-168 -10,-168 -20,-160Z" fill="url(#pepper)"/>
+    <path d="M-15,-150 C-18,-140 -28,-115 -32,-90 C-40,-45 -42,5 -38,50 C-35,80 -28,110 -15,135" fill="none" stroke="url(#highlight)" stroke-width="18" stroke-linecap="round" opacity="0.5"/>
+    <path d="M-10,-165 C-5,-175 5,-180 10,-178 C18,-175 20,-168 15,-160 C10,-155 0,-158 -5,-160Z" fill="url(#stem)"/>
+    <path d="M-8,-168 C-15,-185 -10,-200 0,-205 C10,-200 15,-185 8,-168" fill="url(#stem)"/>
+    <ellipse cx="-5" cy="-195" rx="8" ry="5" fill="#5ab84e" opacity="0.6"/>
   </g>
 </svg>

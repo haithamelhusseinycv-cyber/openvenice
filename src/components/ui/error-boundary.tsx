@@ -1,76 +1,67 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
-import { isStaleBuildError, recoverFromStaleBuild } from '../../lib/app-update'
 
 interface Props {
   children: ReactNode
-  fallback?: (props: { error: Error; reset: () => void }) => ReactNode
-  onError?: (error: Error, info: ErrorInfo) => void
+  fallback?: ReactNode
+  onError?: (error: Error, errorInfo: ErrorInfo) => void
 }
 
 interface State {
+  hasError: boolean
   error: Error | null
 }
 
 export class ErrorBoundary extends Component<Props, State> {
-  state: State = { error: null }
+  constructor(props: Props) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
 
   static getDerivedStateFromError(error: Error): State {
-    return { error }
+    return { hasError: true, error }
   }
 
-  componentDidCatch(error: Error, info: ErrorInfo) {
-    if (this.props.onError) this.props.onError(error, info)
-    console.error('[OpenVenice ErrorBoundary]', error, info)
-    if (isStaleBuildError(error)) void recoverFromStaleBuild()
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    this.props.onError?.(error, errorInfo)
   }
 
-  reset = () => this.setState({ error: null })
+  componentDidUpdate(_: Props, prevState: State) {
+    if (this.state.hasError && !prevState.hasError) {
+      this.retryButtonRef?.focus()
+    }
+  }
+
+  private retryButtonRef: HTMLButtonElement | null = null
 
   render() {
-    if (this.state.error) {
-      if (this.props.fallback) {
-        return this.props.fallback({ error: this.state.error, reset: this.reset })
-      }
-      return <DefaultFallback error={this.state.error} reset={this.reset} />
-    }
-    return this.props.children
-  }
-}
+    if (this.state.hasError) {
+      if (this.props.fallback) return this.props.fallback
 
-// eslint-disable-next-line react-refresh/only-export-components
-function DefaultFallback({ error, reset }: { error: Error; reset: () => void }) {
-  const staleBuild = isStaleBuildError(error)
-  return (
-    <div className="flex flex-col items-center justify-center h-full px-6 text-center" role="alert">
-      <div className="max-w-md">
-        <div className="text-[20px] font-semibold text-white/85 mb-2">Something went wrong</div>
-        <p className="text-[14px] text-white/40 mb-4">
-          {staleBuild
-            ? 'A newer app version is available. OpenVenice is clearing the old cached files and updating now.'
-            : 'The app hit an unexpected error and couldn\'t render this view. Your work is safe — refresh to recover.'}
-        </p>
-        <details className="mb-5 text-left">
-          <summary className="text-[13px] text-white/30 cursor-pointer hover:text-white/55">Show details</summary>
-          <pre className="mt-2 text-[12px] text-red-300/70 bg-white/[0.03] border border-white/[0.06] rounded-lg p-3 overflow-auto max-h-40 whitespace-pre-wrap break-words">
-            {error.message}
-            {error.stack ? `\n\n${error.stack}` : ''}
-          </pre>
-        </details>
-        <div className="flex gap-2 justify-center">
+      return (
+        <div role="alert" className="flex flex-col items-center justify-center p-6 text-center">
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-400" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+          </div>
+          <h3 className="text-[15px] font-medium text-white/90">Something went wrong</h3>
+          <p className="mt-1 text-[13px] text-white/50">
+            {this.state.error?.message || 'An unexpected error occurred'}
+          </p>
           <button
-            onClick={() => staleBuild ? void recoverFromStaleBuild(true) : reset()}
-            className="px-4 py-2 text-[14px] font-medium bg-white text-black rounded-md hover:bg-white/90 transition-colors"
+            ref={(el) => { this.retryButtonRef = el }}
+            type="button"
+            onClick={() => this.setState({ hasError: false, error: null })}
+            className="mt-4 min-h-10 rounded-xl bg-white/10 px-4 text-[13px] font-medium text-white active:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]"
           >
-            {staleBuild ? 'Update app' : 'Try again'}
-          </button>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 text-[14px] font-medium border border-white/[0.1] text-white/60 hover:text-white/80 hover:border-white/[0.2] rounded-md transition-colors"
-          >
-            Reload page
+            Try again
           </button>
         </div>
-      </div>
-    </div>
-  )
+      )
+    }
+
+    return this.props.children
+  }
 }

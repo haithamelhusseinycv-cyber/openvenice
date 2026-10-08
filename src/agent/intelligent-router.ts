@@ -1,7 +1,22 @@
 /**
  * Intelligent routing: analyzes user intent and automatically selects
  * the optimal workflow, operation, and settings with minimal user input.
+ * 
+ * Enhanced with NSFW-specific routing, specialized model selection,
+ * and comprehensive workflow templates for adult content generation.
  */
+
+/**
+ * Intelligent routing: analyzes user intent and automatically selects
+ * the optimal workflow, operation, and settings with minimal user input.
+ *
+ * Enhanced with NSFW-specific routing, specialized model selection,
+ * and comprehensive workflow templates for adult content generation.
+ */
+import { getNSFWWorkflow, type NSFWWorkflowTemplate } from '../lib/nsfw-workflows';
+import { selectOptimalModel, buildNSFWPipeline, type PipelineStep, type LocalDreamModel, type ModelSelectionCriteria } from '../lib/localdream-specialized-models';
+import { buildNSFWPrompt, buildNSFWNegativePrompt, SEXUAL_POSITIONS } from '../lib/nsfw-anatomy-knowledge';
+import { intelligentOrchestrator, analyzePromptComplexity } from '../lib/nsfw-intelligence';
 
 export type WorkflowIntent =
   | 'create_from_scratch'
@@ -217,7 +232,9 @@ function detectAspectRatio(prompt: string): string {
 }
 
 export function routeIntelligently(input: RoutingInput): RoutingDecision {
-  const { intent, confidence } = detectIntent(input.prompt)
+  const detected = detectIntent(input.prompt)
+  const intent = input.hasImages && detected.confidence <= 0.7 ? (input.imageCount > 1 ? 'combine_photos' : 'edit_photo') : detected.intent
+  const confidence = input.hasImages && detected.confidence <= 0.7 ? 0.9 : detected.confidence
   const quality = selectQuality(input.prompt, input.hasImages, input.userExplicitPreferences?.quality)
   const useCloud = shouldUseCloud(intent, quality, input.imageCount)
   const operation = mapIntentToOperation(intent)
@@ -266,3 +283,347 @@ export function enhancePromptForNSFW(prompt: string): string {
 
   return `${prompt}, ${enhancements.join(', ')}`
 }
+
+/**
+ * NSFW-specific routing and workflow selection
+ */
+
+export type NSFWCategory = 'solo' | 'couple' | 'group' | 'oral' | 'anal' | 'bdsm' | 'erotic' | 'explicit'
+
+export interface NSFWRoutingDecision extends RoutingDecision {
+  isNSFW: boolean
+  nsfwCategory?: NSFWCategory
+  nsfwWorkflow?: NSFWWorkflowTemplate
+  nsfwPipeline?: PipelineStep[]
+  nsfwPrompt?: string
+  nsfwNegativePrompt?: string
+  selectedModels?: {
+    primary: string
+    secondary: string[]
+  }
+}
+
+/**
+ * Detect NSFW category from prompt
+ */
+function detectNSFWCategory(prompt: string): NSFWCategory | undefined {
+  if (!isNSFW(prompt)) return undefined
+
+  const categoryPatterns: Record<NSFWCategory, RegExp[]> = {
+    solo: [/\b(solo|alone|self|masturbat)/i],
+    couple: [/\b(couple|two|pair|missionary|doggy|cowgirl|spooning)/i],
+    group: [/\b(threesome|orgy|group|three|multiple|ffm|mmf)/i],
+    oral: [/\b(oral|blowjob|fellatio|cunnilingus|eating|suck)/i],
+    anal: [/\b(anal|butt|ass|rear)/i],
+    bdsm: [/\b(bdsm|bondage|dominant|submissive|tie|restrain)/i],
+    erotic: [/\b(erotic|sensual|lingerie|tease|softcore)/i],
+    explicit: [/\b(explicit|hardcore|porn|xxx|intercourse|penetration)/i],
+  }
+
+  for (const [category, patterns] of Object.entries(categoryPatterns)) {
+    if (patterns.some((pattern) => pattern.test(prompt))) {
+      return category as NSFWCategory
+    }
+  }
+
+  return 'explicit' // Default to explicit if NSFW but no specific category
+}
+
+/**
+ * Detect sexual position from prompt
+ */
+function detectSexualPosition(prompt: string): string | undefined {
+  const positionKeywords = SEXUAL_POSITIONS.flatMap((p) => [p.id, ...p.promptKeywords])
+  
+  for (const keyword of positionKeywords) {
+    if (prompt.toLowerCase().includes(keyword.toLowerCase())) {
+      const position = SEXUAL_POSITIONS.find((p) => 
+        p.id === keyword || p.promptKeywords.some((k) => k.toLowerCase() === keyword.toLowerCase())
+      )
+      if (position) return position.id
+    }
+  }
+  
+  return undefined
+}
+
+/**
+ * Enhanced routing with NSFW workflow integration
+ */
+export function routeIntelligentlyNSFW(input: RoutingInput): NSFWRoutingDecision {
+  const baseDecision = routeIntelligently(input)
+  const nsfwDetected = isNSFW(input.prompt)
+  
+  if (!nsfwDetected) {
+    return {
+      ...baseDecision,
+      isNSFW: false,
+    }
+  }
+
+  // NSFW-specific routing
+  const nsfwCategory = detectNSFWCategory(input.prompt)
+  const position = detectSexualPosition(input.prompt)
+  
+  // Select appropriate workflow
+  let nsfwWorkflow: NSFWWorkflowTemplate | undefined
+  if (nsfwCategory && position) {
+    // Try to find workflow matching both category and position
+    nsfwWorkflow = getNSFWWorkflow(position) || getNSFWWorkflow(`${nsfwCategory}-${position}`)
+  }
+  if (!nsfwWorkflow && nsfwCategory) {
+    // Fallback to category-based workflow
+    const categoryWorkflows = ['solo-female', 'solo-male', 'couple-missionary', 'oral-fellatio', 'anal', 'threesome-ffm', 'bdsm-bondage', 'lingerie-erotic', 'explicit-pornographic']
+    const matchingWorkflow = categoryWorkflows.find((id) => id.startsWith(nsfwCategory!))
+    if (matchingWorkflow) {
+      nsfwWorkflow = getNSFWWorkflow(matchingWorkflow)
+    }
+  }
+
+  // Build NSFW-optimized prompt
+  const nsfwPrompt = buildNSFWPrompt({
+    position: position,
+    lighting: 'soft diffused',
+    cameraAngle: 'eye-level intimacy',
+    focusType: 'shallow depth of field',
+    colorTone: 'warm sensual',
+    additionalDetails: nsfwWorkflow ? [nsfwWorkflow.positivePrompt] : [],
+  })
+
+  const nsfwNegativePrompt = buildNSFWNegativePrompt(
+    nsfwWorkflow ? [nsfwWorkflow.negativePrompt] : []
+  )
+
+  // Select models and build pipeline
+  const quality = baseDecision.quality
+  const modelCriteria: ModelSelectionCriteria = {
+    taskType: 'generation',
+    quality,
+    hasReferenceImage: input.hasImages,
+    requiresAnatomyCorrection: true,
+    targetResolution: nsfwWorkflow?.settings.resolution || [1024, 1024],
+  }
+
+  const primaryModel = selectOptimalModel(modelCriteria)
+  
+  // Build processing pipeline
+  const nsfwPipeline = buildNSFWPipeline({
+    quality,
+    includeFaceEnhance: true,
+    includeBodyEnhance: true,
+    includeSkinTexture: true,
+    includeUpscale: quality === 'best',
+    targetResolution: nsfwWorkflow?.settings.resolution || [1024, 1024],
+  })
+
+  // Build reasoning
+  const reasoning = [
+    baseDecision.reasoning,
+    `NSFW category: ${nsfwCategory}`,
+    position ? `Detected position: ${position}` : null,
+    nsfwWorkflow ? `Using workflow: ${nsfwWorkflow.label}` : null,
+    `Pipeline: ${nsfwPipeline.length} steps`,
+    `Primary model: ${primaryModel.name}`,
+  ].filter(Boolean).join('. ')
+
+  return {
+    ...baseDecision,
+    isNSFW: true,
+    nsfwCategory,
+    nsfwWorkflow,
+    nsfwPipeline,
+    nsfwPrompt,
+    nsfwNegativePrompt,
+    selectedModels: {
+      primary: primaryModel.id,
+      secondary: nsfwPipeline.slice(1).map((step) => step.model.id),
+    },
+    reasoning,
+    autoSettings: {
+      ...baseDecision.autoSettings,
+      nsfw_workflow_id: nsfwWorkflow?.id,
+      nsfw_category: nsfwCategory,
+      position: position,
+      pipeline_steps: nsfwPipeline.length,
+      models: {
+        primary: primaryModel.id,
+        secondary: nsfwPipeline.slice(1).map((step) => step.model.id),
+      },
+    },
+  }
+}
+
+/**
+ * Get recommended settings for NSFW generation
+ */
+export function getNSFWRecommendations(prompt: string): {
+  workflow?: NSFWWorkflowTemplate
+  models: string[]
+  settings: Record<string, unknown>
+  tips: string[]
+} {
+  const category = detectNSFWCategory(prompt)
+  const position = detectSexualPosition(prompt)
+  
+  let workflow: NSFWWorkflowTemplate | undefined
+  if (position) {
+    workflow = getNSFWWorkflow(position)
+  }
+  if (!workflow && category) {
+    const categoryWorkflows = ['solo-female', 'couple-missionary', 'oral-fellatio', 'anal', 'threesome-ffm', 'bdsm-bondage', 'explicit-pornographic']
+    const matchingId = categoryWorkflows.find((id) => id.startsWith(category))
+    if (matchingId) {
+      workflow = getNSFWWorkflow(matchingId)
+    }
+  }
+
+  const primaryModel = selectOptimalModel({
+    taskType: 'generation',
+    quality: 'best',
+    hasReferenceImage: false,
+    requiresAnatomyCorrection: true,
+    targetResolution: workflow?.settings.resolution || [1024, 1024],
+  })
+
+  const tips: string[] = [
+    'Use ControlNet for precise pose control',
+    'Enable face enhancement for realistic expressions',
+    'Apply skin texture model for natural appearance',
+    'Use shallow depth of field for intimate focus',
+    'Enable 4x upscaling for final output',
+  ]
+
+  if (workflow) {
+    tips.push(`Recommended workflow: ${workflow.label}`)
+    if (workflow.loras && workflow.loras.length > 0) {
+      tips.push(`Suggested LoRAs: ${workflow.loras.map((l) => l.name).join(', ')}`)
+    }
+  }
+
+  return {
+    workflow,
+    models: [primaryModel.id],
+    settings: workflow?.settings || {
+      steps: 35,
+      cfg: 8.0,
+      sampler: 'DPM++ 2M Karras',
+      scheduler: 'karras',
+      resolution: [1024, 1024],
+    },
+    tips,
+  }
+}
+
+/**
+ * TOP-TIER INTELLIGENT ORCHESTRATION
+ * 
+ * Master entry point for NSFW content generation with full intelligence:
+ * - Prompt complexity analysis
+ * - Smart prompt enhancement using anatomy knowledge
+ * - Adaptive pipeline depth based on complexity and quality
+ * - Quality prediction before generation
+ * - Intelligent model selection with compatibility awareness
+ * - Context memory and user preference learning
+ * - Comprehensive reasoning and recommendations
+ */
+export interface TopIntelligentResult {
+  // Core outputs
+  enhancedPrompt: string
+  negativePrompt: string
+  pipeline: PipelineStep[]
+  selectedModels: LocalDreamModel[]
+  
+  // Intelligence outputs
+  complexityScore: number
+  qualityPrediction: number
+  successProbability: number
+  confidence: number
+  
+  // Context
+  workflow?: NSFWWorkflowTemplate
+  position?: string
+  category?: string
+  
+  // Metadata
+  reasoning: string[]
+  recommendations: string[]
+  riskFactors: string[]
+  estimatedDuration: number // seconds
+}
+
+export function routeWithTopIntelligence(
+  userId: string,
+  prompt: string,
+  quality: 'fast' | 'balanced' | 'best' | 'ultra' = 'best'
+): TopIntelligentResult {
+  // Use the master orchestrator
+  const result = intelligentOrchestrator.orchestrate(userId, prompt, quality)
+  
+  // Calculate estimated duration based on pipeline
+  const estimatedDuration = result.pipeline.reduce((total, step) => {
+    const baseTime = step.settings.steps * 0.5 // 0.5 seconds per step
+    const overhead = 2 // 2 seconds overhead per model
+    return total + baseTime + overhead
+  }, 0)
+  
+  return {
+    enhancedPrompt: result.enhancedPrompt,
+    negativePrompt: result.negativePrompt,
+    pipeline: result.pipeline,
+    selectedModels: result.selectedModels,
+    complexityScore: analyzePromptComplexity(prompt).score,
+    qualityPrediction: result.qualityPrediction.estimatedQuality,
+    successProbability: result.qualityPrediction.successProbability,
+    confidence: result.qualityPrediction.confidence,
+    workflow: getNSFWWorkflow(
+      detectSexualPosition(prompt) || 
+      (detectNSFWCategory(prompt) ? `${detectNSFWCategory(prompt)}-default` : 'couple-missionary')
+    ),
+    position: detectSexualPosition(prompt),
+    category: detectNSFWCategory(prompt),
+    reasoning: result.reasoning,
+    recommendations: result.recommendations,
+    riskFactors: result.qualityPrediction.riskFactors,
+    estimatedDuration: Math.round(estimatedDuration),
+  }
+}
+
+/**
+ * Re-export intelligence functions for direct access
+ */
+export {
+  analyzePromptComplexity,
+  predictQuality,
+  enhancePromptIntelligently,
+  buildAdaptivePipeline,
+  selectModelsIntelligently,
+  ContextManager,
+  intelligentOrchestrator,
+} from '../lib/nsfw-intelligence'
+
+export {
+  analyzePhoto,
+  analyzeImageQuality,
+  analyzeComposition,
+  analyzeLighting,
+  analyzeColor,
+  analyzeAnatomy,
+  getEnhancementPipeline,
+} from '../lib/photo-director'
+
+export type {
+  ImageAnalysis,
+  CompositionAnalysis,
+  LightingAnalysis,
+  ColorAnalysis,
+  AnatomyAnalysis,
+} from '../lib/photo-director'
+
+export type {
+  PromptComplexity,
+  QualityPrediction,
+  UserContext,
+  GenerationRecord,
+} from '../lib/nsfw-intelligence'
+
+export type { LocalDreamModel } from '../lib/localdream-specialized-models'

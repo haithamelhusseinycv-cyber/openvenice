@@ -79,7 +79,7 @@ export async function saveImage(imageUrl: string, mimeType: string, fileName: st
   if (isNativeOpenVeniceAndroid()) {
     try {
       return await invokeMedia<MediaSaveResult>('saveImage', {
-        imageUri: imageUrl.startsWith('blob:') ? await imageUrlToDataUrl(imageUrl, mimeType) : imageUrl,
+        imageUri: await imageUrlToDataUrl(imageUrl, mimeType),
         mimeType,
         fileName,
       })
@@ -110,7 +110,7 @@ export async function shareImage(imageUrl: string, mimeType: string, fileName: s
   if (isNativeOpenVeniceAndroid()) {
     try {
       await invokeMedia<void>('shareImage', {
-        imageUri: imageUrl.startsWith('blob:') ? await imageUrlToDataUrl(imageUrl, mimeType) : imageUrl,
+        imageUri: await imageUrlToDataUrl(imageUrl, mimeType),
         mimeType,
         fileName,
       })
@@ -134,7 +134,7 @@ export async function shareImage(imageUrl: string, mimeType: string, fileName: s
 export async function copyImage(imageUrl: string, mimeType: string): Promise<'image' | 'url'> {
   if (isNativeOpenVeniceAndroid()) {
     try {
-      await invokeMedia<void>('copyImage', { imageUri: imageUrl.startsWith('blob:') ? await imageUrlToDataUrl(imageUrl, mimeType) : imageUrl, mimeType })
+      await invokeMedia<void>('copyImage', { imageUri: await imageUrlToDataUrl(imageUrl, mimeType), mimeType })
       return 'image'
     } catch (error) {
       if (!imageUrl.startsWith('data:')) throw error

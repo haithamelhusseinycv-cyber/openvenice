@@ -1,8 +1,12 @@
 {
   "appId": "com.chili.app",
-  "appName": "Chili",
+  "appName": "Chilli",
   "webDir": "dist",
   "server": {
     "androidScheme": "https"
+  },
+  "android": {
+    "webContentsDebuggingEnabled": false,
+    "allowMixedContent": true
   }
 }

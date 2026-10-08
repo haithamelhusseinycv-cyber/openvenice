@@ -1,4 +1,4 @@
-import { isValidElement, useState, type ComponentPropsWithoutRef, type ReactNode } from 'react'
+import { isValidElement, memo, useState, type ComponentPropsWithoutRef, type ReactNode } from 'react'
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { ChatArtifact, ChatMessage, ContentPart } from '../../types/venice'
@@ -98,7 +98,7 @@ interface MessageBubbleProps {
   onDiscardArtifact?: (artifact: ChatArtifact) => void
 }
 
-export function MessageBubble({
+export const MessageBubble = memo(function MessageBubble({
   message,
   onCopy,
   onDelete,
@@ -285,7 +285,7 @@ export function MessageBubble({
       </div>
     </div>
   )
-}
+})
 
 function ActionBtn({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
   return (

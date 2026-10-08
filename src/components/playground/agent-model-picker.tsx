@@ -91,6 +91,9 @@ export function AgentModelPicker({ value, onChange }: Props) {
               {showAll ? 'All' : 'Capable'}
             </button>
           </div>
+          <div className="mx-2 mt-1 border border-cyan-400/13 rounded bg-cyan-400/5 px-2 py-1.5 text-[11px] text-white/58 leading-snug">
+            Cloud models use Venice credits. Local tools run on-device.
+          </div>
           <div className="max-h-[min(22rem,45dvh)] overflow-y-auto overscroll-contain py-1">
             {grouped.length === 0 && (
               <div className="px-3 py-6 text-center text-[13px] text-white/30">No matches</div>
@@ -123,6 +126,7 @@ export function AgentModelPicker({ value, onChange }: Props) {
                       {m.capabilities.supportsVision && <Badge tone="pink">Vision</Badge>}
                       {m.capabilities.supportsWebSearch && <Badge tone="slate">Web</Badge>}
                       {m.uncensored && <Badge tone="rose">Uncensored</Badge>}
+                      <CostBadge modelId={m.id} />
                     </div>
                     <div className="text-[11px] text-white/35 mt-1 font-mono truncate">
                       {m.id}{m.contextTokens ? ` · ${formatCtx(m.contextTokens)} ctx` : ''}
@@ -160,4 +164,26 @@ function formatCtx(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
   if (n >= 1_000) return `${Math.round(n / 1000)}K`
   return String(n)
+}
+
+const LOCAL_MODEL_PATTERNS = /\b(local dream|termux|shizuku|facefusion|rish|device)\b/i
+const CLOUD_MODEL_PATTERNS = /\b(qwen|lustify|seedream|krea|chroma|anime|venice|gemini|gpt|grok|flux|ideogram|nano|luma|muse|wan|firered|zai|glm|claude|llama|mistral|deepseek|kokoro|elevenlabs|minimax)\b/i
+
+function CostBadge({ modelId }: { modelId: string }) {
+  const id = modelId.toLowerCase()
+  if (LOCAL_MODEL_PATTERNS.test(id)) {
+    return (
+      <span className="text-[10px] px-1.5 py-px rounded font-medium uppercase tracking-wider bg-white/[0.055] text-white/68 border border-white/[0.12]">
+        Local
+      </span>
+    )
+  }
+  if (CLOUD_MODEL_PATTERNS.test(id)) {
+    return (
+      <span className="text-[10px] px-1.5 py-px rounded font-medium uppercase tracking-wider bg-cyan-400/8 text-cyan-300 border border-cyan-400/18">
+        Credits
+      </span>
+    )
+  }
+  return null
 }

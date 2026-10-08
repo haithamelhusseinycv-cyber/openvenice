@@ -59,7 +59,7 @@ export function PrimaryButton({ onClick, disabled, loading, children, ariaLabel,
         'w-full rounded-xl font-semibold transition-[background-color,transform] duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2',
         sizing,
         !disabled && !loading
-          ? 'bg-white text-black hover:bg-white/92 active:scale-[0.99]'
+          ? 'btn-premium text-black font-bold'
           : 'bg-white/[0.06] text-white/30 cursor-not-allowed',
       )}
     >

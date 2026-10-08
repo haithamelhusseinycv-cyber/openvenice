@@ -53,7 +53,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: Props) {
     <aside
       aria-label="Primary navigation"
       className={cn(
-        'flex flex-col h-full bg-[#0d0d11] border-r border-white/[0.05] transition-all duration-200 ease-out',
+        'flex flex-col h-full glass border-r border-white/[0.08] transition-all duration-200 ease-out',
         'fixed top-0 left-0 z-40 w-72 h-[100dvh] lg:static lg:h-full lg:w-auto',
         mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
         sidebarOpen ? 'lg:w-64' : 'lg:w-[60px]',

@@ -1,0 +1,48 @@
+from pathlib import Path
+import configparser, hashlib, json, mimetypes, re, requests
+root=Path(__file__).resolve().parents[1]
+home=Path('/data/data/com.termux/files/home')
+config=configparser.ConfigParser()
+config.read(home/'.config/rclone/rclone.conf')
+endpoints=[config.get(section,'endpoint',fallback='') for section in config.sections()]
+endpoint=next(value for value in endpoints if '.r2.cloudflarestorage.com' in value)
+account=endpoint.split('://')[-1].split('.')[0]
+token=(home/'.config/cloudflare-workers-token').read_text().strip()
+headers={'Authorization':'Bearer '+token}
+name='chilli-production'
+files={}
+imports=[];entries=[]
+for i,path in enumerate(sorted((root/'dist').rglob('*'))):
+ if not path.is_file() or path.suffix=='.map':continue
+ data=path.read_bytes(); asset='/'+path.relative_to(root/'dist').as_posix()
+ module='asset'+str(i)+'.bin'
+ files[module]=(module,data,'application/octet-stream')
+ imports.append('import a'+str(i)+' from "./'+module+'";')
+ mime=mimetypes.guess_type(path.name)[0] or 'application/octet-stream'
+ if path.suffix=='.js':mime='application/javascript'
+ entries.append(json.dumps(asset)+': [a'+str(i)+','+json.dumps(mime)+','+json.dumps(hashlib.sha256(data).hexdigest())+']')
+worker='\n'.join(imports)+'\nconst files={'+','.join(entries)+'};'+'''
+export default { async fetch(request) {
+ if(!['GET','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405});
+ const path=new URL(request.url).pathname;
+ const file=files[path] || (!path.split('/').pop().includes('.')?files['/index.html']:undefined);
+ if(!file)return new Response('Not found',{status:404});
+ const headers={'Content-Type':file[1],'X-Content-Type-Options':'nosniff','Referrer-Policy':'strict-origin-when-cross-origin','ETag':'"'+file[2]+'"','Cache-Control':path.startsWith('/assets/')?'public,max-age=31536000,immutable':'no-cache'};
+ if(request.headers.get('If-None-Match')===headers.ETag)return new Response(null,{status:304,headers});
+ return new Response(request.method==='HEAD'?null:file[0],{headers});
+}};
+'''
+files['worker.js']=('worker.js',worker,'application/javascript+module')
+files['metadata']=(None,json.dumps({'main_module':'worker.js','compatibility_date':'2026-10-08'}),'application/json')
+base='https://api.cloudflare.com/client/v4/accounts/'+account+'/workers/scripts/'+name
+response=requests.put(base,headers=headers,files=files,timeout=90);result=response.json()
+if not result.get('success'):raise RuntimeError(json.dumps(result.get('errors')))
+response=requests.post(base+'/subdomain',headers=headers,json={'enabled':True},timeout=30)
+if not response.json().get('success'):raise RuntimeError('Could not enable production domain')
+url='https://chilli-production.haitham-elhusseiny-cv.workers.dev'
+live=requests.get(url,timeout=30);assert live.status_code==200 and 'id="root"' in live.text
+assets=re.findall(r'(?:src|href)="(/assets/[^"]+)"',live.text)
+assert assets
+for asset in assets:
+ response=requests.get(url+asset,timeout=30);assert response.status_code==200
+print('DEPLOYED',url,'ASSETS',len(files)-2,'VERIFIED ENTRY ASSETS',len(assets))
