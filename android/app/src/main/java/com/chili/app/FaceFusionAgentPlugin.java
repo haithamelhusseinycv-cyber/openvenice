@@ -261,13 +261,16 @@ public final class FaceFusionAgentPlugin extends Plugin {
         synchronized (lock) {
             pending.put(requestId, call);
             Runnable timeout = () -> {
-                rejectPending(requestId, "FaceFusion timed out. Retry the interrupted operation.");
                 if (command >= MSG_DETECT_FACES && command <= MSG_ENHANCE) {
                     sendCancellation();
-                    closeLostConnection("FaceFusion image operation timed out.");
+                    // Clear connection state before waking the rejected caller;
+                    // its next request must not race a delayed disconnect.
+                    closeLostConnection("FaceFusion image operation timed out. Retry the interrupted operation.");
                 } else {
                     synchronized (lock) {
-                        if (pending.isEmpty()) closeLostConnection("FaceFusion control request timed out.");
+                        if (pending.size() == 1 && pending.containsKey(requestId))
+                            closeLostConnection("FaceFusion control request timed out.");
+                        else rejectPending(requestId, "FaceFusion control request timed out.");
                     }
                 }
             };
