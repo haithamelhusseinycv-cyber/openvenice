@@ -71,6 +71,7 @@ public final class FaceFusionAgentPlugin extends Plugin {
     private final ThreadLocal<PluginCall> preparing = new ThreadLocal<>();
     private PluginCall activeImage;
     private volatile boolean destroyed;
+    private final Runnable bindTimeout = () -> closeLostConnection("FaceFusion connection timed out.");
 
     private Messenger serviceMessenger;
     private boolean binding;
@@ -81,6 +82,7 @@ public final class FaceFusionAgentPlugin extends Plugin {
     private final ServiceConnection connection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
+            deadlines.removeCallbacks(bindTimeout);
             List<Runnable> queued;
             synchronized (lock) {
                 serviceMessenger = new Messenger(service);
@@ -281,6 +283,7 @@ public final class FaceFusionAgentPlugin extends Plugin {
             waitingForConnection.add(action);
             if (binding) return;
             binding = true;
+            deadlines.postDelayed(bindTimeout, controlTimeoutMs);
         }
 
         if (resolveService() == null) {
@@ -501,6 +504,7 @@ public final class FaceFusionAgentPlugin extends Plugin {
     }
 
     private void closeLostConnection(String message) {
+        deadlines.removeCallbacks(bindTimeout);
         try { getContext().unbindService(connection); } catch (IllegalArgumentException ignored) {}
         List<String> ids;
         synchronized (lock) {
