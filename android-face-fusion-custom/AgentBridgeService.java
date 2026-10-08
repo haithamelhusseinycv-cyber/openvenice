@@ -87,7 +87,11 @@ public final class AgentBridgeService extends Service {
         // A previous service instance cannot own an active request here.
         File dir = new File(getCacheDir(), "shared_images");
         File[] files = dir.listFiles((d, name) -> name.startsWith("agent-"));
-        if (files != null) for (File file : files) file.delete();
+        if (files != null) for (File file : files) {
+            Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", file);
+            revokeUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            file.delete();
+        }
     }
 
     @Override
@@ -160,6 +164,10 @@ public final class AgentBridgeService extends Service {
                 return;
             }
 
+            if (executor.isShutdown()) {
+                replyError(replyTo, command, request, new IllegalStateException("FaceFusion service is closing."));
+                return;
+            }
             final int epoch = cancellationEpoch.get();
             executor.execute(() -> {
                 try {
