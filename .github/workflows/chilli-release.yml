@@ -2,7 +2,7 @@ name: Chilli signed production release
 on:
   workflow_dispatch:
   push:
-    branches: ['fix/chilli-*']
+    branches: ['master', 'fix/chilli-*']
     paths: ['src/**', 'public/**', 'scripts/**', 'android/**', 'package*.json', 'index.html', '.github/workflows/chilli-release.yml']
 permissions:
   contents: read
@@ -46,19 +46,19 @@ jobs:
           printf '%s' "$CHILLI_KEYSTORE" | base64 --decode > "$RUNNER_TEMP/chilli-release.jks"
           chmod 600 "$RUNNER_TEMP/chilli-release.jks"
           signer="$ANDROID_HOME/build-tools/36.0.0/apksigner"
-          "$signer" sign --ks "$RUNNER_TEMP/chilli-release.jks" --ks-key-alias chilli-release --ks-pass env:CHILLI_STORE_PASSWORD --out Chilli-1.0.4-release.apk android/app/build/outputs/apk/release/app-release-unsigned.apk
-          "$signer" verify --verbose --print-certs Chilli-1.0.4-release.apk
-          "$ANDROID_HOME/build-tools/36.0.0/aapt2" dump badging Chilli-1.0.4-release.apk > "$RUNNER_TEMP/badging.txt"
+          "$signer" sign --ks "$RUNNER_TEMP/chilli-release.jks" --ks-key-alias chilli-release --ks-pass env:CHILLI_STORE_PASSWORD --out Chilli-1.0.5-release.apk android/app/build/outputs/apk/release/app-release-unsigned.apk
+          "$signer" verify --verbose --print-certs Chilli-1.0.5-release.apk
+          "$ANDROID_HOME/build-tools/36.0.0/aapt2" dump badging Chilli-1.0.5-release.apk > "$RUNNER_TEMP/badging.txt"
           ! grep -q application-debuggable "$RUNNER_TEMP/badging.txt"
-          grep -q "versionName='1.0.4'" "$RUNNER_TEMP/badging.txt"
-          sha256sum Chilli-1.0.4-release.apk > Chilli-1.0.4-release.apk.sha256
+          grep -q "versionName='1.0.5'" "$RUNNER_TEMP/badging.txt"
+          sha256sum Chilli-1.0.5-release.apk > Chilli-1.0.5-release.apk.sha256
           rm "$RUNNER_TEMP/chilli-release.jks"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: Chilli-1.0.4-production
+          name: Chilli-1.0.5-production
           path: |
-            Chilli-1.0.4-release.apk
-            Chilli-1.0.4-release.apk.sha256
+            Chilli-1.0.5-release.apk
+            Chilli-1.0.5-release.apk.sha256
             dist/
           if-no-files-found: error
           retention-days: 30

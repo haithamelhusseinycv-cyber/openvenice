@@ -24,6 +24,12 @@ import org.json.JSONObject;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.FilterInputStream;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -61,6 +67,9 @@ public final class AgentBridgeService extends Service {
     private static final String PREFS = "model_settings";
     private static final String DEFAULT_SWAPPER = "inswapper_128.onnx";
 
+    private static final long MAX_BYTES = 16L * 1024 * 1024;
+    private static final long MAX_PIXELS = 8_000_000;
+    private final Map<String, Integer> outputOwners = new HashMap<>();
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final AtomicInteger cancellationEpoch = new AtomicInteger(0);
     private final Object runtimeLock = new Object();
@@ -118,6 +127,10 @@ public final class AgentBridgeService extends Service {
                 return;
             }
 
+            if (command == 7) {
+                releaseOutput(request.getString("outputUri", ""), callerUid);
+                return;
+            }
             if (command == MSG_CANCEL) {
                 cancellationEpoch.incrementAndGet();
                 replySuccess(replyTo, command, request, new JSONObject());
@@ -254,12 +267,15 @@ public final class AgentBridgeService extends Service {
         ensureAnalysisRuntime();
         ensureSwapperRuntime(swapperFile);
 
-        Bitmap source = loadBitmap(sourceUri);
-        Bitmap target = loadBitmap(targetUri);
+        Bitmap source = null;
+        Bitmap target = null;
         Bitmap swapped = null;
         Bitmap finalImage = null;
         long started = System.currentTimeMillis();
         try {
+            source = loadBitmap(sourceUri);
+            target = loadBitmap(targetUri);
+            validateEnhancement(target, frameEnhancerFile);
             checkCancelled(epoch);
             FaceFusionProcessor processor = new FaceFusionProcessor(faceDetector, faceEmbedder, faceSwapper);
             int[] requestedIndices = request.getIntArray(KEY_TARGET_FACE_INDICES);
@@ -290,8 +306,8 @@ public final class AgentBridgeService extends Service {
             out.put("metadata", metadata);
             return out;
         } finally {
-            source.recycle();
-            target.recycle();
+            if (source != null) source.recycle();
+            if (target != null) target.recycle();
             if (finalImage != null && finalImage != swapped && !finalImage.isRecycled()) finalImage.recycle();
             if (swapped != null && !swapped.isRecycled()) swapped.recycle();
         }
@@ -314,6 +330,7 @@ public final class AgentBridgeService extends Service {
         Bitmap output = null;
         long started = System.currentTimeMillis();
         try {
+            validateEnhancement(input, frameEnhancerFile);
             checkCancelled(epoch);
             EnhancementProcessor enhancer = new EnhancementProcessor(this, faceDetector);
             output = enhancer.apply(input);
@@ -363,31 +380,88 @@ public final class AgentBridgeService extends Service {
         }
     }
 
+    private InputStream boundedInput(Uri uri) throws Exception {
+        InputStream input = getContentResolver().openInputStream(uri);
+        if (input == null) throw new IllegalArgumentException("Image is unreadable.");
+        return new FilterInputStream(input) {
+            long count;
+            private void counted(int n) throws IOException {
+                if (n > 0 && (count += n) > MAX_BYTES) throw new IOException("Image exceeds 16 MB.");
+            }
+            @Override public int read() throws IOException { int v = super.read(); counted(v < 0 ? 0 : 1); return v; }
+            @Override public int read(byte[] b, int off, int len) throws IOException {
+                int n = in.read(b, off, len); counted(n); return n;
+            }
+        };
+    }
+
     private Bitmap loadBitmap(String uriValue) throws Exception {
         Uri uri = Uri.parse(uriValue);
-        try (InputStream input = getContentResolver().openInputStream(uri)) {
-            if (input == null) throw new IllegalArgumentException("Could not open image URI: " + uriValue);
+        BitmapFactory.Options bounds = new BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        try (InputStream input = boundedInput(uri)) { BitmapFactory.decodeStream(input, null, bounds); }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw new IllegalArgumentException("Invalid image.");
+        if ((long) bounds.outWidth * bounds.outHeight > MAX_PIXELS)
+            throw new IllegalArgumentException("Image exceeds 8 megapixels. Resize it before processing.");
+        try (InputStream input = boundedInput(uri)) {
             Bitmap bitmap = BitmapFactory.decodeStream(input);
-            if (bitmap == null) throw new IllegalArgumentException("Could not decode image URI: " + uriValue);
-            if (bitmap.getConfig() == null) {
-                Bitmap copy = bitmap.copy(Bitmap.Config.ARGB_8888, false);
-                bitmap.recycle();
-                bitmap = copy;
-            }
+            if (bitmap == null) throw new IllegalArgumentException("Could not decode image.");
             return bitmap;
+        }
+    }
+
+    private void validateEnhancement(Bitmap input, String frameModel) {
+        int scale = frameModel == null || "none".equals(frameModel) ? 1 : frameModel.contains("x2") ? 2 : 4;
+        if ((long) input.getWidth() * input.getHeight() * scale * scale > MAX_PIXELS)
+            throw new IllegalArgumentException("Enhanced output would exceed 8 megapixels. Resize the input or select a smaller scale.");
+    }
+
+    private synchronized void releaseOutput(String value, int callerUid) {
+        Integer owner = outputOwners.get(value);
+        if (owner == null || owner != callerUid) return;
+        outputOwners.remove(value);
+        Uri uri = Uri.parse(value);
+        File file = new File(new File(getCacheDir(), "shared_images"), uri.getLastPathSegment());
+        if (file.getName().startsWith("agent-")) file.delete();
+        revokeUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+    }
+
+    private synchronized void sweepOutputs(File dir) {
+        File[] files = dir.listFiles((d, name) -> name.startsWith("agent-"));
+        if (files == null) return;
+        Arrays.sort(files, Comparator.comparingLong(File::lastModified));
+        long size = 0, cutoff = System.currentTimeMillis() - 30 * 60_000L;
+        for (File file : files) {
+            if (file.lastModified() < cutoff) file.delete();
+            else size += file.length();
+        }
+        for (File file : files) {
+            if (size <= 48L * 1024 * 1024) break; // Reserve up to 16 MB for the next result.
+            long length = file.length(); if (file.delete()) size -= length;
+        }
+        java.util.Iterator<String> entries = outputOwners.keySet().iterator();
+        while (entries.hasNext()) {
+            String value = entries.next();
+            if (!new File(dir, Uri.parse(value).getLastPathSegment()).exists()) {
+                revokeUriPermission(Uri.parse(value), Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                entries.remove();
+            }
         }
     }
 
     private Uri saveOutput(Bitmap bitmap, int callerUid, String prefix) throws Exception {
         File dir = new File(getCacheDir(), "shared_images");
         if (!dir.exists() && !dir.mkdirs()) throw new IllegalStateException("Could not create FaceFusion output directory");
+        sweepOutputs(dir);
         File out = new File(dir, "agent-" + prefix + "-" + System.currentTimeMillis() + ".jpg");
         try (FileOutputStream stream = new FileOutputStream(out)) {
             if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 95, stream)) {
                 throw new IllegalStateException("Could not encode FaceFusion output");
             }
         }
+        if (out.length() > MAX_BYTES) { out.delete(); throw new IllegalArgumentException("Output exceeds 16 MB."); }
         Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", out);
+        synchronized (this) { outputOwners.put(uri.toString(), callerUid); }
         String[] packages = getPackageManager().getPackagesForUid(callerUid);
         if (packages != null) {
             for (String packageName : packages) {

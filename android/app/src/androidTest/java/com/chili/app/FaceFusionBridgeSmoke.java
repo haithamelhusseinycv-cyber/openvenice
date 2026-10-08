@@ -44,6 +44,30 @@ public final class FaceFusionBridgeSmoke extends Instrumentation {
         try(java.io.InputStream in=getTargetContext().getContentResolver().openInputStream(uri)) { if(in==null||in.read()<0)throw new Exception("Saved media unreadable"); }
         getTargetContext().getContentResolver().delete(uri,null,null);
         JSObject voice=invoke(bridge,"VoiceChat","isAvailable",new JSObject());
+        if (testHardening) {
+            Object plugin = bridge.getPlugin("FaceFusionAgent").getInstance();
+            java.lang.reflect.Field remote=plugin.getClass().getDeclaredField("serviceMessenger");
+            java.lang.reflect.Field bound=plugin.getClass().getDeclaredField("bound");
+            java.lang.reflect.Field timeout=plugin.getClass().getDeclaredField("controlTimeoutMs");
+            remote.setAccessible(true);bound.setAccessible(true);timeout.setAccessible(true);
+            HandlerThread silent=new HandlerThread("SilentCompanion");silent.start();
+            remote.set(plugin,new Messenger(new Handler(silent.getLooper())));bound.setBoolean(plugin,true);
+            timeout.setLong(plugin,500);
+            long began=SystemClock.elapsedRealtime();
+            try { invoke(bridge,"FaceFusionAgent","ping",new JSObject()); throw new Exception("Silent companion unexpectedly succeeded"); }
+            catch (Exception expected) { if(!expected.getMessage().contains("timed out"))throw expected; }
+            if(SystemClock.elapsedRealtime()-began>5000)throw new Exception("Native deadline did not settle promptly");
+            timeout.setLong(plugin,10000);silent.quitSafely();
+            if(invoke(bridge,"FaceFusionAgent","ping",new JSObject()).getInt("protocol")!=1)throw new Exception("Deadline recovery failed");
+            android.graphics.Bitmap big=android.graphics.Bitmap.createBitmap(3000,3000,android.graphics.Bitmap.Config.ARGB_8888);
+            java.io.ByteArrayOutputStream out=new java.io.ByteArrayOutputStream();
+            big.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);big.recycle();
+            JSObject invalid=new JSObject();invalid.put("imageUri","data:image/png;base64,"+android.util.Base64.encodeToString(out.toByteArray(),android.util.Base64.NO_WRAP));
+            try { invoke(bridge,"FaceFusionAgent","detectFaces",invalid);throw new Exception("Oversized image was accepted"); }
+            catch(Exception expected){if(!expected.getMessage().contains("megapixels"))throw expected;}
+            java.io.File[] leftovers=new java.io.File(getTargetContext().getCacheDir(),"agent_inputs").listFiles();
+            if(leftovers!=null&&leftovers.length!=0)throw new Exception("Input cleanup left "+leftovers.length+" files");
+        }
         String processing = "";
         if (testProcessing) {
             byte[] sourceBytes, targetBytes;
@@ -80,6 +104,11 @@ public final class FaceFusionBridgeSmoke extends Instrumentation {
                 killed.delete();
             }
         }
+        if (testHardening) {
+            java.io.File[] files=new java.io.File(getTargetContext().getCacheDir(),"agent_inputs").listFiles();
+            if(files!=null&&files.length!=0)throw new Exception("Completed-job input files remain");
+            processing+=" SILENT_DEADLINE_RECOVERY_PASS OVERSIZE_REJECTION_PASS INPUT_CLEANUP_PASS";
+        }
         return "VAULT_ENCRYPTED_ROUNDTRIP_PASS MEDIASTORE_SAVE_PASS VOICE_AVAILABILITY "+voice.toString()+processing;
     }
     private static byte[] readBytes(java.io.InputStream in) throws Exception {
@@ -90,7 +119,8 @@ public final class FaceFusionBridgeSmoke extends Instrumentation {
     }
     private boolean testProcessing;
     private boolean testRecovery;
-    @Override public void onCreate(Bundle args) { super.onCreate(args); testProcessing = args != null && "true".equals(args.getString("processing")); testRecovery = args != null && "true".equals(args.getString("recovery")); start(); }
+    private boolean testHardening;
+    @Override public void onCreate(Bundle args) { super.onCreate(args); testHardening = args != null && "true".equals(args.getString("hardening")); testProcessing = args != null && "true".equals(args.getString("processing")); testRecovery = args != null && "true".equals(args.getString("recovery")); start(); }
     @Override public void onStart() {
         Bundle report = new Bundle();
         HandlerThread receiver = new HandlerThread("BridgeSmokeReplies");

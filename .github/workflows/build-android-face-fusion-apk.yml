@@ -84,14 +84,14 @@ jobs:
           tools="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
           source=$(find android-face-fusion/app/build/outputs/apk/release -name '*.apk' | head -1)
           test_apk=$(find android-face-fusion/app/build/outputs/apk/androidTest/debug -name '*.apk' | head -1)
-          "$tools/apksigner" sign --ks "$RUNNER_TEMP/chilli-release.jks" --ks-key-alias chilli-release --ks-pass env:CHILLI_STORE_PASSWORD --out Chilli-FaceFusion-4.5-release.apk "$source"
+          "$tools/apksigner" sign --ks "$RUNNER_TEMP/chilli-release.jks" --ks-key-alias chilli-release --ks-pass env:CHILLI_STORE_PASSWORD --out Chilli-FaceFusion-4.5.1-release.apk "$source"
           "$tools/apksigner" sign --ks "$RUNNER_TEMP/chilli-release.jks" --ks-key-alias chilli-release --ks-pass env:CHILLI_STORE_PASSWORD --out Chilli-FaceFusion-native-test.apk "$test_apk"
-          "$tools/apksigner" verify --print-certs Chilli-FaceFusion-4.5-release.apk | tee "$RUNNER_TEMP/cert.txt"
+          "$tools/apksigner" verify --print-certs Chilli-FaceFusion-4.5.1-release.apk | tee "$RUNNER_TEMP/cert.txt"
           grep -q '199e28a4ffacfae81ebcbcd21e09691751cf2f77fe79b951bf043722c88734f2' "$RUNNER_TEMP/cert.txt"
-          "$tools/aapt2" dump badging Chilli-FaceFusion-4.5-release.apk > "$RUNNER_TEMP/badging.txt"
+          "$tools/aapt2" dump badging Chilli-FaceFusion-4.5.1-release.apk > "$RUNNER_TEMP/badging.txt"
           ! grep -q application-debuggable "$RUNNER_TEMP/badging.txt"
-          "$tools/zipalign" -c -p 4 Chilli-FaceFusion-4.5-release.apk
-          sha256sum Chilli-FaceFusion-4.5-release.apk > Chilli-FaceFusion-4.5-release.apk.sha256
+          "$tools/zipalign" -c -p 4 Chilli-FaceFusion-4.5.1-release.apk
+          sha256sum Chilli-FaceFusion-4.5.1-release.apk > Chilli-FaceFusion-4.5.1-release.apk.sha256
           rm "$RUNNER_TEMP/chilli-release.jks"
 
       - name: Upload Complete Models APK
@@ -99,8 +99,8 @@ jobs:
         with:
           name: chilli-facefusion-stable-release
           path: |
-            Chilli-FaceFusion-4.5-release.apk
-            Chilli-FaceFusion-4.5-release.apk.sha256
+            Chilli-FaceFusion-4.5.1-release.apk
+            Chilli-FaceFusion-4.5.1-release.apk.sha256
           if-no-files-found: error
           retention-days: 14
 

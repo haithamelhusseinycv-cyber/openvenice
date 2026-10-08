@@ -1,4 +1,4 @@
-package ai.openvenice.app;
+package com.chili.app;
 
 import android.content.ComponentName;
 import android.content.Context;
@@ -39,6 +39,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import android.graphics.BitmapFactory;
 
 @CapacitorPlugin(name = "FaceFusionAgent")
 public final class FaceFusionAgentPlugin extends Plugin {
@@ -55,6 +58,19 @@ public final class FaceFusionAgentPlugin extends Plugin {
     private final Object lock = new Object();
     private final Map<String, PluginCall> pending = new HashMap<>();
     private final List<Runnable> waitingForConnection = new ArrayList<>();
+
+    private static final long MAX_BYTES = 16L * 1024 * 1024;
+    private static final long MAX_PIXELS = 8_000_000;
+    private final Handler deadlines = new Handler(Looper.getMainLooper());
+    private final ExecutorService imageWorker = Executors.newSingleThreadExecutor();
+    private long controlTimeoutMs = 10_000;
+    private long jobTimeoutMs = 180_000;
+    private final Map<String, Runnable> timers = new HashMap<>();
+    private final Map<PluginCall, List<Uri>> grants = new HashMap<>();
+    private final Map<PluginCall, List<File>> inputs = new HashMap<>();
+    private final ThreadLocal<PluginCall> preparing = new ThreadLocal<>();
+    private PluginCall activeImage;
+    private volatile boolean destroyed;
 
     private Messenger serviceMessenger;
     private boolean binding;
@@ -78,11 +94,7 @@ public final class FaceFusionAgentPlugin extends Plugin {
 
         @Override
         public void onServiceDisconnected(ComponentName name) {
-            synchronized (lock) {
-                serviceMessenger = null;
-                binding = false;
-                bound = false;
-            }
+            closeLostConnection("FaceFusion stopped. Retry the interrupted operation.");
         }
 
         @Override
@@ -92,7 +104,7 @@ public final class FaceFusionAgentPlugin extends Plugin {
 
         @Override
         public void onNullBinding(ComponentName name) {
-            failConnectionQueue("FaceFusion agent service returned a null binding.");
+            closeLostConnection("FaceFusion agent service returned a null binding.");
         }
     };
 
@@ -115,9 +127,16 @@ public final class FaceFusionAgentPlugin extends Plugin {
 
     @PluginMethod
     public void detectFaces(PluginCall call) {
+        synchronized (lock) {
+            if (activeImage != null) { call.reject("FaceFusion is busy. Wait for the active image operation."); return; }
+            activeImage = call;
+        }
+        imageWorker.execute(() -> {
+            preparing.set(call);
+            try { 
         String input = call.getString("imageUri");
         if (input == null || input.trim().isEmpty()) {
-            call.reject("imageUri is required");
+            rejectPrepared(call, "imageUri is required");
             return;
         }
         try {
@@ -126,16 +145,26 @@ public final class FaceFusionAgentPlugin extends Plugin {
             data.putString("imageUri", imageUri.toString());
             sendCommand(call, MSG_DETECT_FACES, data);
         } catch (Exception error) {
-            call.reject(error.getMessage() != null ? error.getMessage() : "Could not prepare FaceFusion image");
+            rejectPrepared(call, error.getMessage() != null ? error.getMessage() : "Could not prepare FaceFusion image");
         }
+    
+            } finally { preparing.remove(); }
+        });
     }
 
     @PluginMethod
     public void swap(PluginCall call) {
+        synchronized (lock) {
+            if (activeImage != null) { call.reject("FaceFusion is busy. Wait for the active image operation."); return; }
+            activeImage = call;
+        }
+        imageWorker.execute(() -> {
+            preparing.set(call);
+            try { 
         String source = call.getString("sourceUri");
         String target = call.getString("targetUri");
         if (source == null || target == null) {
-            call.reject("sourceUri and targetUri are required");
+            rejectPrepared(call, "sourceUri and targetUri are required");
             return;
         }
 
@@ -156,15 +185,25 @@ public final class FaceFusionAgentPlugin extends Plugin {
             }
             sendCommand(call, MSG_SWAP, data);
         } catch (Exception error) {
-            call.reject(error.getMessage() != null ? error.getMessage() : "Could not prepare FaceFusion swap");
+            rejectPrepared(call, error.getMessage() != null ? error.getMessage() : "Could not prepare FaceFusion swap");
         }
+    
+            } finally { preparing.remove(); }
+        });
     }
 
     @PluginMethod
     public void enhance(PluginCall call) {
+        synchronized (lock) {
+            if (activeImage != null) { call.reject("FaceFusion is busy. Wait for the active image operation."); return; }
+            activeImage = call;
+        }
+        imageWorker.execute(() -> {
+            preparing.set(call);
+            try { 
         String input = call.getString("imageUri");
         if (input == null || input.trim().isEmpty()) {
-            call.reject("imageUri is required");
+            rejectPrepared(call, "imageUri is required");
             return;
         }
         try {
@@ -174,42 +213,46 @@ public final class FaceFusionAgentPlugin extends Plugin {
             putOptionalString(data, "frameEnhancer", call.getString("frameEnhancer"));
             sendCommand(call, MSG_ENHANCE, data);
         } catch (Exception error) {
-            call.reject(error.getMessage() != null ? error.getMessage() : "Could not prepare FaceFusion enhancement");
+            rejectPrepared(call, error.getMessage() != null ? error.getMessage() : "Could not prepare FaceFusion enhancement");
         }
+    
+            } finally { preparing.remove(); }
+        });
     }
 
     @PluginMethod
     public void cancel(PluginCall call) {
-        sendCommand(call, MSG_CANCEL, new Bundle());
+        sendCancellation();
+        List<String> ids;
+        synchronized (lock) { ids = new ArrayList<>(pending.keySet()); }
+        for (String id : ids) rejectPending(id, "FaceFusion operation cancelled.");
+        call.resolve();
     }
 
     @Override
     protected void handleOnDestroy() {
+        destroyed = true;
+        closeLostConnection("FaceFusion agent bridge closed");
+        imageWorker.shutdownNow();
         super.handleOnDestroy();
-        synchronized (lock) {
-            if (bound) {
-                try {
-                    getContext().unbindService(connection);
-                } catch (Exception ignored) {}
-            }
-            bound = false;
-            binding = false;
-            serviceMessenger = null;
-            for (PluginCall call : pending.values()) call.reject("FaceFusion agent bridge closed");
-            pending.clear();
-            for (Runnable ignored : waitingForConnection) {}
-            waitingForConnection.clear();
-        }
     }
 
     private void sendCommand(PluginCall call, int command, Bundle data) {
+        if (destroyed) { rejectPrepared(call, "FaceFusion bridge is closed."); return; }
         final String requestId = UUID.randomUUID().toString();
         data.putString("requestId", requestId);
         synchronized (lock) {
             pending.put(requestId, call);
+            Runnable timeout = () -> {
+                sendCancellation();
+                closeLostConnection("FaceFusion timed out. Retry the interrupted operation.");
+            };
+            timers.put(requestId, timeout);
+            deadlines.postDelayed(timeout, command >= MSG_DETECT_FACES && command <= MSG_ENHANCE ? jobTimeoutMs : controlTimeoutMs);
         }
 
         withConnection(call, () -> {
+            synchronized (lock) { if (!pending.containsKey(requestId)) return; }
             Messenger remote;
             synchronized (lock) {
                 remote = serviceMessenger;
@@ -241,7 +284,7 @@ public final class FaceFusionAgentPlugin extends Plugin {
         }
 
         if (resolveService() == null) {
-            failConnectionQueue("FaceFusion AgentBridgeService is not installed. Install the OpenVenice FaceFusion companion APK (same release channel as this app).");
+            failConnectionQueue("FaceFusion AgentBridgeService is not installed. Install the Chilli FaceFusion companion APK (same release channel as this app).");
             return;
         }
 
@@ -251,7 +294,7 @@ public final class FaceFusionAgentPlugin extends Plugin {
             boolean started = getContext().bindService(intent, connection, Context.BIND_AUTO_CREATE);
             if (!started) failConnectionQueue("Android could not bind to FaceFusion AgentBridgeService.");
         } catch (SecurityException error) {
-            failConnectionQueue("FaceFusion signature permission mismatch. Install OpenVenice and FaceFusion builds signed with the same key.");
+            failConnectionQueue("FaceFusion signature permission mismatch. Install Chilli and FaceFusion builds signed with the same key.");
         } catch (Exception error) {
             failConnectionQueue("Could not bind to FaceFusion: " + error.getMessage());
         }
@@ -268,34 +311,34 @@ public final class FaceFusionAgentPlugin extends Plugin {
     }
 
     private boolean handleReply(Message message) {
+        if (destroyed) return true;
         Bundle data = message.getData();
         if (data == null) return true;
-        String requestId = data.getString("requestId", "");
-        PluginCall call;
-        synchronized (lock) {
-            call = pending.remove(requestId);
-        }
-        if (call == null) return true;
-
-        if (!data.getBoolean("ok", false)) {
-            call.reject(data.getString("error", "FaceFusion agent command failed"));
-            return true;
-        }
-
-        String json = data.getString("json", "{}");
-        try {
-            JSONObject raw = new JSONObject(json);
-            if (raw.has("outputUri")) attachOutputImage(raw);
-            JSObject result = new JSObject();
-            Iterator<String> keys = raw.keys();
-            while (keys.hasNext()) {
-                String key = keys.next();
-                result.put(key, raw.get(key));
+        String id = data.getString("requestId", "");
+        imageWorker.execute(() -> {
+            JSONObject raw = null;
+            String outputToRelease = null;
+            try {
+                PluginCall call;
+                synchronized (lock) { call = pending.get(id); }
+                raw = new JSONObject(data.getString("json", "{}"));
+                outputToRelease = raw.optString("outputUri", "");
+                if (call == null) return; // Late responses are released in finally.
+                if (!data.getBoolean("ok", false)) {
+                    rejectPending(id, data.getString("error", "FaceFusion command failed")); return;
+                }
+                if (raw.has("outputUri")) attachOutputImage(raw);
+                JSObject result = new JSObject();
+                Iterator<String> keys = raw.keys();
+                while (keys.hasNext()) { String key = keys.next(); result.put(key, raw.get(key)); }
+                call = takePending(id);
+                if (call != null) { cleanup(call); call.resolve(result); }
+            } catch (Exception error) {
+                rejectPending(id, "Could not decode FaceFusion response: " + error.getMessage());
+            } finally {
+                if (outputToRelease != null && !outputToRelease.isEmpty()) releaseOutput(outputToRelease);
             }
-            call.resolve(result);
-        } catch (Exception error) {
-            call.reject("Could not decode FaceFusion response: " + error.getMessage());
-        }
+        });
         return true;
     }
 
@@ -303,12 +346,15 @@ public final class FaceFusionAgentPlugin extends Plugin {
         String outputUri = raw.optString("outputUri", "");
         if (outputUri.isEmpty()) return;
         byte[] bytes = readAll(Uri.parse(outputUri));
-        raw.put("image", Base64.encodeToString(bytes, Base64.NO_WRAP));
+        String encoded = Base64.encodeToString(bytes, Base64.NO_WRAP);
+        raw.put("image", encoded);
+        raw.put("outputUri", "data:image/jpeg;base64," + encoded);
         raw.put("format", "jpeg");
         raw.put("mimeType", "image/jpeg");
     }
 
     private Uri prepareInputUri(String value, String label) throws Exception {
+        if (value.length() > MAX_BYTES * 4 / 3 + 1024) throw new IllegalArgumentException("Image exceeds the 16 MB encoded limit.");
         String trimmed = value.trim();
         Uri uri;
         if (trimmed.startsWith("content://")) {
@@ -332,18 +378,23 @@ public final class FaceFusionAgentPlugin extends Plugin {
             uri = writeInputFile(bytes, ".jpg", label);
         }
 
+        validateImage(uri);
         getContext().grantUriPermission(
                 FACEFUSION_PACKAGE,
                 uri,
                 Intent.FLAG_GRANT_READ_URI_PERMISSION
         );
+        synchronized (lock) { grants.computeIfAbsent(preparing.get(), k -> new ArrayList<>()).add(uri); }
         return uri;
     }
 
     private Uri writeInputFile(byte[] bytes, String extension, String label) throws Exception {
+        if (bytes.length > MAX_BYTES) throw new IllegalArgumentException("Image exceeds 16 MB.");
         File dir = new File(getContext().getCacheDir(), "agent_inputs");
-        if (!dir.exists() && !dir.mkdirs()) throw new IllegalStateException("Could not create OpenVenice agent input directory");
+        sweepInputs(dir);
+        if (!dir.exists() && !dir.mkdirs()) throw new IllegalStateException("Could not create Chilli agent input directory");
         File file = new File(dir, label + "-" + UUID.randomUUID() + extension);
+        synchronized (lock) { inputs.computeIfAbsent(preparing.get(), k -> new ArrayList<>()).add(file); }
         try (FileOutputStream stream = new FileOutputStream(file)) {
             stream.write(bytes);
         }
@@ -356,7 +407,10 @@ public final class FaceFusionAgentPlugin extends Plugin {
             if (input == null) throw new IllegalArgumentException("Could not read FaceFusion output URI");
             byte[] buffer = new byte[64 * 1024];
             int count;
-            while ((count = input.read(buffer)) >= 0) output.write(buffer, 0, count);
+            while ((count = input.read(buffer)) >= 0) {
+                if ((long)output.size() + count > MAX_BYTES) throw new IllegalArgumentException("FaceFusion output exceeds 16 MB.");
+                output.write(buffer, 0, count);
+            }
             return output.toByteArray();
         }
     }
@@ -372,24 +426,90 @@ public final class FaceFusionAgentPlugin extends Plugin {
         if (value != null && !value.trim().isEmpty()) data.putString(key, value.trim());
     }
 
-    private void rejectPending(String requestId, String message) {
-        PluginCall call;
+    private PluginCall takePending(String id) {
         synchronized (lock) {
-            call = pending.remove(requestId);
+            Runnable timer = timers.remove(id);
+            if (timer != null) deadlines.removeCallbacks(timer);
+            return pending.remove(id);
         }
-        if (call != null) call.reject(message);
     }
 
-    private void failConnectionQueue(String message) {
-        List<PluginCall> calls;
+    private void rejectPending(String id, String message) {
+        PluginCall call = takePending(id);
+        if (call != null) rejectPrepared(call, message);
+    }
+
+    private void rejectPrepared(PluginCall call, String message) {
+        cleanup(call);
+        call.reject(message);
+    }
+
+    private void cleanup(PluginCall call) {
         synchronized (lock) {
-            binding = false;
-            bound = false;
-            serviceMessenger = null;
-            calls = new ArrayList<>(pending.values());
-            pending.clear();
+            List<Uri> uris = grants.remove(call);
+            if (uris != null) for (Uri uri : uris)
+                getContext().revokeUriPermission(FACEFUSION_PACKAGE, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            List<File> files = inputs.remove(call);
+            if (files != null) for (File file : files) file.delete();
+            if (activeImage == call) activeImage = null;
+        }
+    }
+
+    private void sweepInputs(File dir) {
+        File[] files = dir.listFiles();
+        if (files == null) return;
+        long cutoff = System.currentTimeMillis() - 30 * 60_000L;
+        for (File file : files) if (file.lastModified() < cutoff) file.delete();
+        long size = 0;
+        for (File file : files) size += file.length();
+        if (size > 64L * 1024 * 1024) throw new IllegalStateException("FaceFusion temporary storage is full.");
+    }
+
+    private void validateImage(Uri uri) throws Exception {
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inJustDecodeBounds = true;
+        try (InputStream stream = getContext().getContentResolver().openInputStream(uri)) {
+            BitmapFactory.decodeStream(stream, null, options);
+        }
+        if (options.outWidth <= 0 || options.outHeight <= 0) throw new IllegalArgumentException("Invalid image.");
+        if ((long)options.outWidth * options.outHeight > MAX_PIXELS)
+            throw new IllegalArgumentException("Image exceeds 8 megapixels. Resize it before processing.");
+        try (InputStream stream = getContext().getContentResolver().openInputStream(uri)) {
+            byte[] buffer = new byte[65536]; long total = 0; int count;
+            if (stream == null) throw new IllegalArgumentException("Image is unreadable.");
+            while ((count = stream.read(buffer)) != -1) {
+                total += count;
+                if (total > MAX_BYTES) throw new IllegalArgumentException("Image exceeds 16 MB.");
+            }
+        }
+    }
+
+    private void sendCancellation() { sendUntracked(MSG_CANCEL, new Bundle()); }
+
+    private void releaseOutput(String value) {
+        Bundle data = new Bundle(); data.putString("outputUri", value);
+        sendUntracked(7, data);
+    }
+
+    private void sendUntracked(int command, Bundle data) {
+        synchronized (lock) {
+            if (serviceMessenger == null) return;
+            Message message = Message.obtain(null, command);
+            message.replyTo = replyMessenger; message.setData(data);
+            try { serviceMessenger.send(message); } catch (RemoteException ignored) {}
+        }
+    }
+
+    private void closeLostConnection(String message) {
+        try { getContext().unbindService(connection); } catch (IllegalArgumentException ignored) {}
+        List<String> ids;
+        synchronized (lock) {
+            binding = false; bound = false; serviceMessenger = null;
+            ids = new ArrayList<>(pending.keySet());
             waitingForConnection.clear();
         }
-        for (PluginCall call : calls) call.reject(message);
+        for (String id : ids) rejectPending(id, message);
     }
+
+    private void failConnectionQueue(String message) { closeLostConnection(message); }
 }
