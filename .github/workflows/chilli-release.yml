@@ -31,7 +31,7 @@ jobs:
           npx cap sync android
       - name: Build non-debuggable release
         run: |
-          sdkmanager "platforms;android-36" "build-tools;36.0.0"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"
           chmod +x android/gradlew
           cd android
           ./gradlew assembleRelease --no-daemon
