@@ -62,6 +62,23 @@ public final class FaceFusionBridgeSmoke extends Instrumentation {
             if(changed<100)throw new Exception("Chilli swap returned unchanged image");
             processing=" CHILLI_FACEFUSION_PROCESSING_PASS pixels="+changed+" size="+output.getWidth()+"x"+output.getHeight();
             output.recycle();target.recycle();
+            if (testRecovery) {
+                java.io.File dir=getTargetContext().getExternalFilesDir(null);
+                java.io.File ready=new java.io.File(dir,"facefusion-recovery-ready");
+                java.io.File killed=new java.io.File(dir,"facefusion-recovery-killed");
+                killed.delete();ready.createNewFile();
+                long until=SystemClock.elapsedRealtime()+60000;
+                while(!killed.exists()&&SystemClock.elapsedRealtime()<until)Thread.sleep(200);
+                ready.delete();
+                if(!killed.exists())throw new Exception("Companion kill checkpoint was not reached");
+                Thread.sleep(500);
+                JSObject ping=invoke(bridge,"FaceFusionAgent","ping",new JSObject());
+                if(ping.getInt("protocol")!=1)throw new Exception("Companion reconnect failed");
+                JSObject retry=invoke(bridge,"FaceFusionAgent","swap",job);
+                if(retry.getString("image")==null)throw new Exception("Companion processing after reconnect failed");
+                processing+=" CHILLI_FACEFUSION_KILL_RECONNECT_PASS";
+                killed.delete();
+            }
         }
         return "VAULT_ENCRYPTED_ROUNDTRIP_PASS MEDIASTORE_SAVE_PASS VOICE_AVAILABILITY "+voice.toString()+processing;
     }
@@ -72,7 +89,8 @@ public final class FaceFusionBridgeSmoke extends Instrumentation {
         return out.toByteArray();
     }
     private boolean testProcessing;
-    @Override public void onCreate(Bundle args) { super.onCreate(args); testProcessing = args != null && "true".equals(args.getString("processing")); start(); }
+    private boolean testRecovery;
+    @Override public void onCreate(Bundle args) { super.onCreate(args); testProcessing = args != null && "true".equals(args.getString("processing")); testRecovery = args != null && "true".equals(args.getString("recovery")); start(); }
     @Override public void onStart() {
         Bundle report = new Bundle();
         HandlerThread receiver = new HandlerThread("BridgeSmokeReplies");

@@ -78,11 +78,7 @@ public final class FaceFusionAgentPlugin extends Plugin {
 
         @Override
         public void onServiceDisconnected(ComponentName name) {
-            synchronized (lock) {
-                serviceMessenger = null;
-                binding = false;
-                bound = false;
-            }
+            closeLostConnection("FaceFusion stopped. Retry the interrupted operation.");
         }
 
         @Override
@@ -92,7 +88,7 @@ public final class FaceFusionAgentPlugin extends Plugin {
 
         @Override
         public void onNullBinding(ComponentName name) {
-            failConnectionQueue("FaceFusion agent service returned a null binding.");
+            closeLostConnection("FaceFusion agent service returned a null binding.");
         }
     };
 
@@ -241,7 +237,7 @@ public final class FaceFusionAgentPlugin extends Plugin {
         }
 
         if (resolveService() == null) {
-            failConnectionQueue("FaceFusion AgentBridgeService is not installed. Install the OpenVenice FaceFusion companion APK (same release channel as this app).");
+            failConnectionQueue("FaceFusion AgentBridgeService is not installed. Install the Chilli FaceFusion companion APK (same release channel as this app).");
             return;
         }
 
@@ -378,6 +374,11 @@ public final class FaceFusionAgentPlugin extends Plugin {
             call = pending.remove(requestId);
         }
         if (call != null) call.reject(message);
+    }
+
+    private void closeLostConnection(String message) {
+        try { getContext().unbindService(connection); } catch (IllegalArgumentException ignored) {}
+        failConnectionQueue(message);
     }
 
     private void failConnectionQueue(String message) {

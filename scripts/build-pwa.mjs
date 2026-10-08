@@ -6,4 +6,4 @@ const version = crypto.createHash('sha256').update(files.map(p=>fs.readFileSync(
 let sw = fs.readFileSync('public/sw.js','utf8')
 sw = sw.replace('__VERSION__',version).replace('__PRECACHE__',JSON.stringify(files.map(p=>'/'+p.slice(5))))
 fs.writeFileSync('dist/sw.js',sw)
-fs.writeFileSync('dist/version.json',JSON.stringify({version:'1.0.3',build:version}))
+fs.writeFileSync('dist/version.json',JSON.stringify({version:JSON.parse(fs.readFileSync('package.json','utf8')).version,build:version}))
