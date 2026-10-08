@@ -34,7 +34,7 @@ public class MediaActionsPlugin extends Plugin {
     u=getContext().getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,v);if(u==null)throw new IOException();
     try(OutputStream out=getContext().getContentResolver().openOutputStream(u)){if(out==null)throw new IOException();out.write(bytes(c));}
     if(Build.VERSION.SDK_INT>=29){v.clear();v.put(MediaStore.Images.Media.IS_PENDING,0);getContext().getContentResolver().update(u,v,null,null);}
-    JSObject o=new JSObject();o.put("uri",u.toString());o.put("fileName",filename(c));c.resolve(o);
+    JSObject o=new JSObject();o.put("uri",u.toString());o.put("fileName",filename(c));o.put("destination","gallery");c.resolve(o);
    }catch(Exception e){if(u!=null)getContext().getContentResolver().delete(u,null,null);c.reject("Could not save image to gallery");}
   });
  }

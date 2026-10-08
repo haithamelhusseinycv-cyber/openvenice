@@ -1,11 +1,11 @@
 {
   "name": "chilli",
   "private": true,
-  "version": "1.0.2",
+  "version": "1.0.3",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && node scripts/build-pwa.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",

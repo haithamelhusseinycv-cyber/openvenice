@@ -10,6 +10,7 @@ import { createGithubTools } from '../toolsets/github-tools'
 import { createGraphTools } from '../toolsets/graph-tools'
 import { createResearchTools } from '../toolsets/research-tools'
 import { createIntelligentRoutingTools } from '../toolsets/intelligent-routing-tools'
+import { browserStorage } from '../../lib/browser-storage'
 import type { AgentPluginDefinition } from './plugin-types'
 
 export function createLocalDreamPlugin(connector = new LocalDreamConnector()): AgentPluginDefinition {
@@ -102,7 +103,7 @@ export function createResearchPlugin(connector = new ResearchConnector()): Agent
   }
 }
 
-export function createIntelligentRoutingPlugin(cloudConnector = new LocalDreamCloudConnector(localStorage)): AgentPluginDefinition {
+export function createIntelligentRoutingPlugin(cloudConnector = new LocalDreamCloudConnector(browserStorage)): AgentPluginDefinition {
   return {
     manifest: {
       id: 'intelligent-routing',

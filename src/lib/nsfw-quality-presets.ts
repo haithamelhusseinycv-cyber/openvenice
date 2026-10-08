@@ -6,7 +6,7 @@
 
 import type { QualityTier } from '../agent/intelligent-router'
 
-export type NSFWPreset = 'softcore' | 'artistic' | 'explicit' | 'pornographic'
+export type NSFWPreset = 'neutral' | 'softcore' | 'artistic' | 'explicit' | 'pornographic'
 
 export interface NSFWPresetConfig {
   label: string
@@ -23,6 +23,12 @@ export interface NSFWPresetConfig {
 }
 
 export const NSFW_PRESETS: Record<NSFWPreset, NSFWPresetConfig> = {
+  neutral: {
+    label: 'Neutral', description: 'Preserve your description without adding subjects or content',
+    steps: { min: 8, max: 50, default: 24 }, cfg: { min: 1, max: 12, default: 7 },
+    resolution: '1024x1024', aspectRatio: '1:1', sampler: 'dpm++_2m', scheduler: 'karras',
+    negativePromptBoost: '', promptEnhancement: '', recommendedModels: [],
+  },
   softcore: {
     label: 'Softcore',
     description: 'Suggestive, lingerie, implied nudity — tasteful and teasing',
@@ -129,7 +135,7 @@ export function detectPresetFromPrompt(prompt: string): NSFWPreset {
   const scores = { pornographic: pornographicScore, explicit: explicitScore, artistic: artisticScore, softcore: softcoreScore }
   const max = Math.max(...Object.values(scores))
 
-  if (max === 0) return 'artistic'
+  if (max === 0) return 'neutral'
   return Object.entries(scores).find(([, s]) => s === max)?.[0] as NSFWPreset
 }
 
@@ -163,6 +169,7 @@ export function buildPresetNegativePrompt(preset: NSFWPreset, customNegative?: s
 }
 
 export function enhancePromptWithPreset(prompt: string, preset: NSFWPreset): string {
+  if (preset === 'neutral') return prompt
   const config = NSFW_PRESETS[preset]
   return `${prompt}, ${config.promptEnhancement}`
 }

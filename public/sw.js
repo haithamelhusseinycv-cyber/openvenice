@@ -1,68 +1,34 @@
-const APP_CACHE_PREFIX = 'openvenice-'
-const CACHE_NAME = APP_CACHE_PREFIX + 'shell-v5'
-const APP_SHELL = ['/manifest.webmanifest', '/favicon.svg', '/icon-192.png', '/icon-512.png']
-
-self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)))
-  self.skipWaiting()
+const CACHE_PREFIX = 'chilli-shell-'
+const CACHE_NAME = CACHE_PREFIX + '__VERSION__'
+const SHELL = __PRECACHE__
+self.addEventListener('install', event => {
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME)
+    try { await cache.addAll(SHELL) } catch (error) { await caches.delete(CACHE_NAME); throw error }
+  })())
 })
-
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys()
-      // Only delete app-owned caches from this origin; never touch other apps' caches.
-      .then((keys) => Promise.all(keys
-        .filter((key) => key.startsWith(APP_CACHE_PREFIX) && key !== CACHE_NAME)
-        .map((key) => caches.delete(key))))
-      .then(() => self.clients.claim()),
-  )
+self.addEventListener('activate', event => {
+  event.waitUntil((async () => {
+    const keys = (await caches.keys()).filter(k=>k.startsWith(CACHE_PREFIX))
+    const previous = keys.filter(k=>k!==CACHE_NAME).pop()
+    await Promise.all(keys.filter(k=>k!==CACHE_NAME && k!==previous).map(k=>caches.delete(k)))
+    await self.clients.claim()
+  })())
 })
-
-self.addEventListener('message', (event) => {
-  if (event.data === 'SKIP_WAITING') self.skipWaiting()
-})
-
-self.addEventListener('fetch', (event) => {
+self.addEventListener('message', event => { if(event.data === 'SKIP_WAITING') self.skipWaiting() })
+self.addEventListener('fetch', event => {
   const request = event.request
-  if (request.method !== 'GET') return
-
   const url = new URL(request.url)
-  if (url.origin !== self.location.origin) return
-
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request, { cache: 'no-store' })
-        .then((response) => {
-          const copy = response.clone()
-          caches.open(CACHE_NAME).then((cache) => cache.put('/', copy))
-          return response
-        })
-        .catch(() => caches.match('/')),
-    )
-    return
-  }
-
-  if (['script', 'style'].includes(request.destination)) {
-    event.respondWith(
-      fetch(request, { cache: 'no-store' })
-        .then((response) => {
-          if (response.ok) {
-            const copy = response.clone()
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy))
-          }
-          return response
-        })
-        .catch(() => caches.match(request)),
-    )
-    return
-  }
-
-  if (['image', 'font'].includes(request.destination)) {
-    event.respondWith(
-      caches.match(request).then((cached) => cached || fetch(request).then((response) => {
-        if (response.ok) caches.open(CACHE_NAME).then((cache) => cache.put(request, response.clone()))
-        return response
-      })),
-    )
+  if(request.method !== 'GET' || url.origin !== self.location.origin) return
+  if(request.mode === 'navigate') {
+    event.respondWith((async () => {
+      try { return await fetch(request,{cache:'no-store'}) }
+      catch { return (await caches.open(CACHE_NAME)).match('/index.html') }
+    })())
+  } else if(SHELL.includes(url.pathname)) {
+    event.respondWith((async () => {
+      const cached = await (await caches.open(CACHE_NAME)).match(url.pathname)
+      return cached || fetch(request)
+    })())
   }
 })

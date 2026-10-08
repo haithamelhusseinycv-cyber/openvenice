@@ -16,7 +16,7 @@ export function GenerationJobStatus() {
   const isFailed = job.status === 'failed'
 
   return (
-    <div className="animate-fade-in rounded-2xl border border-white/[0.08] bg-[#111114] p-4">
+    <div aria-busy={isRunning} className="animate-fade-in rounded-2xl border border-white/[0.08] bg-[#111114] p-4">
       <div className="flex items-center gap-3">
         {/* Status icon */}
         <div className={cn(

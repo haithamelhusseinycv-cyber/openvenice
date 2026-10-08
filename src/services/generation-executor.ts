@@ -1,3 +1,4 @@
+import { browserStorage } from '../lib/browser-storage'
 import type { RoutingDecision } from '../agent/intelligent-router'
 import { veniceImageAPI } from '../lib/venice-image-api'
 import { enqueueGeneration, getQueuedGenerations, dequeueGeneration, incrementRetryCount } from '../lib/offline-queue'
@@ -14,13 +15,29 @@ export interface GenerationJob {
 }
 export interface StartGenerationParams { prompt: string; enhancedPrompt: string; route: RoutingDecision; inputImages?: string[] }
 type JobListener = (job: GenerationJob | null) => void
+const JOB_KEY = 'chilli.generation.current.v1'
 const ACTIVE = new Set<JobStatus>(['starting', 'running', 'routing'])
 export class GenerationExecutor {
   private currentJob: GenerationJob | null = null
   private listeners = new Set<JobListener>()
   private controller: AbortController | null = null
   private processingQueue = false
-  private notify() { this.listeners.forEach(listener => listener(this.currentJob)) }
+  constructor() {
+    try {
+      const saved = JSON.parse(browserStorage.getItem(JOB_KEY) || 'null') as GenerationJob | null
+      if (saved?.id && saved?.route) {
+        this.currentJob = saved
+        if (ACTIVE.has(saved.status)) this.currentJob = { ...saved, status: 'failed', message: saved.provider === 'local-dream' ? 'Interrupted. Reconnect in Local Dream Cloud to recover this job.' : 'Interrupted. Check the image library before submitting again; the provider may have completed it.', error: 'Request interrupted by app restart' }
+      }
+    } catch { browserStorage.removeItem(JOB_KEY) }
+  }
+  private notify() {
+    if (this.currentJob) {
+      const saved = { ...this.currentJob, imageUrl: undefined }
+      browserStorage.setItem(JOB_KEY, JSON.stringify(saved))
+    } else browserStorage.removeItem(JOB_KEY)
+    this.listeners.forEach(listener => listener(this.currentJob))
+  }
   subscribe(listener: JobListener) { this.listeners.add(listener); listener(this.currentJob); return () => { this.listeners.delete(listener) } }
   private updateJob(updates: Partial<GenerationJob>) {
     if (!this.currentJob) return
@@ -45,7 +62,7 @@ export class GenerationExecutor {
       let completedCloud: LocalDreamCloudConnector | undefined
       if (['masked_edit', 'face_detailer', 'mask'].includes(operation)) {
         this.updateJob({ provider: 'local-dream', status: 'running', message: 'Connecting to cloud workflow', progress: 10 })
-        const cloud = new LocalDreamCloudConnector(localStorage)
+        const cloud = new LocalDreamCloudConnector(browserStorage)
         const photos = await Promise.all((params.inputImages || []).map(image => cloud.upload(image.split(',')[1] || image, this.controller!.signal)))
         let job = await cloud.submit({ prompt: params.prompt, operation: operation as CloudOperation,
           image: photos[0]?.filename, references: photos.slice(1).map(photo => photo.filename), max_cost_usd: 0.5 }, this.controller.signal)
@@ -98,11 +115,11 @@ export class GenerationExecutor {
     this.currentJob = null; this.notify()
   }
   async cancel() {
+    this.controller?.abort()
     if (this.currentJob?.provider === 'local-dream') {
-      const cloud = new LocalDreamCloudConnector(localStorage)
+      const cloud = new LocalDreamCloudConnector(browserStorage)
       if (cloud.pending()) await cloud.cancel()
     }
-    this.controller?.abort()
   }
   async processOfflineQueue() {
     if (this.processingQueue || (typeof navigator !== 'undefined' && !navigator.onLine) || (this.currentJob && ACTIVE.has(this.currentJob.status))) return

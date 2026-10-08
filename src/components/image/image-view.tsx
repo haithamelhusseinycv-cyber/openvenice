@@ -191,7 +191,7 @@ export function ImageView() {
   const addContentItem = useContentStore((s) => s.addItem)
   const trackGeneration = useAnalyticsStore((s) => s.trackGeneration)
 
-  const [nsfwPreset, setNsfwPreset] = useState<NSFWPreset>('artistic')
+  const [nsfwPreset, setNsfwPreset] = useState<NSFWPreset>('neutral')
   const [presetPickerOpen, setPresetPickerOpen] = useState(false)
   const [galleryOpen, setGalleryOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<TabId>('generate')
@@ -395,7 +395,7 @@ export function ImageView() {
       const name = defaultImageFileName(`gen-${index ?? 0}-${Date.now()}`, 'image/jpeg')
       const result = await saveImage(src, 'image/jpeg', name)
       haptic('success')
-      toast.success('Saved to gallery', result.fileName || name)
+      toast.success(result.destination === 'gallery' ? 'Saved to gallery' : 'Download started', result.fileName || name)
     } catch (error) {
       toast.fromError(error, 'Could not save image')
     } finally {

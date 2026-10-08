@@ -12,6 +12,7 @@ interface Props {
 }
 
 const PRESET_ICONS: Record<NSFWPreset, string> = {
+  neutral: 'M5 12l4 4L19 6',
   softcore: 'M12 3v18M3 12h18',
   artistic: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z',
   explicit: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z',
@@ -19,6 +20,7 @@ const PRESET_ICONS: Record<NSFWPreset, string> = {
 }
 
 const PRESET_COLORS: Record<NSFWPreset, string> = {
+  neutral: 'border-white/20 bg-white/5',
   softcore: 'border-amber-500/30 bg-amber-500/5',
   artistic: 'border-blue-500/30 bg-blue-500/5',
   explicit: 'border-purple-500/30 bg-purple-500/5',
@@ -26,6 +28,7 @@ const PRESET_COLORS: Record<NSFWPreset, string> = {
 }
 
 const PRESET_ACTIVE_COLORS: Record<NSFWPreset, string> = {
+  neutral: 'border-white/20 bg-white/5',
   softcore: 'border-amber-500/60 bg-amber-500/15',
   artistic: 'border-blue-500/60 bg-blue-500/15',
   explicit: 'border-purple-500/60 bg-purple-500/15',

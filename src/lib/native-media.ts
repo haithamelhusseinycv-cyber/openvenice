@@ -3,6 +3,7 @@ import { isNativeOpenVeniceAndroid } from '../connectors/facefusion/capacitor-fa
 interface MediaSaveResult {
   uri?: string
   fileName?: string
+  destination?: 'gallery' | 'download'
 }
 
 async function invokeMedia<T>(method: string, options: Record<string, unknown> = {}): Promise<T> {
@@ -54,7 +55,7 @@ function extensionForMime(mimeType: string) {
 
 export function defaultImageFileName(id: string, mimeType: string) {
   const safeId = id.replace(/[^a-z0-9_-]/gi, '-').slice(0, 48) || String(Date.now())
-  return `openvenice-${safeId}.${extensionForMime(mimeType)}`
+  return `chilli-${safeId}.${extensionForMime(mimeType)}`
 }
 
 export async function shareText(text: string): Promise<'shared' | 'copied'> {
@@ -103,7 +104,7 @@ export async function saveImage(imageUrl: string, mimeType: string, fileName: st
   } finally {
     window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
   }
-  return { fileName }
+  return { fileName, destination: 'download' }
 }
 
 export async function shareImage(imageUrl: string, mimeType: string, fileName: string): Promise<'shared' | 'saved'> {
@@ -122,7 +123,7 @@ export async function shareImage(imageUrl: string, mimeType: string, fileName: s
 
   const blob = await imageBlob(imageUrl, mimeType)
   const file = new File([blob], fileName, { type: mimeType })
-  const shareData: ShareData = { files: [file], title: 'OpenVenice image' }
+  const shareData: ShareData = { files: [file], title: 'Chilli image' }
   if (navigator.share && (!navigator.canShare || navigator.canShare(shareData))) {
     await navigator.share(shareData)
     return 'shared'

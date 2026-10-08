@@ -251,7 +251,7 @@ export function ImageTools() {
     if (!resultUrl || sharing) return
     setSharing(true)
     try {
-      const result = await shareImage(resultUrl, 'image/png', `venice-${tool}-result-${Date.now()}.png`)
+      const result = await shareImage(resultUrl, 'image/png', `chilli-${tool}-result-${Date.now()}.png`)
       if (result === 'saved') toast.success('Saved image', 'Sharing is unavailable here; the image was saved instead.')
     } catch (error) {
       toast.fromError(error, 'Could not share result')
@@ -263,10 +263,10 @@ export function ImageTools() {
     if (!resultUrl) return
     setSaving(true)
     try {
-      const name = `venice-${tool}-result-${Date.now()}.png`
-      await saveImage(resultUrl, 'image/png', name)
+      const name = `chilli-${tool}-result-${Date.now()}.png`
+      const saved = await saveImage(resultUrl, 'image/png', name)
       haptic('success')
-      toast.success('Saved to gallery', name)
+      toast.success(saved.destination === 'gallery' ? 'Saved to gallery' : 'Download started', name)
     } catch (error) {
       toast.fromError(error, 'Could not save result')
     } finally {

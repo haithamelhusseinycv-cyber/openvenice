@@ -17,6 +17,7 @@ permissions:
 
 jobs:
   build:
+    if: ${{ !startsWith(github.ref_name, 'fix/chilli-') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:

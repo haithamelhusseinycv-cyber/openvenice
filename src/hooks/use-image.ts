@@ -35,7 +35,7 @@ function normalizeGenerate(req: ImageGenerateRequest): ImageGenerateRequest {
   }
 
   if (!normalized.variants || normalized.variants < 1) normalized.variants = 1
-  if (normalized.variants > 1) normalized.variants = 1
+  normalized.variants = Math.min(2, Math.max(1, Math.floor(Number(normalized.variants) || 1)))
 
   if (!normalized.resolution && /gpt-image|nano-banana|seedream|flux-3|grok-imagine|qwen-image/i.test(model)) {
     normalized.resolution = '1K'
