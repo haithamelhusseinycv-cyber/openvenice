@@ -34,7 +34,7 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
     button.textContent = 'Update ready · restart Chilli'
     button.style.cssText = 'position:fixed;bottom:80px;left:16px;right:16px;z-index:9999;padding:14px;border-radius:12px;background:#eee6d6;color:#171717'
     button.onclick = async () => {
-      if (document.querySelector('[aria-busy="true"]')) { button.textContent = 'Finish or cancel your active job before updating'; return }
+      if (queryClient.isMutating() > 0 || document.querySelector('[aria-busy="true"]')) { button.textContent = 'Finish or cancel your active job before updating'; return }
       const registration = await navigator.serviceWorker.getRegistration()
       updateRequested = true
       if (registration?.waiting) registration.waiting.postMessage('SKIP_WAITING')
