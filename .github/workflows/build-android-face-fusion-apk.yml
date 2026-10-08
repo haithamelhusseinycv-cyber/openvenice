@@ -65,6 +65,7 @@ jobs:
         working-directory: android-face-fusion
         shell: bash
         run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;28.2.13676358"
           rm -f gradle/gradle-daemon-jvm.properties
           chmod +x ./gradlew
           ./gradlew assembleRelease assembleDebugAndroidTest --no-daemon --stacktrace
