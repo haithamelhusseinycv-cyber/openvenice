@@ -268,6 +268,7 @@ public final class FaceFusionAgentPlugin extends Plugin {
         final String requestId = UUID.randomUUID().toString();
         data.putString("requestId", requestId);
         synchronized (lock) {
+            if (finishedCalls.contains(call)) { cleanup(call); return; }
             pending.put(requestId, call);
             Runnable timeout = () -> {
                 if (command >= MSG_DETECT_FACES && command <= MSG_ENHANCE) {
