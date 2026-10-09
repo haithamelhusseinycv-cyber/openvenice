@@ -101,6 +101,7 @@ export function LocalDreamPhonePanel() {
         {busy && <button className={button} onClick={() => controller.current?.abort()}>Cancel</button>}
         {error && <p role="alert" className="text-rose-300">{error}</p>}
         {imageUrl && <figure><img src={imageUrl} alt="Local Dream Easy result" className="w-full rounded-xl" /><ArtifactActions artifact={{ id: 'easy-phone-result', kind: 'image', url: imageUrl, mimeType: 'image/jpeg', format: 'jpeg', sourceTool: 'localdream.generate' }} /></figure>}
+        <button className={button} onClick={() => setOpen(false)}>Close</button>
       </div>
     </BottomSheet>
   </>

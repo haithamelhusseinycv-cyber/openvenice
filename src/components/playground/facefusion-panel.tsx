@@ -74,6 +74,7 @@ export function FaceFusionPanel() {
         {busy && <button className={button} onClick={() => controller.current?.abort()}>Cancel</button>}
         {error && <p role="alert" className="text-rose-300">{error}</p>}
         {output && <figure><img src={output} alt="FaceFusion result" className="w-full rounded-xl" /><ArtifactActions artifact={{ id: 'facefusion-result', kind: 'image', url: output, mimeType: 'image/jpeg', format: 'jpeg', sourceTool: 'facefusion.' + mode }} /></figure>}
+        <button className={button} onClick={() => setOpen(false)}>Close</button>
       </div>
     </BottomSheet>
   </>
