@@ -49,11 +49,13 @@ export interface GateResult {
 
 /**
  * Show the platform biometric prompt. Resolves { unlocked: true } on success.
- * Devices without an enrolled authenticator fall open (never brick the app).
+ * Missing authenticators and failed or cancelled prompts reject the request.
  */
-export function requestBiometricGate(options: { title?: string; subtitle?: string } = {}): Promise<GateResult> {
-  return invoke<GateResult>('gate', {
+export async function requestBiometricGate(options: { title?: string; subtitle?: string } = {}): Promise<GateResult> {
+  const result = await invoke<GateResult>('gate', {
     title: options.title || 'Unlock OpenVenice',
     subtitle: options.subtitle || 'Noor stays private behind your screen lock.',
   })
+  if (result.unlocked !== true || result.fallback === true) throw new Error('Device authentication was not verified.')
+  return result
 }

@@ -9,7 +9,7 @@ interface LockScreenProps {
 /**
  * Premium front-door lock: Noor-branded gate shown before any conversation
  * content when the biometric lock is enabled on a native Android build.
- * Devices without biometrics never reach this screen (fall-open in native).
+ * Native authentication failures leave the lock screen visible.
  */
 export function LockScreen({ onUnlocked }: LockScreenProps) {
   const [unlocking, setUnlocking] = useState(false)
