@@ -74,7 +74,7 @@ export function BottomSheet({ open, onClose, title, children, className }: Botto
         tabIndex={-1}
         className={cn(
           'absolute inset-x-0 bottom-0 flex max-h-[88dvh] flex-col rounded-t-2xl outline-none',
-          'border-x border-t border-white/[0.08] bg-[#15151b] shadow-[0_-16px_60px_rgba(0,0,0,0.65)]',
+          'border-x border-t border-white/[0.1] glass-strong shadow-[0_-16px_60px_rgba(0,0,0,0.65)]',
           exiting ? 'transition-transform' : dragging ? '' : 'animate-sheet-in',
           className,
         )}

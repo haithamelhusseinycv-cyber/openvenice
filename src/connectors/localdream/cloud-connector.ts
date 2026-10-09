@@ -43,16 +43,47 @@ export class LocalDreamCloudConnector {
   private wsListeners = new Set<WsListener>()
   private wsReconnectTimer: ReturnType<typeof setTimeout> | null = null
   private wsClosed = false
+  private wsReconnectAttempts = 0
+  private readonly maxReconnectAttempts = 10
+  private readonly requestTimeoutMs = 30000
+  private readonly maxRetries = 3
   constructor(storage: Persistence, fetcher: typeof fetch = fetch) { this.storage = storage; this.fetcher = fetcher }
   private async request<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
-    const response = await this.fetcher(this.base + path, {
-      method: body === undefined ? 'GET' : 'POST',
-      headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body), signal,
-    })
-    const value = await response.json() as T & { error?: string }
-    if (!response.ok) throw new Error(value.error || 'Local Dream cloud request failed')
-    return value
+    for (let attempt = 0; attempt < this.maxRetries; attempt++) {
+      if (signal?.aborted) throw new DOMException('Cancelled', 'AbortError')
+      const controller = new AbortController()
+      const forward = () => controller.abort()
+      signal?.addEventListener('abort', forward, { once: true })
+      const timeoutId = setTimeout(() => controller.abort(), this.requestTimeoutMs)
+      let retry = false
+      try {
+        const response = await this.fetcher(this.base + path, {
+          method: body === undefined ? 'GET' : 'POST',
+          headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+          body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal,
+        })
+        const value = await response.json() as T & { error?: string }
+        if (!response.ok) {
+          retry = response.status >= 500 || response.status === 429
+          throw new Error(value.error || 'Local Dream request failed (' + response.status + ')')
+        }
+        return value
+      } catch (err) {
+        if (signal?.aborted) throw new DOMException('Cancelled', 'AbortError')
+        const error = err instanceof Error ? err : new Error(String(err))
+        retry = retry || error instanceof TypeError || controller.signal.aborted
+        if (!retry || attempt === this.maxRetries - 1) {
+          if (error instanceof TypeError) throw new Error('Cannot reach Local Dream on this device. Start the gateway and allow local network access in your browser site settings.', { cause: error })
+          throw error
+        }
+      } finally { clearTimeout(timeoutId); signal?.removeEventListener('abort', forward) }
+      await new Promise<void>((resolve, reject) => {
+        const aborted = () => { clearTimeout(timer); reject(new DOMException('Cancelled', 'AbortError')) }
+        const timer = setTimeout(() => { signal?.removeEventListener('abort', aborted); resolve() }, 1000 * 2 ** attempt)
+        signal?.addEventListener('abort', aborted, { once: true })
+      })
+    }
+    throw new Error('Local Dream is unavailable')
   }
   capabilities(signal?: AbortSignal) {
     return this.request<{ protocol: number; profile: string; cancel_by_token: boolean; operations: Array<{ id: CloudOperation; acceptance: string }> }>('/api/capabilities', undefined, signal)
@@ -62,7 +93,8 @@ export class LocalDreamCloudConnector {
   }
   pending(): Pending | undefined {
     const stored = this.storage.getItem(KEY)
-    return stored ? JSON.parse(stored) as Pending : undefined
+    if (!stored) return undefined
+    try { const value = JSON.parse(stored) as Pending; return value?.body?.token ? value : undefined } catch { return undefined }
   }
   async submit(input: CloudRequest, signal?: AbortSignal): Promise<CloudJob> {
     const existing = this.pending()
@@ -115,20 +147,32 @@ export class LocalDreamCloudConnector {
   connectWebSocket(): void {
     if (this.ws || typeof WebSocket === 'undefined') return
     this.wsClosed = false
-    const ws = new WebSocket('ws://127.0.0.1:8299')
-    this.ws = ws
-    ws.onopen = () => { ws.send(JSON.stringify({ type: 'subscribe', channels: ['job_update', 'gpu_status', 'progress'] })) }
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(String(event.data)) as CloudWsEvent
-        for (const listener of this.wsListeners) listener(data)
-      } catch { /* ignore malformed frames */ }
+    this.wsReconnectAttempts = 0
+    const connect = () => {
+      if (this.wsClosed) return
+      const ws = new WebSocket('ws://127.0.0.1:8299')
+      this.ws = ws
+      ws.onopen = () => {
+        this.wsReconnectAttempts = 0
+        ws.send(JSON.stringify({ type: 'subscribe', channels: ['job_update', 'gpu_status', 'progress'] }))
+      }
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(String(event.data)) as CloudWsEvent
+          for (const listener of this.wsListeners) listener(data)
+        } catch { /* ignore malformed frames */ }
+      }
+      ws.onclose = () => {
+        this.ws = null
+        if (!this.wsClosed && this.wsReconnectAttempts < this.maxReconnectAttempts) {
+          const delay = Math.min(1000 * Math.pow(1.5, this.wsReconnectAttempts), 15000)
+          this.wsReconnectAttempts++
+          this.wsReconnectTimer = setTimeout(connect, delay)
+        }
+      }
+      ws.onerror = () => { try { ws.close() } catch { /* already closing */ } }
     }
-    ws.onclose = () => {
-      this.ws = null
-      if (!this.wsClosed) this.wsReconnectTimer = setTimeout(() => this.connectWebSocket(), 3000)
-    }
-    ws.onerror = () => { try { ws.close() } catch { /* already closing */ } }
+    connect()
   }
   disconnectWebSocket(): void {
     this.wsClosed = true

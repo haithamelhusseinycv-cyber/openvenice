@@ -16,17 +16,18 @@ import { DEFAULT_AGENT_MODEL, FALLBACK_AGENT_MODEL } from './playground-agent'
 import { shouldUseModelFallback } from './model-routing'
 
 describe('OpenVenice product model routing', () => {
-  it('defaults Noor to Qwen 3.6 Plus Uncensored with venice-uncensored fallback', () => {
-    expect(DEFAULT_CHAT_MODEL_ID).toBe('qwen-3-6-plus')
+  it('defaults Noor to Venice Uncensored 1.2 with venice-uncensored fallback', () => {
+    expect(DEFAULT_CHAT_MODEL_ID).toBe('venice-uncensored-1-2')
     expect(FALLBACK_CHAT_MODEL_ID).toBe('venice-uncensored')
-    expect(DEFAULT_AGENT_MODEL).toBe('qwen-3-6-plus')
+    expect(DEFAULT_AGENT_MODEL).toBe('venice-uncensored-1-2')
     expect(FALLBACK_AGENT_MODEL).toBe('venice-uncensored')
-    expect(ALLOWED_CHAT_MODEL_IDS[0]).toBe('qwen-3-6-plus')
+    expect(ALLOWED_CHAT_MODEL_IDS[0]).toBe('venice-uncensored-1-2')
     expect(ALLOWED_CHAT_MODEL_IDS).toContain('venice-uncensored')
+    expect(ALLOWED_CHAT_MODEL_IDS).toContain('qwen-3-6-plus')
     expect(ALLOWED_CHAT_MODEL_IDS).toContain('olafangensan-glm-4.7-flash-heretic')
-    expect(isAllowedChatModel('qwen-3-6-plus')).toBe(true)
-    expect(isAllowedChatModel('venice-uncensored')).toBe(true)
     expect(isAllowedChatModel('venice-uncensored-1-2')).toBe(true)
+    expect(isAllowedChatModel('venice-uncensored')).toBe(true)
+    expect(isAllowedChatModel('qwen-3-6-plus')).toBe(true)
     expect(isAllowedChatModel('olafangensan-glm-4.7-flash-heretic')).toBe(true)
     expect(isAllowedChatModel('kimi-k2.6')).toBe(false)
     expect(isAllowedChatModel('qwen3-coder-480b-a35b-instruct')).toBe(false)

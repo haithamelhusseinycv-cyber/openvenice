@@ -1,0 +1,250 @@
+/* Chilli mobile polish layer */
+
+/* Keyboard-open state: hide nav bar and voice dock */
+body.chilli-keyboard-open nav[aria-label="Mobile navigation"] {
+  display: none !important;
+}
+
+body.chilli-keyboard-open .nour-voice-dock {
+  display: none !important;
+}
+
+/* Hide desktop hints on mobile */
+.chilli-desktop-hint {
+  display: none !important;
+}
+
+/* Hide "Local Dream" button on mobile */
+@media (max-width: 768px) {
+  .chilli-local-dream-mobile-hidden {
+    display: none !important;
+  }
+
+  /* Agent model menu repositioning for mobile */
+  .chilli-agent-model-dropdown {
+    position: fixed !important;
+    top: calc(env(safe-area-inset-top) + 112px) !important;
+    left: 12px !important;
+    right: 12px !important;
+    z-index: 90 !important;
+    width: auto !important;
+    max-width: none !important;
+    height: auto !important;
+    max-height: min(58dvh, 430px) !important;
+    overflow: hidden !important;
+    border-radius: 16px !important;
+    background: rgba(21, 21, 27, 0.98) !important;
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.55) !important;
+  }
+
+  .chilli-agent-model-dropdown [class*="overflow-y-auto"] {
+    max-height: calc(min(58dvh, 430px) - 64px) !important;
+  }
+}
+
+/* Termux bridge card */
+.chilli-bridge-card {
+  margin: 0.75rem;
+  border: 1px solid rgba(124, 245, 223, 0.18);
+  border-radius: 20px;
+  background: linear-gradient(145deg, rgba(255, 77, 46, 0.08), rgba(124, 245, 223, 0.055) 48%, rgba(255, 255, 255, 0.025));
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  padding: 14px;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.chilli-bridge-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.chilli-bridge-card__title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.chilli-bridge-card__mark {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: rgba(255, 77, 46, 0.14);
+  color: #ff4d2e;
+  font-weight: 800;
+}
+
+.chilli-bridge-card__pill {
+  min-height: 32px;
+  border: 1px solid rgba(124, 245, 223, 0.2);
+  border-radius: 999px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  color: rgba(124, 245, 223, 0.92);
+  background: rgba(124, 245, 223, 0.08);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.chilli-bridge-card__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.chilli-bridge-card__item {
+  border: 1px solid rgba(255, 255, 255, 0.065);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.16);
+  padding: 10px 11px;
+}
+
+.chilli-bridge-card__item strong {
+  display: block;
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.chilli-bridge-card__item span {
+  display: block;
+  margin-top: 3px;
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.chilli-bridge-card details {
+  margin-top: 10px;
+}
+
+.chilli-bridge-card summary {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.chilli-bridge-card code {
+  display: block;
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.34);
+  padding: 10px;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+@media (max-width: 480px) {
+  .chilli-bridge-card {
+    margin: 0.5rem 0.75rem 0.75rem;
+    padding: 11px;
+    border-radius: 18px;
+  }
+
+  .chilli-bridge-card__title {
+    font-size: 13.5px;
+    gap: 8px;
+  }
+
+  .chilli-bridge-card__mark {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+  }
+
+  .chilli-bridge-card__pill {
+    min-height: 30px;
+    padding: 0 9px;
+    font-size: 11px;
+  }
+
+  .chilli-bridge-card__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  .chilli-bridge-card__item {
+    min-height: 54px;
+    padding: 8px;
+  }
+
+  .chilli-bridge-card__item strong {
+    font-size: 11.5px;
+  }
+
+  .chilli-bridge-card__item span {
+    display: none;
+  }
+
+  .chilli-bridge-card summary {
+    min-height: 34px;
+    font-size: 12px;
+  }
+}
+
+/* Mobile noise: hide long suggestions, prompt ideas, plugin errors */
+.chilli-mobile-noise {
+  display: none !important;
+}
+
+/* Floating cloud panels hidden on mobile */
+.chilli-floating-cloud-hidden {
+  display: none !important;
+}
+
+/* Advanced-only elements (Local Dream backend, rish shell, setup reference) */
+.chilli-advanced-only {
+  display: none !important;
+}
+
+/* Account options hidden on mobile */
+.chilli-account-options-hidden {
+  display: none !important;
+}
+
+/* Compact clear button */
+.chilli-clear-button {
+  min-width: 44px;
+  min-height: 32px;
+}
+
+/* Empty preset button */
+.chilli-empty-preset {
+  display: none !important;
+}
+
+/* Model overflow open state */
+.chilli-model-overflow-open {
+  overflow: visible !important;
+}
+
+/* Composer wrapper */
+.chilli-composer {
+  position: relative;
+}
+
+/* Settings popover repositioning on mobile */
+@media (max-width: 768px) {
+  .chilli-settings-popover {
+    position: fixed !important;
+    top: calc(env(safe-area-inset-top) + 56px) !important;
+    right: 8px !important;
+    left: auto !important;
+    z-index: 95 !important;
+  }
+}

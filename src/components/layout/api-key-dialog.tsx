@@ -238,7 +238,7 @@ export function ApiKeyDialog({ open, onClose }: { open: boolean; onClose: () => 
                 />
                 <span>
                   <span className="block">Keep me signed in on this device</span>
-                  <span className="mt-0.5 block text-[11.5px] leading-relaxed text-white/35">Saved with Android Keystore and restored automatically when OpenVenice starts.</span>
+                  <span className="mt-0.5 block text-[11.5px] leading-relaxed text-white/35">Saved with Android Keystore and restored automatically when Chilli starts.</span>
                 </span>
               </label>
             )}
@@ -302,7 +302,7 @@ export function ApiKeyDialog({ open, onClose }: { open: boolean; onClose: () => 
         )}
 
         <div className="mt-5 border-t border-white/[0.1] pt-4">
-          <label htmlFor="proxy-access-token" className="block text-[13px] text-white/75">OpenVenice host access token</label>
+          <label htmlFor="proxy-access-token" className="block text-[13px] text-white/75">Chilli host access token</label>
           <p className="mt-1 text-[12px] text-white/45">For protected tools and VoiceTut. Get OPENVENICE_ACCESS_TOKEN from your Railway service. This is separate from your Venice API key. Browser sessions do not persist it; Android can keep it in secure device storage.</p>
           <input
             id="proxy-access-token"

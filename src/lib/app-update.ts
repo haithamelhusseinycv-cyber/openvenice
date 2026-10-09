@@ -78,7 +78,11 @@ export async function checkForNewBuild(): Promise<void> {
     const response = await fetch(url, { cache: 'no-store', headers: { Accept: 'text/html' } })
     if (!response.ok) return
     const latest = entryScriptFromHtml(await response.text())
-    if (latest && latest !== current) await recoverFromStaleBuild()
+    if (latest && latest !== current) {
+      window.dispatchEvent(new Event('chilli-update-ready'))
+      const registration = await navigator.serviceWorker?.getRegistration()
+      await registration?.update()
+    }
   } catch {
     // Being offline should not interrupt the active app.
   }

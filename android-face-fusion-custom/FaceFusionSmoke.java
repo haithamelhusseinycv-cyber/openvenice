@@ -20,6 +20,36 @@ public class FaceFusionSmoke extends Instrumentation {
         long start = android.os.SystemClock.elapsedRealtime();
         try {
             Context context = getTargetContext();
+            {
+            AgentBridgeService service = new AgentBridgeService();
+            java.lang.reflect.Method attach = android.content.ContextWrapper.class.getDeclaredMethod("attachBaseContext", Context.class);
+            attach.setAccessible(true); attach.invoke(service, context);
+            java.lang.reflect.Method save = AgentBridgeService.class.getDeclaredMethod("saveOutput", Bitmap.class, int.class, String.class);
+            java.lang.reflect.Method release = AgentBridgeService.class.getDeclaredMethod("releaseOutput", String.class, int.class);
+            java.lang.reflect.Method sweep = AgentBridgeService.class.getDeclaredMethod("sweepOutputs", File.class);
+            save.setAccessible(true); release.setAccessible(true); sweep.setAccessible(true);
+            Bitmap tiny=Bitmap.createBitmap(2,2,Bitmap.Config.ARGB_8888);
+            android.net.Uri saved=(android.net.Uri)save.invoke(service,tiny,android.os.Process.myUid(),"cleanup-smoke");
+            tiny.recycle();
+            File dir=new File(context.getCacheDir(),"shared_images");
+            File savedFile=new File(dir,saved.getLastPathSegment());
+            if(!savedFile.exists())throw new Exception("Output cleanup fixture missing");
+            release.invoke(service,saved.toString(),-1);
+            if(!savedFile.exists())throw new Exception("Wrong caller could delete an output");
+            release.invoke(service,saved.toString(),android.os.Process.myUid());
+            if(savedFile.exists())throw new Exception("Acknowledged output was not deleted");
+            File stale=new File(dir,"agent-stale-smoke.jpg");stale.createNewFile();stale.setLastModified(1);
+            sweep.invoke(service,dir);
+            if(stale.exists())throw new Exception("Stale output survived sweep");
+            for(int i=0;i<4;i++) {
+                try(java.io.RandomAccessFile file=new java.io.RandomAccessFile(new File(dir,"agent-quota-smoke-"+i+".jpg"),"rw")) { file.setLength(16L*1024*1024); }
+            }
+            sweep.invoke(service,dir);
+            long retained=0;for(File f:dir.listFiles())if(f.getName().startsWith("agent-"))retained+=f.length();
+            if(retained>48L*1024*1024)throw new Exception("Output quota was exceeded");
+            for(File f:dir.listFiles())if(f.getName().startsWith("agent-quota-smoke-"))f.delete();
+            System.out.println("OUTPUT_ACK_OWNER_CHECK_PASS OUTPUT_STALE_SWEEP_PASS OUTPUT_QUOTA_PASS");
+            }
             Bitmap source, target;
             try (InputStream in = getContext().getAssets().open("grace_hopper.jpg")) {
                 source = BitmapFactory.decodeStream(in);

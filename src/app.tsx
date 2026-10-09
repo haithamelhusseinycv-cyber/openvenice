@@ -1,24 +1,33 @@
-import { lazy, Suspense, useState, useEffect, useRef } from 'react'
-import { useSettingsStore, type Tab } from './stores/settings-store'
-import { usePlaygroundStore } from './stores/playground-store'
-import { useAuthStore } from './stores/auth-store'
-import { Sidebar } from './components/layout/sidebar'
-import { Header } from './components/layout/header'
-import { ApiKeyDialog } from './components/layout/api-key-dialog'
-import { DeviceDiagnosticsDialog } from './components/chat/device-diagnostics-dialog'
-import { ErrorBoundary } from './components/ui/error-boundary'
-import { Toaster } from './components/ui/toaster'
-import { LockScreen } from './components/ui/lock-screen'
-import { biometricGateAvailability } from './lib/auth-gate'
-import { isVisibleTab } from './lib/allowed-models'
-import { haptic } from './lib/haptics'
-import { checkVoiceTutHealth } from './lib/venice-client'
-import { readLastCrashReport, clearLastCrashReport, copyCrashReport } from './lib/crash-report'
-import { toast } from './stores/toast-store'
-import { hydrateProxyAccessTokenFromDevice } from './lib/proxy-access'
+import { lazy, Suspense, useState, useEffect, useRef, useCallback } from 'react';
+import { useSettingsStore, type Tab } from './stores/settings-store';
+import { usePlaygroundStore } from './stores/playground-store';
+import { useAuthStore } from './stores/auth-store';
+import { Sidebar } from './components/layout/sidebar';
+import { Header } from './components/layout/header';
+import { MobileNav } from './components/layout/mobile-nav';
+import { ApiKeyDialog } from './components/layout/api-key-dialog';
+import { DeviceDiagnosticsDialog } from './components/chat/device-diagnostics-dialog';
+import { ErrorBoundary } from './components/ui/error-boundary';
+import { Toaster } from './components/ui/toaster';
+import { LockScreen } from './components/ui/lock-screen';
+import { CommandPalette, useCommandPalette } from './components/ui/command-palette';
+import { BottomSheet } from './components/ui/bottom-sheet';
+import { biometricGateAvailability } from './lib/auth-gate';
+import { isVisibleTab } from './lib/allowed-models';
+import { haptic } from './lib/haptics';
+import { checkVoiceTutHealth } from './lib/venice-client';
+import { readLastCrashReport, clearLastCrashReport, copyCrashReport } from './lib/crash-report';
+import { toast } from './stores/toast-store';
+import { hydrateProxyAccessTokenFromDevice } from './lib/proxy-access';
+import { generationExecutor } from './services/generation-executor';
+import { installGlobalHandlers } from './lib/error-monitor';
+import type { RoutingDecision } from './agent/intelligent-router';
 
 const ImagePage = lazy(() => import('./components/image/image-page').then((module) => ({ default: module.ImagePage })))
 const PlaygroundView = lazy(() => import('./components/playground/playground-view').then((module) => ({ default: module.PlaygroundView })))
+const SmartActionBar = lazy(() => import('./components/playground/smart-action-bar').then((module) => ({ default: module.SmartActionBar })))
+const GenerationJobStatus = lazy(() => import('./components/playground/generation-job-status').then((module) => ({ default: module.GenerationJobStatus })))
+const JobHistoryGallery = lazy(() => import('./components/playground/job-history-gallery').then((module) => ({ default: module.JobHistoryGallery })))
 
 const views = {
   playground: PlaygroundView,
@@ -26,25 +35,6 @@ const views = {
 } as const
 
 const TAB_ORDER: Tab[] = ['playground', 'image']
-
-function AgentNavIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 2v4M4.9 4.9l2.8 2.8M2 12h4M18 12h4M16.3 7.7l2.8-2.8" />
-      <rect x="5" y="9" width="14" height="11" rx="3" />
-    </svg>
-  )
-}
-
-function ImageNavIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="3" y="3" width="18" height="18" rx="2" />
-      <circle cx="8.5" cy="8.5" r="1.5" />
-      <polyline points="21 15 16 10 5 21" />
-    </svg>
-  )
-}
 
 export function App() {
   const needsUnlock = useAuthStore((s) => s.hasEncrypted && !s.apiKey)
@@ -54,14 +44,23 @@ export function App() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const activeTab = useSettingsStore((s) => s.activeTab)
   const setActiveTab = useSettingsStore((s) => s.setActiveTab)
-  const safeTab = isVisibleTab(activeTab) ? activeTab : 'playground'
+  const safeTab = (new URLSearchParams(window.location.search).has('recipe') || new URLSearchParams(window.location.search).has('preset')) ? 'image' : isVisibleTab(activeTab) ? activeTab : 'playground'
   const ActiveView = views[safeTab]
   const biometricLock = useSettingsStore((s) => s.biometricLock)
   const [gateReady, setGateReady] = useState(false)
   const [biometricUsable, setBiometricUsable] = useState(false)
   const [locked, setLocked] = useState(false)
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false)
+  const commandPalette = useCommandPalette()
   const relockArmedRef = useRef(false)
   const touchStart = useRef<{ x: number; y: number } | null>(null)
+
+  const handleQuickCreateRoute = useCallback((_decision: RoutingDecision, _enhancedPrompt: string) => {
+void _decision;
+void _enhancedPrompt;
+    setQuickCreateOpen(false)
+    setActiveTab('image')
+  }, [setActiveTab])
 
   useEffect(() => {
     let disposed = false
@@ -71,10 +70,10 @@ export function App() {
     const timer = window.setTimeout(() => {
       void biometricGateAvailability().then((availability) => {
         if (disposed) return
-        const usable = availability.available && availability.biometric
+        const usable = availability.available
         setBiometricUsable(usable)
         setGateReady(true)
-        if (usable) setLocked(true)
+        if (usable && useSettingsStore.getState().biometricLock) setLocked(true)
       })
     }, 350)
     return () => { disposed = true; window.clearTimeout(timer) }
@@ -103,9 +102,18 @@ export function App() {
   }, [hydrateFromDevice])
 
   useEffect(() => {
+    installGlobalHandlers()
     void hydrateProxyAccessTokenFromDevice()
       .then(() => checkVoiceTutHealth())
       .catch(() => undefined)
+  }, [])
+
+  useEffect(() => {
+    const onOnline = () => {
+      void generationExecutor.processOfflineQueue()
+    }
+    window.addEventListener('online', onOnline)
+    return () => window.removeEventListener('online', onOnline)
   }, [])
 
   useEffect(() => {
@@ -114,10 +122,12 @@ export function App() {
       const viewport = window.visualViewport
       if (!viewport) {
         root.style.setProperty('--keyboard-inset', '0px')
+        document.body.classList.remove('chilli-keyboard-open')
         return
       }
       const inset = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
       root.style.setProperty('--keyboard-inset', `${Math.round(inset)}px`)
+      document.body.classList.toggle('chilli-keyboard-open', viewport.height < window.innerHeight - 140)
     }
     syncKeyboard()
     window.visualViewport?.addEventListener('resize', syncKeyboard)
@@ -128,6 +138,7 @@ export function App() {
       window.visualViewport?.removeEventListener('scroll', syncKeyboard)
       window.removeEventListener('resize', syncKeyboard)
       root.style.removeProperty('--keyboard-inset')
+      document.body.classList.remove('chilli-keyboard-open')
     }
   }, [])
 
@@ -264,24 +275,25 @@ export function App() {
             </ErrorBoundary>
           </Suspense>
         </main>
-        <nav aria-label="Mobile navigation" className="lg:hidden shrink-0 grid grid-cols-2 border-t border-white/[0.08] bg-[#0d0d11]/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
-          {([['playground', 'Noor', AgentNavIcon], ['image', 'Create', ImageNavIcon]] as const).map(([id, label, Icon]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => { if (id !== safeTab) haptic('tap'); setActiveTab(id) }}
-              aria-current={safeTab === id ? 'page' : undefined}
-              className={`relative min-h-14 px-2 text-[12px] font-medium flex flex-col items-center justify-center gap-0.5 transition-colors ${safeTab === id ? 'text-[var(--color-accent)]' : 'text-white/50'}`}
-            >
-              {safeTab === id && <span aria-hidden="true" className="absolute top-0 h-0.5 w-10 rounded-full bg-[var(--color-accent)] shadow-[0_0_12px_var(--color-accent)]" />}
-              <Icon />
-              {label}
-            </button>
-          ))}
-        </nav>
+        <MobileNav onQuickCreate={() => setQuickCreateOpen(true)} />
       </div>
+      <BottomSheet open={quickCreateOpen} onClose={() => setQuickCreateOpen(false)} title="Quick Create">
+        <Suspense fallback={<div className="flex h-32 items-center justify-center"><span className="h-6 w-6 animate-spin rounded-full border-2 border-white/15 border-t-[var(--color-accent)]" /></div>}>
+          <SmartActionBar onRoute={handleQuickCreateRoute} />
+          <GenerationJobStatus />
+          <div className="mt-4 border-t border-white/[0.06] pt-4">
+            <JobHistoryGallery />
+          </div>
+        </Suspense>
+      </BottomSheet>
       <ApiKeyDialog open={apiKeyOpen} onClose={() => setApiKeyOpen(false)} />
       <DeviceDiagnosticsDialog open={diagnosticsOpen} onClose={() => setDiagnosticsOpen(false)} />
+      <CommandPalette
+        open={commandPalette.open}
+        onClose={() => commandPalette.setOpen(false)}
+        onOpenApiKey={() => setApiKeyOpen(true)}
+        onOpenDiagnostics={() => setDiagnosticsOpen(true)}
+      />
       <Toaster />
     </div>
   )

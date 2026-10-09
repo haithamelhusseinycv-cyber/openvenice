@@ -1,0 +1,3 @@
+-dontwarn javax.lang.model.**
+-keep class com.chili.app.FaceFusionBridgeSmoke { *; }
+-keep class com.chili.app.FaceFusionBridgeSmoke$* { *; }

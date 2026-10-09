@@ -1,25 +1,25 @@
-import { ImageShapePicker } from '../ui/image-shape-picker'
-import { DEFAULT_IMAGE_SHAPES } from '../../lib/image-shapes'
-import type { ImageConstraints } from '../../types/venice'
-import { imageModelLabel } from '../../lib/image-model-label'
-import { FullscreenButton } from '../ui/fullscreen-button'
-import { useState, useRef, useEffect, useMemo } from 'react'
-import { useAuthStore } from '../../stores/auth-store'
-import { useImageWorkspace } from '../../stores/image-workspace-store'
-import { useImageEdit, useImageMultiEdit, useImageUpscale, useBackgroundRemove } from '../../hooks/use-image-tools'
-import { useBlobUrl } from '../../hooks/use-blob-url'
-import { Select } from '../ui/select'
-import { Label, TextArea, PrimaryButton, ErrorText, EmptyState } from '../ui/shared'
-import { TaskProgress } from '../ui/task-progress'
-import { cn } from '../../lib/utils'
-import { toast } from '../../stores/toast-store'
-import { haptic } from '../../lib/haptics'
-import { saveImage, shareImage } from '../../lib/native-media'
-import { buildSwapPrompt, UNDRESS_PROMPT, type SwapKind, type SwapPerson } from '../../lib/tool-prompts'
-import { prepareImage, formatBytes, type ImagePreparationStage, type PreparedImage } from '../../lib/image-input'
-import { useModels } from '../../hooks/use-models'
-import { formatVeniceError } from '../../lib/venice-client'
-import { DEFAULT_EDIT_MODEL_ID } from '../../lib/allowed-models'
+import { ImageShapePicker } from '../ui/image-shape-picker';
+import { DEFAULT_IMAGE_SHAPES } from '../../lib/image-shapes';
+import type { ImageConstraints } from '../../types/venice';
+import { imageModelLabel } from '../../lib/image-model-label';
+import { FullscreenButton } from '../ui/fullscreen-button';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { useAuthStore } from '../../stores/auth-store';
+import { useImageWorkspace } from '../../stores/image-workspace-store';
+import { useImageEdit, useImageMultiEdit, useImageUpscale, useBackgroundRemove } from '../../hooks/use-image-tools';
+import { useBlobUrl } from '../../hooks/use-blob-url';
+import { Select } from '../ui/select';
+import { Label, TextArea, PrimaryButton, ErrorText, EmptyState } from '../ui/shared';
+import { TaskProgress } from '../ui/task-progress';
+import { cn } from '../../lib/utils';
+import { toast } from '../../stores/toast-store';
+import { haptic } from '../../lib/haptics';
+import { saveImage, shareImage } from '../../lib/native-media';
+import { UNDRESS_PROMPT, type SwapKind, type SwapPerson } from '../../lib/tool-prompts';
+import { prepareImage, formatBytes, type ImagePreparationStage, type PreparedImage } from '../../lib/image-input';
+import { useModels } from '../../hooks/use-models';
+import { formatVeniceError } from '../../lib/venice-client';
+import { DEFAULT_EDIT_MODEL_ID } from '../../lib/allowed-models';
 
 type Tool = 'edit' | 'swap' | 'undress' | 'upscale' | 'remove-bg'
 
@@ -194,18 +194,11 @@ export function ImageTools() {
       )
     } else if (tool === 'swap') {
       if (!imageData || !idImage) return
-      swapMutation.mutate(
-        {
-          images: dualSwap && secondIdImage ? [imageData, idImage, secondIdImage] : [imageData, idImage],
-          prompt: dualSwap ? dualSwapPrompt(swapKind, secondSwapKind) : buildSwapPrompt(swapKind, swapPerson),
-          modelId: editModel,
-          aspect_ratio: aspectRatio,
-          safe_mode: false,
-          enhance_prompt: false,
-          disable_prompt_optimization_thinking: true,
-        },
-        opts,
-      )
+      swapMutation.mutate({
+        images: dualSwap && secondIdImage ? [imageData, idImage, secondIdImage] : [imageData, idImage],
+        prompt: dualSwap ? dualSwapPrompt(swapKind, secondSwapKind) : `Reference 1 is the target scene. Reference 2 is the requested identity. Replace only the ${swapPerson} subject's ${swapKind}; preserve all other people, pose, framing, lighting and background. Do not blend identities.`,
+        modelId: editModel, aspect_ratio: aspectRatio, safe_mode: false, enhance_prompt: false,
+      }, opts)
     } else if (tool === 'undress') {
       if (!imageData) return
       undressMutation.mutate(
@@ -258,7 +251,7 @@ export function ImageTools() {
     if (!resultUrl || sharing) return
     setSharing(true)
     try {
-      const result = await shareImage(resultUrl, 'image/png', `venice-${tool}-result-${Date.now()}.png`)
+      const result = await shareImage(resultUrl, 'image/png', `chilli-${tool}-result-${Date.now()}.png`)
       if (result === 'saved') toast.success('Saved image', 'Sharing is unavailable here; the image was saved instead.')
     } catch (error) {
       toast.fromError(error, 'Could not share result')
@@ -270,10 +263,10 @@ export function ImageTools() {
     if (!resultUrl) return
     setSaving(true)
     try {
-      const name = `venice-${tool}-result-${Date.now()}.png`
-      await saveImage(resultUrl, 'image/png', name)
+      const name = `chilli-${tool}-result-${Date.now()}.png`
+      const saved = await saveImage(resultUrl, 'image/png', name)
       haptic('success')
-      toast.success('Saved to gallery', name)
+      toast.success(saved.destination === 'gallery' ? 'Saved to gallery' : 'Download started', name)
     } catch (error) {
       toast.fromError(error, 'Could not save result')
     } finally {
@@ -318,7 +311,7 @@ export function ImageTools() {
     <div className="flex h-full max-w-full min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-auto overscroll-contain touch-pan-y lg:flex-row lg:overflow-hidden">
       <div className="flex w-full max-w-full min-w-0 shrink-0 flex-col gap-4 overflow-x-hidden border-b border-white/[0.06] p-4 sm:p-6 lg:w-[400px] lg:overflow-y-auto lg:overscroll-contain lg:touch-pan-y lg:border-b-0 lg:border-r">
         <div className="grid grid-cols-3 gap-1 rounded-lg border border-white/[0.06] bg-white/[0.02] p-1 sm:grid-cols-5">
-          {([['edit', 'Edit'], ['swap', 'Swap'], ['undress', 'Undress'], ['upscale', 'Upscale'], ['remove-bg', 'BG']] as const).map(([id, label]) => (
+          {([['edit', 'Edit'], ['swap', 'Swap'], ['undress', 'Outfit'], ['upscale', 'Upscale'], ['remove-bg', 'BG']] as const).map(([id, label]) => (
             <button
               key={id}
               type="button"
@@ -537,7 +530,7 @@ export function ImageTools() {
             : tool === 'swap'
               ? dualSwap ? `Swap male ${swapKind} + female ${secondSwapKind}` : `Swap ${swapKind}`
               : tool === 'undress'
-                ? 'Undress'
+                ? 'Outfit'
                 : tool === 'upscale'
                   ? 'Upscale Image'
                   : 'Remove Background'}
@@ -599,7 +592,7 @@ export function ImageTools() {
               : tool === 'swap'
                 ? 'Swapped image appears here'
                 : tool === 'undress'
-                  ? 'Undressed image appears here'
+                  ? 'Outfitted image appears here'
                   : tool === 'upscale'
                     ? 'Upscaled image appears here'
                     : 'Background-removed image appears here'}

@@ -260,8 +260,8 @@ s = replace(s, """                resultBitmap.compress(Bitmap.CompressFormat.JP
                 }""")
 p.write_text(s)
 p = root / "app/build.gradle.kts"
-s = re.sub(r'versionCode = \d+', 'versionCode = 45', p.read_text())
-s = re.sub(r'versionName = "[^"]+"', 'versionName = "4.5"', s)
+s = re.sub(r'versionCode = \d+', 'versionCode = 46', p.read_text())
+s = re.sub(r'versionName = "[^"]+"', 'versionName = "4.5.1"', s)
 p.write_text(s)
 
 print("FaceFusion mobile usability and download fixes applied")

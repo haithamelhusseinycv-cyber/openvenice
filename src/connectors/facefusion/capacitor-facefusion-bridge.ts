@@ -35,7 +35,7 @@ export function isNativeOpenVeniceAndroid() {
 async function invoke<T>(method: string, options: Record<string, unknown> = {}): Promise<T> {
   const runtime = capacitor()
   if (!runtime || !isNativeOpenVeniceAndroid()) {
-    throw new Error('FaceFusion native bridge is only available inside the OpenVenice Android app.')
+    throw new Error('FaceFusion native bridge is only available inside the Chilli Android app.')
   }
 
   if (typeof runtime.nativePromise === 'function') {
@@ -57,12 +57,24 @@ async function invokeAbortable<T>(
 
   let abortHandler: (() => void) | undefined
   if (signal) {
+    // The native cancellation rejects pending calls too; the JS race also
+    // settles promptly if a broken native transport never acknowledges it.
     abortHandler = () => { void invoke('cancel').catch(() => undefined) }
     signal.addEventListener('abort', abortHandler, { once: true })
   }
 
   try {
-    const result = await invoke<T>(method, options)
+    const operation = invoke<T>(method, options)
+    const result = signal ? await Promise.race([
+      operation,
+      new Promise<never>((_, reject) => {
+        const previous = abortHandler
+        abortHandler = () => { previous?.(); reject(new DOMException('Aborted', 'AbortError')) }
+        if (previous) signal.removeEventListener('abort', previous)
+        signal.addEventListener('abort', abortHandler, { once: true })
+        if (signal.aborted) abortHandler()
+      }),
+    ]) : await operation
     if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
     return result
   } finally {

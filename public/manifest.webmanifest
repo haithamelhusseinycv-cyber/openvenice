@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "OpenVenice",
-  "short_name": "OpenVenice",
-  "description": "Mobile Venice AI chat, image studio and Nour companion-agent",
+  "name": "Chilli",
+  "short_name": "Chilli",
+  "description": "AI image generation studio with intelligent routing across cloud, local, and GPU backends",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

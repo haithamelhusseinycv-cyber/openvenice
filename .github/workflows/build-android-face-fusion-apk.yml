@@ -1,4 +1,4 @@
-name: Build Android Face Fusion Complete Models APK
+name: Chilli FaceFusion stable signed release
 
 on:
   workflow_dispatch:
@@ -28,31 +28,6 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      # Keep the same debug signing identity so Android can update previous
-      # companion builds in place and OpenVenice can use signature IPC.
-      - name: Restore stable debug signing key
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        with:
-          path: ~/.android/debug.keystore
-          key: android-face-fusion-debug-keystore-v2
-
-      - name: Ensure shared signing key exists
-        shell: bash
-        run: |
-          mkdir -p ~/.android
-          if [ ! -f ~/.android/debug.keystore ]; then
-            keytool -genkeypair -v \
-              -keystore ~/.android/debug.keystore \
-              -storepass android \
-              -alias androiddebugkey \
-              -keypass android \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -dname 'CN=Android Debug,O=Android,C=US'
-          fi
-          keytool -list -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey | grep 'SHA256:'
-
       - name: Clone pinned Android Face Fusion
         shell: bash
         env:
@@ -64,21 +39,18 @@ jobs:
 
       - name: Apply Complete Models customization
         shell: bash
-        env:
-          OPENVENICE_DEBUG_KEYSTORE: /home/runner/.android/debug.keystore
         run: |
           python3 android-face-fusion-custom/apply_custom.py
           python3 android-face-fusion-custom/fix_downloads_v31.py
           python3 android-face-fusion-custom/apply_agent_bridge.py
           python3 android-face-fusion-custom/improve_mobile_v42.py
-          python3 android-openvenice-custom/pin_debug_signing.py android-face-fusion/app/build.gradle.kts
 
       - name: Verify agent bridge manifest
         shell: bash
         run: |
           grep -q 'ai.openvenice.permission.FACEFUSION_AGENT' android-face-fusion/app/src/main/AndroidManifest.xml
           grep -q 'AgentBridgeService' android-face-fusion/app/src/main/AndroidManifest.xml
-          grep -q 'openVeniceStableDebug' android-face-fusion/app/build.gradle.kts
+          grep -q '199E28A4FFACFAE81EBCBCD21E09691751CF2F77FE79B951BF043722C88734F2' android-face-fusion/app/src/main/res/values/openvenice_known_certs.xml
           test -f android-face-fusion/app/src/main/java/com/pv/androidfacefusion/AgentBridgeService.java
 
       - name: Add on-device processing test
@@ -89,36 +61,46 @@ jobs:
           curl -fL --retry 2 https://raw.githubusercontent.com/scikit-image/scikit-image/v0.19.3/skimage/data/astronaut.png -o android-face-fusion/app/src/androidTest/assets/astronaut.png
           curl -fL --retry 2 https://raw.githubusercontent.com/matplotlib/matplotlib/v3.9.2/lib/matplotlib/mpl-data/sample_data/grace_hopper.jpg -o android-face-fusion/app/src/androidTest/assets/grace_hopper.jpg
 
-      - name: Build debug APK
+      - name: Build release and on-device test APK
         working-directory: android-face-fusion
         shell: bash
-        env:
-          OPENVENICE_DEBUG_KEYSTORE: /home/runner/.android/debug.keystore
         run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;28.2.13676358"
+          rm -f gradle/gradle-daemon-jvm.properties
           chmod +x ./gradlew
-          ./gradlew assembleDebug assembleDebugAndroidTest --no-daemon --stacktrace
+          ./gradlew assembleRelease assembleDebugAndroidTest --no-daemon --stacktrace
 
-      - name: Verify APK and signing identity
+      - name: Sign with permanent Chilli identity
         shell: bash
+        env:
+          CHILLI_KEYSTORE: ${{ secrets.CHILLI_RELEASE_KEYSTORE_BASE64 }}
+          CHILLI_STORE_PASSWORD: ${{ secrets.CHILLI_RELEASE_STORE_PASSWORD }}
         run: |
-          apk='android-face-fusion/app/build/outputs/apk/debug/app-debug.apk'
-          apksigner="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner"
-          test -f "$apk"
-          ls -lh "$apk"
-          "$apksigner" verify --print-certs "$apk"
-
-          expected=$(keytool -list -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey | awk '/SHA256:/{print $2; exit}' | tr -d ':' | tr '[:upper:]' '[:lower:]')
-          actual=$("$apksigner" verify --print-certs "$apk" | awk '/certificate SHA-256 digest:/{print $NF; exit}' | tr '[:upper:]' '[:lower:]')
-          echo "Expected signer: $expected"
-          echo "APK signer:      $actual"
-          test -n "$expected"
-          test "$expected" = "$actual"
+          set -euo pipefail
+          test -n "$CHILLI_KEYSTORE"
+          test -n "$CHILLI_STORE_PASSWORD"
+          printf '%s' "$CHILLI_KEYSTORE" | base64 --decode > "$RUNNER_TEMP/chilli-release.jks"
+          chmod 600 "$RUNNER_TEMP/chilli-release.jks"
+          tools="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+          source=$(find android-face-fusion/app/build/outputs/apk/release -name '*.apk' | head -1)
+          test_apk=$(find android-face-fusion/app/build/outputs/apk/androidTest/debug -name '*.apk' | head -1)
+          "$tools/apksigner" sign --ks "$RUNNER_TEMP/chilli-release.jks" --ks-key-alias chilli-release --ks-pass env:CHILLI_STORE_PASSWORD --out Chilli-FaceFusion-4.5.1-release.apk "$source"
+          "$tools/apksigner" sign --ks "$RUNNER_TEMP/chilli-release.jks" --ks-key-alias chilli-release --ks-pass env:CHILLI_STORE_PASSWORD --out Chilli-FaceFusion-native-test.apk "$test_apk"
+          "$tools/apksigner" verify --print-certs Chilli-FaceFusion-4.5.1-release.apk | tee "$RUNNER_TEMP/cert.txt"
+          grep -q '199e28a4ffacfae81ebcbcd21e09691751cf2f77fe79b951bf043722c88734f2' "$RUNNER_TEMP/cert.txt"
+          "$tools/aapt2" dump badging Chilli-FaceFusion-4.5.1-release.apk > "$RUNNER_TEMP/badging.txt"
+          ! grep -q application-debuggable "$RUNNER_TEMP/badging.txt"
+          "$tools/zipalign" -c -p 4 Chilli-FaceFusion-4.5.1-release.apk
+          sha256sum Chilli-FaceFusion-4.5.1-release.apk > Chilli-FaceFusion-4.5.1-release.apk.sha256
+          rm "$RUNNER_TEMP/chilli-release.jks"
 
       - name: Upload Complete Models APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: android-face-fusion-complete-models-apk
-          path: android-face-fusion/app/build/outputs/apk/debug/app-debug.apk
+          name: chilli-facefusion-stable-release
+          path: |
+            Chilli-FaceFusion-4.5.1-release.apk
+            Chilli-FaceFusion-4.5.1-release.apk.sha256
           if-no-files-found: error
           retention-days: 14
 
@@ -126,6 +108,6 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: facefusion-on-device-test-apk
-          path: android-face-fusion/app/build/outputs/apk/androidTest/debug/*.apk
+          path: Chilli-FaceFusion-native-test.apk
           if-no-files-found: error
           retention-days: 14

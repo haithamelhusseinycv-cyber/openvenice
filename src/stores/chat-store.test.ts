@@ -3,8 +3,8 @@ import { conversationsForStorage, useChatStore } from './chat-store'
 import type { Conversation } from '../types/venice'
 
 const conversations: Conversation[] = [
-  { id: 'one', title: 'First', model: 'qwen-3-6-plus', createdAt: 1, messages: [] },
-  { id: 'two', title: 'Second', model: 'qwen-3-6-plus', createdAt: 2, messages: [] },
+  { id: 'one', title: 'First', model: 'venice-uncensored-1-2', createdAt: 1, messages: [] },
+  { id: 'two', title: 'Second', model: 'venice-uncensored-1-2', createdAt: 2, messages: [] },
 ]
 
 describe('chat history actions', () => {

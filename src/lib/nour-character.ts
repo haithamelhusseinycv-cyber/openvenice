@@ -7,7 +7,7 @@
 import { UNDER_18_HARD_STOP } from './under-18-hard-stop'
 import { SHAHY_VENICE_POLICY_HEADER } from './venice-policy'
 
-export const NOUR_NAME = 'Noor'
+export const NOUR_NAME = 'Nour'
 export const NOUR_AGE = 30
 export const NOUR_TAGLINE = 'Egyptian-American companion · reasoning and creative agent'
 
@@ -16,7 +16,7 @@ export type NourLanguageMode = 'dual-dialect'
 
 export const NOUR_LANGUAGE_MODE: NourLanguageMode = 'dual-dialect'
 
-export const NOUR_LANGUAGE_LABEL = 'English + Egyptian'
+export const NOUR_LANGUAGE_LABEL = 'NY English + Egyptian Arabic'
 
 /** @deprecated kept for callers; always dual-dialect */
 export const NOUR_LANGUAGE_LABELS: Record<NourLanguageMode, string> = {

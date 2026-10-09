@@ -9,6 +9,7 @@ import { StatusDot } from '../ui/shared'
 import { BottomSheet } from '../ui/bottom-sheet'
 import { haptic } from '../../lib/haptics'
 import { BillingBar } from './billing-bar'
+import { BackendIndicator } from '../ui/backend-indicator'
 
 const modelTypeMap: Record<string, string> = {
   chat: 'text',
@@ -81,7 +82,7 @@ export function Header({ onOpenApiKey, onOpenDiagnostics, onOpenMobileSidebar }:
   }
 
   return (
-    <header className="flex max-w-full min-w-0 items-center gap-1.5 border-b border-white/[0.05] bg-[var(--color-bg-base)] px-2 py-1 pt-[max(0.25rem,env(safe-area-inset-top))] sm:min-h-14 sm:gap-3 sm:px-3 sm:py-0 sm:pt-[env(safe-area-inset-top)]">
+    <header className="glass flex max-w-full min-w-0 items-center gap-1.5 border-b border-white/[0.05] px-2 py-2 pt-[max(0.25rem,env(safe-area-inset-top))] sm:min-h-14 sm:gap-3 sm:px-3 sm:py-0 sm:pt-[env(safe-area-inset-top)]">
       <button
         onClick={() => { haptic('tap'); onOpenMobileSidebar?.() }}
         aria-label="Open menu"
@@ -103,7 +104,10 @@ export function Header({ onOpenApiKey, onOpenDiagnostics, onOpenMobileSidebar }:
       </button>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="text-[15px] font-semibold text-[#f4efe8] leading-none">{tabLabels[activeTab]}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[15px] font-semibold text-[#f4efe8] leading-none">{tabLabels[activeTab]}</span>
+          <BackendIndicator />
+        </div>
         {!hasOwnSelector ? (
           <button
             type="button"

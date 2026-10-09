@@ -1,0 +1,64 @@
+name: Chilli signed production release
+on:
+  workflow_dispatch:
+  push:
+    branches: ['master', 'fix/chilli-*']
+    paths: ['src/**', 'public/**', 'scripts/**', 'android/**', 'package*.json', 'index.html', '.github/workflows/chilli-release.yml']
+permissions:
+  contents: read
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Verify and build web
+        run: |
+          npm ci
+          npm run lint
+          npm run test:run
+          npm run build
+          npx cap sync android
+      - name: Build non-debuggable release
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"
+          chmod +x android/gradlew
+          cd android
+          ./gradlew assembleRelease --no-daemon
+      - name: Sign and verify Chilli
+        env:
+          CHILLI_KEYSTORE: ${{ secrets.CHILLI_RELEASE_KEYSTORE_BASE64 }}
+          CHILLI_STORE_PASSWORD: ${{ secrets.CHILLI_RELEASE_STORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$CHILLI_KEYSTORE"
+          test -n "$CHILLI_STORE_PASSWORD"
+          printf '%s' "$CHILLI_KEYSTORE" | base64 --decode > "$RUNNER_TEMP/chilli-release.jks"
+          chmod 600 "$RUNNER_TEMP/chilli-release.jks"
+          signer="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          "$signer" sign --ks "$RUNNER_TEMP/chilli-release.jks" --ks-key-alias chilli-release --ks-pass env:CHILLI_STORE_PASSWORD --out Chilli-1.0.5-release.apk android/app/build/outputs/apk/release/app-release-unsigned.apk
+          "$signer" verify --verbose --print-certs Chilli-1.0.5-release.apk
+          "$ANDROID_HOME/build-tools/36.0.0/aapt2" dump badging Chilli-1.0.5-release.apk > "$RUNNER_TEMP/badging.txt"
+          ! grep -q application-debuggable "$RUNNER_TEMP/badging.txt"
+          grep -q "versionName='1.0.5'" "$RUNNER_TEMP/badging.txt"
+          sha256sum Chilli-1.0.5-release.apk > Chilli-1.0.5-release.apk.sha256
+          rm "$RUNNER_TEMP/chilli-release.jks"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: Chilli-1.0.5-production
+          path: |
+            Chilli-1.0.5-release.apk
+            Chilli-1.0.5-release.apk.sha256
+            dist/
+          if-no-files-found: error
+          retention-days: 30

@@ -15,6 +15,7 @@ export const LOCKED_CHAT_PARAMS: VeniceParameters = {
   enable_web_search: 'off',
   disable_thinking: true,
   strip_thinking_response: true,
+  include_venice_system_prompt: false,
 }
 
 export const DEFAULT_CHAT_SEARCH_PARAMS: VeniceParameters = {
@@ -139,6 +140,7 @@ export function lockChatParams(params?: VeniceParameters): VeniceParameters {
   return {
     ...(params || {}),
     ...LOCKED_CHAT_PARAMS,
+    include_venice_system_prompt: params?.include_venice_system_prompt ?? LOCKED_CHAT_PARAMS.include_venice_system_prompt,
   }
 }
 

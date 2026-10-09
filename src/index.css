@@ -100,6 +100,142 @@ body {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+/* Glassmorphism utilities */
+.glass {
+  background: rgba(22, 22, 27, 0.7);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-strong {
+  background: rgba(22, 22, 27, 0.85);
+  backdrop-filter: blur(40px) saturate(200%);
+  -webkit-backdrop-filter: blur(40px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Gradient accents */
+.gradient-border {
+  position: relative;
+  background: rgba(22, 22, 27, 0.8);
+  border-radius: 16px;
+}
+
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  padding: 1px;
+  background: linear-gradient(135deg, var(--color-accent), rgba(110, 231, 211, 0.3), transparent);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Animated gradient background */
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.gradient-animated {
+  background: linear-gradient(-45deg, rgba(110, 231, 211, 0.1), rgba(110, 231, 211, 0.05), rgba(255, 255, 255, 0.02));
+  background-size: 400% 400%;
+  animation: gradient-shift 15s ease infinite;
+}
+
+/* Glow effects */
+.glow-accent {
+  box-shadow: 0 0 20px rgba(110, 231, 211, 0.3), 0 0 40px rgba(110, 231, 211, 0.1);
+}
+
+.glow-subtle {
+  box-shadow: 0 0 10px rgba(110, 231, 211, 0.15);
+}
+
+/* Premium button styles */
+.btn-premium {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--color-accent), rgba(110, 231, 211, 0.8));
+  box-shadow: 0 4px 20px rgba(110, 231, 211, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-premium:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(110, 231, 211, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.btn-premium:active {
+  transform: translateY(0);
+}
+
+.btn-premium::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.6s;
+}
+
+.btn-premium:hover::after {
+  transform: translateX(100%);
+}
+
+/* Card hover effects */
+.card-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+
+/* Shimmer loading effect */
+@keyframes shimmer-loading {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+  animation: shimmer-loading 2s infinite;
+}
+
+/* Floating animation */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+.float-animation {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Pulse glow */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(110, 231, 211, 0.3); }
+  50% { box-shadow: 0 0 40px rgba(110, 231, 211, 0.6); }
+}
+
+.pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
 @keyframes backdrop-out {
   from { opacity: 1; }
   to { opacity: 0; }
@@ -122,6 +258,17 @@ body {
 .animate-backdrop-in { animation: backdrop-in 0.2s ease-out; }
 .animate-backdrop-out { animation: backdrop-out 0.2s ease-in; }
 .animate-voice-ring { animation: voice-ring 1.6s cubic-bezier(0.2, 0.6, 0.3, 1) infinite; }
+
+@keyframes suggestions-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes suggestions-exit {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(8px); }
+}
+.animate-suggestions-enter { animation: suggestions-enter 0.25s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+.animate-suggestions-exit { animation: suggestions-exit 0.18s cubic-bezier(0.4, 0, 1, 1) forwards; }
 
 /* Ambient brand mesh — one signature moment, kept subtle */
 .ambient-mesh {
