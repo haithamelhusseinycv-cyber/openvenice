@@ -81,6 +81,105 @@ public final class AgentBridgeService extends Service {
 
     private final Messenger messenger = new Messenger(new IncomingHandler(Looper.getMainLooper()));
 
+    private PwaBridgeServer pwaServer;
+    private final java.util.concurrent.atomic.AtomicBoolean browserBusy = new java.util.concurrent.atomic.AtomicBoolean();
+
+    @Override public int onStartCommand(Intent intent, int flags, int startId) {
+        android.app.NotificationManager manager = getSystemService(android.app.NotificationManager.class);
+        manager.createNotificationChannel(new android.app.NotificationChannel(
+            "chilli_pwa", "Chilli image tools", android.app.NotificationManager.IMPORTANCE_LOW));
+        android.app.Notification notification = new android.app.Notification.Builder(this, "chilli_pwa")
+            .setSmallIcon(android.R.drawable.ic_menu_camera)
+            .setContentTitle("FaceFusion connected to Chilli")
+            .setContentText("On-device face tools are ready").setOngoing(true).build();
+        startForeground(8810, notification);
+        try { if (pwaServer == null) pwaServer = new PwaBridgeServer(this); }
+        catch (IOException e) { android.util.Log.e(TAG, "Chilli PWA listener failed", e); stopSelf(); }
+        return START_NOT_STICKY;
+    }
+
+    JSONObject browserRequest(String path, JSONObject data) throws Exception {
+        if ("/cancel".equals(path)) {
+            cancellationEpoch.incrementAndGet();
+            return new JSONObject().put("ok", true);
+        }
+        boolean imageJob = !"/models".equals(path);
+        if (imageJob && !browserBusy.compareAndSet(false, true))
+            throw new IllegalStateException("A FaceFusion image job is already running.");
+        final int epoch = cancellationEpoch.get();
+        java.util.concurrent.Future<JSONObject> future;
+        try {
+            future = executor.submit(() -> {
+                try { return browserExecute(path, data, epoch); }
+                finally { if (imageJob) browserBusy.set(false); }
+            });
+        } catch (RuntimeException e) { if (imageJob) browserBusy.set(false); throw e; }
+        try { return future.get(imageJob ? 180 : 10, java.util.concurrent.TimeUnit.SECONDS); }
+        catch (java.util.concurrent.TimeoutException e) {
+            if (imageJob) cancellationEpoch.incrementAndGet();
+            throw e;
+        }
+    }
+
+    private JSONObject browserExecute(String path, JSONObject data, int epoch) throws Exception {
+        java.util.ArrayList<File> files = new java.util.ArrayList<>();
+        String outputUri = null;
+        try {
+            checkCancelled(epoch);
+            if ("/models".equals(path)) return listModels();
+            Bundle request = new Bundle();
+            for (String key : new String[] {KEY_SWAPPER, KEY_FACE_ENHANCER, KEY_FRAME_ENHANCER})
+                if (data.has(key)) request.putString(key, data.getString(key));
+            JSONObject result;
+            if ("/detect".equals(path)) {
+                return detectFaces(browserInput(data.getString("image"), files), epoch);
+            } else if ("/swap".equals(path)) {
+                request.putString(KEY_SOURCE_URI, browserInput(data.getString("sourceImage"), files));
+                request.putString(KEY_TARGET_URI, browserInput(data.getString("targetImage"), files));
+                if (data.has(KEY_TARGET_FACE_INDICES)) {
+                    JSONArray items = data.getJSONArray(KEY_TARGET_FACE_INDICES);
+                    int[] indices = new int[items.length()];
+                    for (int i = 0; i < indices.length; i++) indices[i] = items.getInt(i);
+                    request.putIntArray(KEY_TARGET_FACE_INDICES, indices);
+                }
+                result = runSwap(request, android.os.Process.myUid(), epoch);
+            } else if ("/enhance".equals(path)) {
+                request.putString(KEY_IMAGE_URI, browserInput(data.getString("image"), files));
+                result = runEnhance(request, android.os.Process.myUid(), epoch);
+            } else throw new IllegalArgumentException("Unknown FaceFusion operation");
+            outputUri = result.getString("outputUri");
+            checkCancelled(epoch);
+            try (InputStream input = boundedInput(Uri.parse(outputUri));
+                 java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream()) {
+                byte[] buffer = new byte[65536]; int count;
+                while ((count = input.read(buffer)) != -1) bytes.write(buffer, 0, count);
+                result.put("outputImage", android.util.Base64.encodeToString(bytes.toByteArray(), android.util.Base64.NO_WRAP));
+                result.put("mimeType", "image/jpeg");
+                result.put("format", "jpeg");
+                result.remove("outputUri");
+            }
+            return result;
+        } finally {
+            if (outputUri != null) releaseOutput(outputUri, android.os.Process.myUid());
+            for (File file : files) file.delete();
+        }
+    }
+
+    private String browserInput(String encoded, java.util.List<File> files) throws Exception {
+        if (encoded.startsWith("data:")) encoded = encoded.substring(encoded.indexOf(',') + 1);
+        if (encoded.length() > ((MAX_BYTES + 2) / 3) * 4 + 8)
+            throw new IllegalArgumentException("Image exceeds 16 MB.");
+        byte[] bytes = android.util.Base64.decode(encoded, android.util.Base64.DEFAULT);
+        if (bytes.length == 0 || bytes.length > MAX_BYTES)
+            throw new IllegalArgumentException("Image exceeds 16 MB or is empty.");
+        File dir = new File(getCacheDir(), "chilli_pwa_inputs");
+        if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("Cannot prepare image");
+        File file = File.createTempFile("input-", ".img", dir);
+        files.add(file);
+        try (FileOutputStream out = new FileOutputStream(file)) { out.write(bytes); }
+        return Uri.fromFile(file).toString();
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -105,6 +204,7 @@ public final class AgentBridgeService extends Service {
 
     @Override
     public void onDestroy() {
+        if (pwaServer != null) { pwaServer.close(); pwaServer = null; }
         cancellationEpoch.incrementAndGet();
         // Do not close an ONNX session while its worker is still using it.
         // Queued jobs observe cancellation; runtime disposal is the last task.
