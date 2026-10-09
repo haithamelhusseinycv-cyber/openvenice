@@ -10,6 +10,7 @@ describe('createAgentRuntime', () => {
     expect(runtime.plugins.inspect('research')?.enabled).toBe(true)
     expect(runtime.plugins.inspect('facefusion')?.enabled).toBe(true)
     expect(runtime.registry.has('facefusion.list_models')).toBe(true)
+    expect(runtime.registry.has('intelligent.run_image_workflow')).toBe(true)
 
     expect(runtime.registry.has('github.search_repositories')).toBe(true)
     expect(runtime.registry.has('graph.list_mail')).toBe(true)

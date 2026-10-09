@@ -1,3 +1,4 @@
+import { createImageStudioTools } from './image-studio-tools'
 import type { AgentTool } from '../types'
 import { routeIntelligently, enhancePromptForNSFW, type RoutingInput } from '../intelligent-router'
 import { LocalDreamCloudConnector, type CloudOperation } from '../../connectors/localdream/cloud-connector'
@@ -11,10 +12,11 @@ const objectSchema = (properties: Record<string, unknown>, required: string[] = 
 
 export function createIntelligentRoutingTools(cloudConnector = new LocalDreamCloudConnector(localStorage)): AgentTool[] {
   return [
+    ...createImageStudioTools(),
     {
       id: 'intelligent.analyze_and_route',
       name: 'Analyze and route intelligently',
-      description: 'Analyze user prompt and images, then automatically select the optimal workflow, operation, quality tier, and settings. Returns routing decision with reasoning. Use this BEFORE calling generation tools to ensure optimal configuration.',
+      description: 'Keyword intent hint only; does not inspect pixels. Use intelligent.run_image_workflow for visual reasoning and automatic model settings. Returns routing decision with reasoning. Use this BEFORE calling generation tools to ensure optimal configuration.',
       risk: 'read',
       permissions: ['network'],
       inputSchema: objectSchema(
@@ -22,12 +24,13 @@ export function createIntelligentRoutingTools(cloudConnector = new LocalDreamClo
           prompt: { type: 'string', description: 'User prompt describing what they want' },
           has_images: { type: 'boolean', description: 'Whether user provided images' },
           image_count: { type: 'integer', minimum: 0, description: 'Number of images provided' },
-          preferred_quality: { type: 'string', enum: ['fast', 'balanced', 'best'], description: 'Optional quality preference' },
+          preferred_quality: { type: 'string', enum: ['best'], description: 'Optional quality preference' },
         },
         ['prompt', 'has_images', 'image_count'],
       ),
       execute: async (input) => {
-        const value = input as RoutingInput
+        const raw = input as { prompt: string; has_images: boolean; image_count: number }
+        const value: RoutingInput = { prompt: raw.prompt, hasImages: raw.has_images, imageCount: raw.image_count, userExplicitPreferences: { quality: 'best' } }
         const decision = routeIntelligently(value)
 
         return {
@@ -67,11 +70,11 @@ export function createIntelligentRoutingTools(cloudConnector = new LocalDreamClo
           imageCount: value.image_handles?.length ?? 0,
         }
 
-        const decision = routeIntelligently(routingInput)
+        const decision = routeIntelligently({ ...routingInput, userExplicitPreferences: { quality: 'best' } })
         const enhancedPrompt = enhancePromptForNSFW(value.prompt)
 
         const cloudRequest = {
-          operation: decision.operation as CloudOperation,
+          operation: 'auto' as CloudOperation, // Backend vision planner applies validated settings, never keyword-only routing.
           prompt: enhancedPrompt,
           image: value.image_handles?.[0],
           references: value.image_handles?.slice(1).filter(Boolean),
