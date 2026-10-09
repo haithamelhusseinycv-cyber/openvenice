@@ -39,6 +39,8 @@ import javax.crypto.spec.GCMParameterSpec;
 public class AuthVaultPlugin extends Plugin {
     private static final String KEYSTORE = "AndroidKeyStore";
     private static final String KEY_ALIAS = "openvenice.auth.vault.v1";
+    private static final String GATE_KEY_ALIAS = "openvenice.auth.gate.v1";
+    private static final byte[] GATE_CHALLENGE = "OpenVenice authentication gate".getBytes(StandardCharsets.UTF_8);
     private static final String PREFS = "openvenice_auth_vault";
     private static final String PREF_CT = "ciphertext";
     private static final String PREF_IV = "iv";
@@ -207,9 +209,36 @@ public class AuthVaultPlugin extends Plugin {
         }
     }
 
+    private Cipher gateCipher() throws Exception {
+        KeyStore keyStore = KeyStore.getInstance(KEYSTORE);
+        keyStore.load(null);
+        if (!keyStore.containsAlias(GATE_KEY_ALIAS)) {
+            KeyGenParameterSpec.Builder spec = new KeyGenParameterSpec.Builder(
+                GATE_KEY_ALIAS, KeyProperties.PURPOSE_ENCRYPT)
+                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                .setUserAuthenticationRequired(true);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                spec.setUserAuthenticationParameters(0,
+                    KeyProperties.AUTH_BIOMETRIC_STRONG | KeyProperties.AUTH_DEVICE_CREDENTIAL);
+            } else {
+                // Legacy credential confirmation authorizes key use for a short window.
+                spec.setUserAuthenticationValidityDurationSeconds(30);
+            }
+            KeyGenerator generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, KEYSTORE);
+            generator.init(spec.build());
+            generator.generateKey();
+            keyStore.load(null);
+        }
+        SecretKey key = ((KeyStore.SecretKeyEntry) keyStore.getEntry(GATE_KEY_ALIAS, null)).getSecretKey();
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        cipher.init(Cipher.ENCRYPT_MODE, key);
+        return cipher;
+    }
+
     private int biometricStatus() {
         try {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
                 KeyguardManager keyguard = (KeyguardManager) getContext().getSystemService(KeyguardManager.class);
                 boolean secure = keyguard != null && keyguard.isDeviceSecure();
                 return secure ? BiometricManager.BIOMETRIC_SUCCESS : BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE;
@@ -217,7 +246,7 @@ public class AuthVaultPlugin extends Plugin {
             BiometricManager manager = getContext().getSystemService(BiometricManager.class);
             if (manager == null) return BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE;
             return manager.canAuthenticate(
-                BiometricManager.Authenticators.BIOMETRIC_WEAK
+                BiometricManager.Authenticators.BIOMETRIC_STRONG
                     | BiometricManager.Authenticators.DEVICE_CREDENTIAL);
         } catch (Throwable error) {
             // Some OEM builds throw from canAuthenticate (missing KeyguardManager
@@ -263,13 +292,14 @@ public class AuthVaultPlugin extends Plugin {
                         .setTitle(title)
                         .setSubtitle(call.getString("subtitle", ""))
                         .setAllowedAuthenticators(
-                            BiometricManager.Authenticators.BIOMETRIC_WEAK
+                            BiometricManager.Authenticators.BIOMETRIC_STRONG
                                 | BiometricManager.Authenticators.DEVICE_CREDENTIAL)
                         .build();
                 android.os.CancellationSignal cancellation = new android.os.CancellationSignal();
                 cancellation.setOnCancelListener(() ->
                     call.reject("Authentication cancelled"));
-                prompt.authenticate(null, cancellation, executor, callbackFor(call));
+                Cipher cipher = gateCipher();
+                prompt.authenticate(new BiometricPrompt.CryptoObject(cipher), cancellation, executor, callbackFor(call));
                 return;
             }
 
@@ -295,9 +325,21 @@ public class AuthVaultPlugin extends Plugin {
         return new BiometricPrompt.AuthenticationCallback() {
             @Override
             public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) {
-                JSObject response = new JSObject();
-                response.put("unlocked", true);
-                call.resolve(response);
+                try {
+                    BiometricPrompt.CryptoObject crypto = result.getCryptoObject();
+                    Cipher cipher = crypto != null ? crypto.getCipher() : null;
+                    if (cipher == null) {
+                        call.reject("Authentication did not authorize the secure key");
+                        return;
+                    }
+                    // A forged success callback cannot perform this key operation.
+                    byte[] proof = cipher.doFinal(GATE_CHALLENGE);
+                    JSObject response = new JSObject();
+                    response.put("unlocked", proof.length > 0);
+                    call.resolve(response);
+                } catch (Exception error) {
+                    call.reject("Secure device authentication failed");
+                }
             }
 
             @Override
@@ -314,8 +356,13 @@ public class AuthVaultPlugin extends Plugin {
             call.reject("Authentication cancelled or failed");
             return;
         }
-        JSObject response = new JSObject();
-        response.put("unlocked", true);
-        call.resolve(response);
+        try {
+            byte[] proof = gateCipher().doFinal(GATE_CHALLENGE);
+            JSObject response = new JSObject();
+            response.put("unlocked", proof.length > 0);
+            call.resolve(response);
+        } catch (Exception error) {
+            call.reject("Device credential did not authorize the secure key");
+        }
     }
 }
