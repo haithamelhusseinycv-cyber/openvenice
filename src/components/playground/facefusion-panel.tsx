@@ -17,6 +17,7 @@ export function FaceFusionPanel() {
   const [target, setTarget] = useState('')
   const [mode, setMode] = useState('swap')
   const [enhancer, setEnhancer] = useState('none')
+  const [frameEnhancer, setFrameEnhancer] = useState('none')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [status, setStatus] = useState('')
@@ -26,7 +27,7 @@ export function FaceFusionPanel() {
     try {
       const models = await client.listModels()
       setCatalog(models)
-      setSwapper(models.selected?.swapper || models.swappers[0] || '')
+      setSwapper(models.swappers.includes(models.selected?.swapper || '') ? models.selected!.swapper! : models.swappers[0] || '')
       setStatus(models.swappers.length + ' swappers · ' + models.faceEnhancers.length + ' face enhancers')
     } catch { setError('Open FaceFusion on this phone to start its Chilli connection, then refresh.') }
   }
@@ -50,8 +51,8 @@ export function FaceFusionPanel() {
     setBusy(true); setError(''); setOutput(''); setStatus('Processing on this phone')
     try {
       const result = mode === 'swap'
-        ? await client.swap({ sourceUri: source, targetUri: target, swapper, faceEnhancer: enhancer, frameEnhancer: 'none' }, abort.signal)
-        : await client.enhance({ imageUri: target, faceEnhancer: enhancer, frameEnhancer: 'none' }, abort.signal)
+        ? await client.swap({ sourceUri: source, targetUri: target, swapper, faceEnhancer: enhancer, frameEnhancer }, abort.signal)
+        : await client.enhance({ imageUri: target, faceEnhancer: enhancer, frameEnhancer }, abort.signal)
       await saveGeneratedImage({ id: crypto.randomUUID(), imageUrl: result.outputUri, prompt: 'FaceFusion ' + mode, provider: 'facefusion' })
       setOutput(result.outputUri); setStatus('Complete · saved on this device')
     } catch (reason) { setError(abort.signal.aborted ? 'Cancelled' : reason instanceof Error ? reason.message : 'FaceFusion failed') }
@@ -68,7 +69,8 @@ export function FaceFusionPanel() {
         {mode === 'swap' && <><label className="flex flex-col gap-1">Swapper<select className={field} disabled={busy} value={swapper} onChange={event => setSwapper(event.target.value)}>{catalog?.swappers.map(model => <option key={model}>{model}</option>)}</select></label><label>Source identity<input type="file" accept="image/*" disabled={busy} onChange={event => photo(event.target.files?.[0], 'source')} /></label></>}
         <label>Target photo<input type="file" accept="image/*" disabled={busy} onChange={event => photo(event.target.files?.[0], 'target')} /></label>
         <label className="flex flex-col gap-1">Face restoration<select className={field} disabled={busy} value={enhancer} onChange={event => setEnhancer(event.target.value)}><option value="none">None</option>{catalog?.faceEnhancers.map(model => <option key={model}>{model}</option>)}</select></label>
-        <button className={button} disabled={busy || !catalog || !target || (mode === 'swap' ? !source || !swapper : enhancer === 'none')} onClick={() => { void run() }}>Run FaceFusion</button>
+        <label className="flex flex-col gap-1">Frame enhancement<select className={field} disabled={busy} value={frameEnhancer} onChange={event => setFrameEnhancer(event.target.value)}><option value="none">None</option>{catalog?.frameEnhancers.map(model => <option key={model}>{model}</option>)}</select></label>
+        <button className={button} disabled={busy || !catalog || !target || (mode === 'swap' ? !source || !swapper : enhancer === 'none' && frameEnhancer === 'none')} onClick={() => { void run() }}>Run FaceFusion</button>
         {busy && <button className={button} onClick={() => controller.current?.abort()}>Cancel</button>}
         {error && <p role="alert" className="text-rose-300">{error}</p>}
         {output && <figure><img src={output} alt="FaceFusion result" className="w-full rounded-xl" /><ArtifactActions artifact={{ id: 'facefusion-result', kind: 'image', url: output, mimeType: 'image/jpeg', format: 'jpeg', sourceTool: 'facefusion.' + mode }} /></figure>}
