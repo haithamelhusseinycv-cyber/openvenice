@@ -1,6 +1,6 @@
 import { LocalDreamConnector } from '../connectors/localdream/localdream-connector'
-import { CapacitorFaceFusionBridge, isNativeOpenVeniceAndroid } from '../connectors/facefusion/capacitor-facefusion-bridge'
-import { FaceFusionConnector } from '../connectors/facefusion/facefusion-connector'
+import { isNativeOpenVeniceAndroid } from '../connectors/facefusion/capacitor-facefusion-bridge'
+import { defaultFaceFusionConnector } from '../connectors/facefusion/default-connector'
 import { isAllowedChatModel, isAllowedImageModel } from './allowed-models'
 import { checkVoiceTutHealth, veniceWithTimeout } from './venice-client'
 import type { ModelsResponse } from '../types/venice'
@@ -93,24 +93,15 @@ export async function checkLocalDream(): Promise<DiagnosticResult> {
 }
 
 export async function checkFaceFusion(): Promise<DiagnosticResult> {
-  if (!isNativeOpenVeniceAndroid()) {
-    return {
-      id: 'facefusion',
-      label: 'FaceFusion · optional',
-      status: 'warn',
-      detail: 'Native Android bridge is unavailable in browser/PWA mode.',
-    }
-  }
-
   try {
-    const connector = new FaceFusionConnector(new CapacitorFaceFusionBridge())
+    const connector = defaultFaceFusionConnector()
     const available = await withTimeout(() => connector.isAvailable(), 3000)
     if (!available) {
       return {
         id: 'facefusion',
         label: 'FaceFusion · optional',
         status: 'warn',
-        detail: 'Bridge is present; install or start the matching FaceFusion companion to enable it.',
+        detail: 'Open FaceFusion on this phone to start its Chilli connection.',
       }
     }
 

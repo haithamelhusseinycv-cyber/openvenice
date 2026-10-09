@@ -1,8 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
-import { FaceFusionConnector } from '../connectors/facefusion/facefusion-connector'
-import { CloudFaceFusionBridge } from '../connectors/facefusion/cloud-facefusion-bridge'
+import { defaultFaceFusionConnector } from '../connectors/facefusion/default-connector'
 
-const connector = new FaceFusionConnector(new CloudFaceFusionBridge())
+const connector = defaultFaceFusionConnector()
 
 export function useFaceFusionSwap() {
   return useMutation({

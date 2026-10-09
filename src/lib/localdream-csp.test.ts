@@ -7,7 +7,7 @@ describe('Local Dream browser connection policy', () => {
     expect(directive).toBeDefined()
     const sources = directive!.split(/\s+/)
     expect(sources.filter((source) => source.startsWith('http:'))).toEqual([
-      'http://127.0.0.1:8807', 'http://127.0.0.1:8806', 'http://127.0.0.1:8298',
+      'http://127.0.0.1:8807', 'http://127.0.0.1:8806', 'http://127.0.0.1:8810', 'http://127.0.0.1:8298',
     ])
     expect(sources).not.toContain('*')
     expect(sources).not.toContain('http:')

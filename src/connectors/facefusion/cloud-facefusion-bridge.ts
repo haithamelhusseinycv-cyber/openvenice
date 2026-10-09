@@ -1,155 +1,76 @@
 import type {
-  FaceFusionBridgeTransport,
-  FaceFusionDetectedFace,
-  FaceFusionEnhanceRequest,
-  FaceFusionJobResult,
-  FaceFusionModelCatalog,
-  FaceFusionSwapRequest,
+  FaceFusionBridgeTransport, FaceFusionDetectedFace, FaceFusionEnhanceRequest,
+  FaceFusionJobResult, FaceFusionModelCatalog, FaceFusionSwapRequest,
 } from './facefusion-connector'
 
-const FACEFUSION_API_URL = 'http://localhost:8081'
-
-function toBase64(dataUrl: string): string {
-  if (dataUrl.startsWith('data:')) {
-    const commaIndex = dataUrl.indexOf(',')
-    if (commaIndex !== -1) {
-      return dataUrl.substring(commaIndex + 1)
-    }
-  }
-  return dataUrl
-}
-
-function fromBase64(base64: string, mimeType: string = 'image/jpeg'): string {
-  return `data:${mimeType};base64,${base64}`
-}
-
+/** HTTP transport to the Android companion on this phone. */
 export class CloudFaceFusionBridge implements FaceFusionBridgeTransport {
   private readonly apiUrl: string
+  constructor(apiUrl = 'http://127.0.0.1:8810') { this.apiUrl = apiUrl }
 
-  constructor(apiUrl: string = FACEFUSION_API_URL) {
-    this.apiUrl = apiUrl
-  }
-
-  async isAvailable(): Promise<boolean> {
+  private async request<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+    const controller = new AbortController()
+    const abort = () => controller.abort()
+    signal?.addEventListener('abort', abort, { once: true })
+    if (signal?.aborted) controller.abort()
+    const timer = setTimeout(abort, body && path !== '/cancel' ? 185_000 : 10_000)
     try {
-      const response = await fetch(`${this.apiUrl}/health`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch(this.apiUrl + path, {
+        method: body === undefined ? 'GET' : 'POST',
+        ...(body === undefined ? {} : { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+        signal: controller.signal,
       })
-      if (!response.ok) return false
-      const data = await response.json()
-      return data.status === 'healthy'
-    } catch {
-      return false
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'FaceFusion request failed: HTTP ' + response.status)
+      return result as T
+    } finally {
+      clearTimeout(timer)
+      signal?.removeEventListener('abort', abort)
     }
   }
 
-  async listModels(): Promise<FaceFusionModelCatalog> {
-    const response = await fetch(`${this.apiUrl}/models`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-    })
-    if (!response.ok) {
-      throw new Error(`Failed to list models: ${response.statusText}`)
-    }
-    return await response.json()
+  async isAvailable() {
+    try { return (await this.request<{ status: string }>('/health')).status === 'healthy' }
+    catch { return false }
   }
+
+  listModels() { return this.request<FaceFusionModelCatalog>('/models') }
 
   async detectFaces(imageUri: string): Promise<FaceFusionDetectedFace[]> {
-    const base64Image = toBase64(imageUri)
-    
-    const formData = new FormData()
-    formData.append('image', base64Image)
-
-    const response = await fetch(`${this.apiUrl}/detect`, {
-      method: 'POST',
-      body: formData,
-    })
-
-    if (!response.ok) {
-      throw new Error(`Face detection failed: ${response.statusText}`)
-    }
-
-    const faces = await response.json()
-    return faces.map((face: FaceFusionDetectedFace) => ({
-      index: face.index,
-      confidence: face.confidence,
-      bounds: face.bounds,
-    }))
+    const result = await this.request<{ faces: FaceFusionDetectedFace[] }>('/detect', { image: payload(imageUri) })
+    return result.faces
   }
 
-  async swap(request: FaceFusionSwapRequest, signal?: AbortSignal): Promise<FaceFusionJobResult> {
-    const sourceBase64 = toBase64(request.sourceUri)
-    const targetBase64 = toBase64(request.targetUri)
-
-    const response = await fetch(`${this.apiUrl}/swap`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sourceImage: sourceBase64,
-        targetImage: targetBase64,
-        targetFaceIndices: request.targetFaceIndices,
-        swapper: request.swapper,
-        detector: request.detector,
-        recognizer: request.recognizer,
-        faceEnhancer: request.faceEnhancer,
-        frameEnhancer: request.frameEnhancer,
-      }),
-      signal,
-    })
-
-    if (!response.ok) {
-      throw new Error(`Face swap failed: ${response.statusText}`)
-    }
-
-    const result = await response.json()
-    
-    return {
-      outputUri: fromBase64(result.outputImage, result.mimeType || 'image/jpeg'),
-      elapsedMs: result.elapsedMs,
-      image: result.outputImage,
-      format: result.format,
-      mimeType: result.mimeType,
-      width: result.width,
-      height: result.height,
-      metadata: result.metadata,
-    }
+  private async imageJob(path: string, body: unknown, signal?: AbortSignal): Promise<FaceFusionJobResult> {
+    let cancellation: Promise<void> | undefined
+    const cancelOnce = () => cancellation ??= this.cancel().catch(() => {})
+    const abort = () => { void cancelOnce() }
+    if (signal?.aborted) throw new DOMException('Cancelled', 'AbortError')
+    signal?.addEventListener('abort', abort, { once: true })
+    try {
+      const result = await this.request<FaceFusionJobResult & { outputImage: string }>(path, body, signal)
+      if (!result.outputImage) throw new Error('FaceFusion ended without an image')
+      return { ...result, outputUri: 'data:' + (result.mimeType || 'image/jpeg') + ';base64,' + result.outputImage, image: result.outputImage }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') await cancelOnce()
+      throw error
+    } finally { signal?.removeEventListener('abort', abort) }
   }
 
-  async enhance(request: FaceFusionEnhanceRequest, signal?: AbortSignal): Promise<FaceFusionJobResult> {
-    const base64Image = toBase64(request.imageUri)
-
-    const response = await fetch(`${this.apiUrl}/enhance`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        image: base64Image,
-        faceEnhancer: request.faceEnhancer,
-        frameEnhancer: request.frameEnhancer,
-      }),
-      signal,
-    })
-
-    if (!response.ok) {
-      throw new Error(`Face enhancement failed: ${response.statusText}`)
-    }
-
-    const result = await response.json()
-    
-    return {
-      outputUri: fromBase64(result.outputImage, result.mimeType || 'image/jpeg'),
-      elapsedMs: result.elapsedMs,
-      image: result.outputImage,
-      format: result.format,
-      mimeType: result.mimeType,
-      width: result.width,
-      height: result.height,
-      metadata: result.metadata,
-    }
+  swap(request: FaceFusionSwapRequest, signal?: AbortSignal) {
+    return this.imageJob('/swap', { ...request, sourceImage: payload(request.sourceUri), targetImage: payload(request.targetUri),
+      sourceUri: undefined, targetUri: undefined }, signal)
   }
 
-  async cancel(): Promise<void> {
-    // Cloud API doesn't support cancellation yet
-    // Could be implemented with job IDs in the future
+  enhance(request: FaceFusionEnhanceRequest, signal?: AbortSignal) {
+    return this.imageJob('/enhance', { ...request, image: payload(request.imageUri), imageUri: undefined }, signal)
   }
+
+  async cancel() { await this.request('/cancel', {}) }
+}
+
+function payload(value: string) {
+  if (value.startsWith('data:')) return value.slice(value.indexOf(',') + 1)
+  if (/^(artifact:|content:|https?:|blob:)/.test(value)) throw new Error('Resolve the image attachment before passing it to FaceFusion')
+  return value
 }
