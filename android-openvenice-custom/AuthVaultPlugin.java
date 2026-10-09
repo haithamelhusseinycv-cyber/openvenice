@@ -1,6 +1,9 @@
 package ai.openvenice.app;
 
+import android.app.Activity;
 import android.app.KeyguardManager;
+import androidx.activity.result.ActivityResult;
+import com.getcapacitor.annotation.ActivityCallback;
 import android.content.SharedPreferences;
 import android.hardware.biometrics.BiometricManager;
 import android.hardware.biometrics.BiometricPrompt;
@@ -30,8 +33,7 @@ import javax.crypto.spec.GCMParameterSpec;
  * Uses the PLATFORM (framework) biometric APIs — not the androidx.biometric
  * library — so the device's own Android build resolves OEM quirks instead of
  * a bundled library that ages badly across Android releases. Every biometric
- * path is armored with catch(Throwable) and falls OPEN: the lock can never
- * be the reason the app fails to launch.
+ * failure rejects authentication so unavailable hardware cannot unlock the app.
  */
 @CapacitorPlugin(name = "AuthVault")
 public class AuthVaultPlugin extends Plugin {
@@ -235,25 +237,20 @@ public class AuthVaultPlugin extends Plugin {
 
     /**
      * Premium lock gate: platform BiometricPrompt (fingerprint, face, or
-     * device credential). Armored end to end — any internal failure falls
-     * OPEN, because the lock must never be able to kill the app.
+     * device credential). Success is reported only after a verified OS callback.
      */
     @PluginMethod
     public void gate(PluginCall call) {
         try {
             android.app.Activity activity = getBridge() != null ? getBridge().getActivity() : null;
             if (activity == null || activity.isFinishing()) {
-                call.resolve(fallOpen("activity-unavailable"));
+                call.reject("Authentication activity unavailable");
                 return;
             }
 
             int status = biometricStatus();
             if (status != BiometricManager.BIOMETRIC_SUCCESS) {
-                // No usable authenticator (none enrolled, no lock screen,
-                // hardware missing): fall open and surface why.
-                JSObject result = fallOpen("no-authenticator");
-                result.put("status", status);
-                call.resolve(result);
+                call.reject("No usable authenticator. Configure a device screen lock and retry.");
                 return;
             }
 
@@ -284,17 +281,13 @@ public class AuthVaultPlugin extends Plugin {
                     title,
                     call.getString("subtitle", ""));
                 if (confirmIntent != null) {
-                    activity.startActivityForResult(confirmIntent, 7001);
-                    // Resolve optimistically; the vault itself is unchanged and
-                    // the gate is UX, not a security boundary for the key.
-                    call.resolve(fallOpen("legacy-credential-flow"));
+                    startActivityForResult(call, confirmIntent, "credentialResult");
                     return;
                 }
             }
-            call.resolve(fallOpen("no-framework-prompt"));
+            call.reject("Device authentication prompt unavailable");
         } catch (Throwable error) {
-            // Never let biometric internals take the app down.
-            call.resolve(fallOpen(error.getClass().getSimpleName()));
+            call.reject("Device authentication unavailable");
         }
     }
 
@@ -314,11 +307,15 @@ public class AuthVaultPlugin extends Plugin {
         };
     }
 
-    private JSObject fallOpen(String reason) {
-        JSObject result = new JSObject();
-        result.put("unlocked", true);
-        result.put("fallback", true);
-        result.put("reason", reason);
-        return result;
+    @ActivityCallback
+    private void credentialResult(PluginCall call, ActivityResult result) {
+        if (call == null) return;
+        if (result.getResultCode() != Activity.RESULT_OK) {
+            call.reject("Authentication cancelled or failed");
+            return;
+        }
+        JSObject response = new JSObject();
+        response.put("unlocked", true);
+        call.resolve(response);
     }
 }

@@ -5,6 +5,9 @@ on:
     branches: [ main, master, 'feat/**' ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -49,11 +52,3 @@ jobs:
         name: chili-android-apk
         path: android/app/build/outputs/apk/release/app-release.apk
         retention-days: 30
-
-    - name: Upload APK to releases (on tag)
-      if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@26994186c0ac3ef5cae75ac16aa32e8153525f77
-      with:
-        files: android/app/build/outputs/apk/release/app-release.apk
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
