@@ -1,13 +1,14 @@
 #!/data/data/com.termux/files/usr/bin/python
 """Loopback-only browser transport for the existing Local Dream Android host."""
-import re
 import signal
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
 import requests
 
-ALLOWED_ORIGINS = frozenset({"https://localhost"})
+ALLOWED_ORIGINS = frozenset({"https://localhost",
+    "https://chilli-production.haitham-elhusseiny-cv.workers.dev",
+    "https://chilli-staging.haitham-elhusseiny-cv.workers.dev"})
 MAX_BODY = 128 * 1024 * 1024
 CONTROL_ROUTES = frozenset({"/info", "/models", "/status", "/select", "/stop"})
 GENERATION_ROUTES = frozenset({"/health", "/generate", "/upscale"})
@@ -15,12 +16,14 @@ HOP_HEADERS = frozenset({"connection", "keep-alive", "transfer-encoding", "upgra
                          "proxy-authenticate", "proxy-authorization", "te", "trailer",
                          "content-length", "content-encoding", "access-control-allow-origin"})
 
-def safe_response_header(name, value):
-    """Only forward HTTP token names and printable Latin-1 header values."""
-    return (isinstance(name, str) and isinstance(value, str)
-            and re.fullmatch(r"[!#$%&'*+.^_`|~0-9A-Za-z-]+", name) is not None
-            and all(char == "\t" or 32 <= ord(char) <= 255 and ord(char) != 127
-                    for char in value))
+def generation_port(control_port=8808):
+    """Follow the Android host port while keeping requests on loopback."""
+    response = requests.get(f"http://127.0.0.1:{control_port}/info", timeout=(3, 3))
+    response.raise_for_status()
+    port = response.json().get("generation_port")
+    if type(port) is not int or not 1 <= port <= 65535:
+        raise ValueError("Invalid Local Dream generation port")
+    return port
 
 def handler_for(upstream_port, routes):
     class Handler(BaseHTTPRequestHandler):
@@ -36,7 +39,7 @@ def handler_for(upstream_port, routes):
         def cors_headers(self):
             origin = self.headers.get("Origin")
             if origin in ALLOWED_ORIGINS:
-                self.send_header("Access-Control-Allow-Origin", "https://localhost")
+                self.send_header("Access-Control-Allow-Origin", origin)
                 self.send_header("Vary", "Origin")
                 self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
                 self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Image-Width, X-Image-Height, X-Upscaler-Path, X-Use-OpenCL")
@@ -93,17 +96,16 @@ def handler_for(upstream_port, routes):
             upstream_path = path.path + ("?" + path.query if path.query else "")
             started = False
             try:
+                port = upstream_port() if callable(upstream_port) else upstream_port
                 with requests.request(
-                    self.command, f"http://127.0.0.1:{upstream_port}{upstream_path}",
+                    self.command, f"http://127.0.0.1:{port}{upstream_path}",
                     data=body, headers=headers, stream=True, timeout=(5, 600),
                     allow_redirects=False,
                 ) as response:
                     self.send_response(response.status_code)
                     for key, value in response.headers.items():
-                        if safe_response_header(key, value) and key.lower() not in HOP_HEADERS:
-                            # Sanitize at the sink as well as rejecting invalid headers above.
-                            self.send_header(key.replace("\r", "").replace("\n", ""),
-                                             value.replace("\r", "").replace("\n", ""))
+                        if key.lower() not in HOP_HEADERS:
+                            self.send_header(key, value)
                     self.cors_headers()
                     self.end_headers()
                     started = True
@@ -114,7 +116,7 @@ def handler_for(upstream_port, routes):
                             self.wfile.flush()
             except (BrokenPipeError, ConnectionResetError):
                 pass  # Closing the browser request also closes the upstream stream.
-            except requests.RequestException:
+            except (requests.RequestException, ValueError):
                 if not started:
                     self.error(503, "Local Dream backend is not ready")
             finally:
@@ -128,7 +130,7 @@ def make_server(port, upstream_port, routes):
 
 def main():
     servers = [make_server(8807, 8808, CONTROL_ROUTES),
-               make_server(8806, 8081, GENERATION_ROUTES)]
+               make_server(8806, generation_port, GENERATION_ROUTES)]
     done = threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: done.set())
     signal.signal(signal.SIGINT, lambda *_: done.set())
