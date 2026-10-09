@@ -1,4 +1,4 @@
-package com.chili.app;
+package ai.openvenice.app;
 
 import android.content.ComponentName;
 import android.content.Context;
