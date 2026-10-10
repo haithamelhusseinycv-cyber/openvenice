@@ -15,3 +15,6 @@ dist
 *.gguf
 *.safetensors
 *.log
+
+# Owner-only native credential provisioning
+android/app/src/main/assets/venice-key.json

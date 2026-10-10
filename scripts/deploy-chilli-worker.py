@@ -30,6 +30,8 @@ for i,path in enumerate(sorted((root/'dist').rglob('*'))):
  entries.append(json.dumps(asset)+': [a'+str(i)+','+json.dumps(mime)+','+json.dumps(hashlib.sha256(data).hexdigest())+']')
 worker='\n'.join(imports)+'\nconst files={'+','.join(entries)+'};'+'''
 export default { async fetch(request) {
+ const proxied = await handleVeniceSession(request);
+ if (proxied) return proxied;
  if(!['GET','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405});
  const path=new URL(request.url).pathname;
  const file=files[path] || (!path.split('/').pop().includes('.')?files['/index.html']:undefined);
@@ -39,6 +41,7 @@ export default { async fetch(request) {
  return new Response(request.method==='HEAD'?null:file[0],{headers});
 }};
 '''
+worker=(root/'scripts/venice-session-proxy.mjs').read_text()+worker
 files['worker.js']=('worker.js',worker,'application/javascript+module')
 files['metadata']=(None,json.dumps({'main_module':'worker.js','compatibility_date':'2026-10-08'}),'application/json')
 base='https://api.cloudflare.com/client/v4/accounts/'+account+'/workers/scripts/'+name

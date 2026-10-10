@@ -41,6 +41,20 @@ public class AuthVaultPlugin extends Plugin {
    c.resolve(o);
   }catch(Exception e){c.reject("Could not unlock secure credential");}
  }
+ @PluginMethod public void markProvisioned(PluginCall c){
+  try{String value=c.getString("value","");String revision=android.util.Base64.encodeToString(java.security.MessageDigest.getInstance("SHA-256").digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)),android.util.Base64.NO_WRAP);
+   if(!getContext().getSharedPreferences("venice-provisioning",android.content.Context.MODE_PRIVATE).edit().putString("revision",revision).commit())throw new Exception();c.resolve();
+  }catch(Exception e){c.reject("Could not mark credential provisioning");}
+ }
+ @PluginMethod public void loadProvisioned(PluginCall c){
+  try(java.io.InputStream input=getContext().getAssets().open("venice-key.json")){
+   java.io.ByteArrayOutputStream buffer=new java.io.ByteArrayOutputStream();byte[] chunk=new byte[1024];int count;
+   while((count=input.read(chunk))!=-1){buffer.write(chunk,0,count);if(buffer.size()>2048)throw new Exception();}
+   org.json.JSONObject record=new org.json.JSONObject(buffer.toString("UTF-8"));
+   String value=record.optString("apiKey","");String revision=android.util.Base64.encodeToString(java.security.MessageDigest.getInstance("SHA-256").digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)),android.util.Base64.NO_WRAP);if(revision.equals(getContext().getSharedPreferences("venice-provisioning",android.content.Context.MODE_PRIVATE).getString("revision","")))value="";JSObject out=new JSObject();out.put("found",!value.isEmpty());if(!value.isEmpty())out.put("value",value);c.resolve(out);
+  }catch(java.io.FileNotFoundException e){JSObject out=new JSObject();out.put("found",false);c.resolve(out);}
+  catch(Exception e){c.reject("Could not load provisioned credential");}
+ }
  @PluginMethod public void save(PluginCall c){saveValue(c);}
  @PluginMethod public void saveNamed(PluginCall c){saveValue(c);}
  @PluginMethod public void load(PluginCall c){loadValue(c);}
