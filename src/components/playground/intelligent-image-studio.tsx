@@ -8,8 +8,8 @@ import type { ImageWorkflowPlan } from '../../agent/image-workflow-planner'
 const button = 'min-h-11 rounded-xl border border-white/20 px-4 py-2 disabled:opacity-40'
 const terminal = new Set(['complete', 'needs_review', 'needs_input', 'failed', 'cancelled'])
 const KEY = 'chilli.image-studio.plan.v1'
-export function IntelligentImageStudio() {
-  const [open, setOpen] = useState(false), [prompt, setPrompt] = useState(''), [photos, setPhotos] = useState<string[]>([])
+export function IntelligentImageStudio({ fullPage = false }: { fullPage?: boolean }) {
+  const [open, setOpen] = useState(fullPage), [prompt, setPrompt] = useState(''), [photos, setPhotos] = useState<string[]>([])
   const [plan, setPlan] = useState<ImageWorkflowPlan>(), [status, setStatus] = useState(''), [error, setError] = useState('')
   const [busy, setBusy] = useState(false), [cloudActive, setCloudActive] = useState(false)
   const [versions, setVersions] = useState<Array<{ label: string; uri: string }>>([]), [selected, setSelected] = useState(0)
@@ -104,9 +104,7 @@ export function IntelligentImageStudio() {
     }
   }
   const output = versions[selected]
-  return <>
-    <button className="mx-3 mt-2 min-h-11 shrink-0 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-left text-[15px] text-white" onClick={() => setOpen(true)}>Chilli Studio · Intelligent workflow</button>
-    <BottomSheet open={open} onClose={() => setOpen(false)} title="Chilli Studio">
+  const content = (
       <div className="flex flex-col gap-4 pb-5 text-[15px] text-white">
         <p>Describe the result. Chilli understands the photos, chooses the workflow and model settings, then reviews the output. Best quality.</p>
         <label>Original photo and optional references<input type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={busy || cloudActive} onChange={e => { void upload(e.target.files) }} /></label>
@@ -123,8 +121,12 @@ export function IntelligentImageStudio() {
         {output && !busy && !cloudActive && <button className={button} onClick={() => { void (async () => { const response = await fetch(output.uri); if (!response.ok) throw new Error("Cannot load this version"); const blob = await response.blob(); const uri = await new Promise<string>((resolve,reject) => { const r = new FileReader(); r.onload = () => resolve(String(r.result)); r.onerror = () => reject(new Error("Cannot read this version")); r.readAsDataURL(blob) }); setPhotos([uri]); setPrompt(prompt + (issues.length ? '\nRepair these visible issues while preserving everything else: ' + issues.join('; ') : '\nRefine this result while preserving appearance and composition')); setPlan(undefined); setStatus('Describe any further changes, then run') })().catch(e => setError(formatVeniceError(e))) }}>Refine this version</button>}
         {imageCloud().pending() && !cloudActive && !busy && <button className={button} onClick={() => { void imageCloud().acknowledge().then(() => { localStorage.removeItem(KEY); setStatus('Ready for another task') }).catch(e => setError(formatVeniceError(e))) }}>Finish saved cloud job</button>}
         {error && <p role="alert" className="text-rose-300">{error}</p>}
-        <button className={button} onClick={() => setOpen(false)}>Close</button>
+        {!fullPage && <button className={button} onClick={() => setOpen(false)}>Close</button>}
       </div>
-    </BottomSheet>
+  )
+  if (fullPage) return <section aria-label="Chilli Studio" className="mx-auto w-full max-w-3xl p-4 sm:p-6"><h1 className="mb-4 text-2xl font-semibold">Chilli Studio</h1>{content}</section>
+  return <>
+    <button className="mx-3 mt-2 min-h-11 shrink-0 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-left text-[15px] text-white" onClick={() => setOpen(true)}>Chilli Studio · Intelligent workflow</button>
+    <BottomSheet open={open} onClose={() => setOpen(false)} title="Chilli Studio">{content}</BottomSheet>
   </>
 }

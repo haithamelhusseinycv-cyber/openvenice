@@ -1,3 +1,4 @@
+import { tabForPath } from './lib/app-routes'
 import { lazy, Suspense, useState, useEffect, useRef, useCallback } from 'react';
 import { useSettingsStore, type Tab } from './stores/settings-store';
 import { usePlaygroundStore } from './stores/playground-store';
@@ -23,6 +24,7 @@ import { generationExecutor } from './services/generation-executor';
 import { installGlobalHandlers } from './lib/error-monitor';
 import type { RoutingDecision } from './agent/intelligent-router';
 
+const StudioPage = lazy(() => import('./components/playground/studio-page').then(module => ({ default: module.StudioPage })))
 const ImagePage = lazy(() => import('./components/image/image-page').then((module) => ({ default: module.ImagePage })))
 const PlaygroundView = lazy(() => import('./components/playground/playground-view').then((module) => ({ default: module.PlaygroundView })))
 const SmartActionBar = lazy(() => import('./components/playground/smart-action-bar').then((module) => ({ default: module.SmartActionBar })))
@@ -30,11 +32,12 @@ const GenerationJobStatus = lazy(() => import('./components/playground/generatio
 const JobHistoryGallery = lazy(() => import('./components/playground/job-history-gallery').then((module) => ({ default: module.JobHistoryGallery })))
 
 const views = {
+  studio: StudioPage,
   playground: PlaygroundView,
   image: ImagePage,
 } as const
 
-const TAB_ORDER: Tab[] = ['playground', 'image']
+const TAB_ORDER: Tab[] = ['studio', 'playground', 'image']
 
 export function App() {
   const needsUnlock = useAuthStore((s) => s.hasEncrypted && !s.apiKey)
@@ -44,7 +47,7 @@ export function App() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const activeTab = useSettingsStore((s) => s.activeTab)
   const setActiveTab = useSettingsStore((s) => s.setActiveTab)
-  const safeTab = (new URLSearchParams(window.location.search).has('recipe') || new URLSearchParams(window.location.search).has('preset')) ? 'image' : isVisibleTab(activeTab) ? activeTab : 'playground'
+  const safeTab = (new URLSearchParams(window.location.search).has('recipe') || new URLSearchParams(window.location.search).has('preset')) ? 'image' : isVisibleTab(activeTab) ? activeTab : 'studio'
   const ActiveView = views[safeTab]
   const biometricLock = useSettingsStore((s) => s.biometricLock)
   const [gateReady, setGateReady] = useState(false)
@@ -143,7 +146,7 @@ void _enhancedPrompt;
   }, [])
 
   useEffect(() => {
-    if (!isVisibleTab(activeTab)) setActiveTab('playground')
+    if (!isVisibleTab(activeTab)) setActiveTab('studio')
   }, [activeTab, setActiveTab])
 
   useEffect(() => {
@@ -172,36 +175,20 @@ void _enhancedPrompt;
   }, [])
 
   useEffect(() => {
-    const stay = () => {
-      if (window.history.state?.venice !== 1) {
-        window.history.pushState({ venice: 1 }, '')
-      }
+    const sync = () => {
+      const query = new URLSearchParams(window.location.search)
+      useSettingsStore.setState({ activeTab: query.has('recipe') || query.has('preset') ? 'image' : tabForPath(window.location.pathname) })
     }
-    stay()
+    sync()
     const onPop = () => {
       const ev = new CustomEvent('venice-back', { cancelable: true })
       window.dispatchEvent(ev)
-      stay()
-      if (ev.defaultPrevented) return
-      if (diagnosticsOpen) {
-        setDiagnosticsOpen(false)
-        return
-      }
-      if (mobileSidebarOpen) {
-        setMobileSidebarOpen(false)
-        return
-      }
-      if (apiKeyOpen) {
-        setApiKeyOpen(false)
-        return
-      }
-      if (safeTab !== 'playground') {
-        setActiveTab('playground')
-      }
+      setDiagnosticsOpen(false); setMobileSidebarOpen(false); setApiKeyOpen(false)
+      sync()
     }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
-  }, [diagnosticsOpen, mobileSidebarOpen, apiKeyOpen, safeTab, setActiveTab])
+  }, [])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

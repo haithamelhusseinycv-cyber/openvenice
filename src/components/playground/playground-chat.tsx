@@ -26,7 +26,6 @@ import { generateId } from '../../lib/utils'
 import { cn } from '../../lib/utils'
 import { haptic } from '../../lib/haptics'
 import { BottomSheet } from '../ui/bottom-sheet'
-import { LocalDreamPanel } from './localdream-panel'
 import { SegmentedControl } from '../ui/segmented-control'
 import { SmartActionBar } from './smart-action-bar'
 import { CloudJobStatus } from './cloud-job-status'
@@ -458,7 +457,6 @@ export function PlaygroundChat() {
 
   return (
     <div className="flex h-full max-w-full min-w-0 flex-col overflow-hidden bg-[#0c0c10]">
-      <LocalDreamPanel />
       <div
         ref={scrollRef}
         className="touch-pan-y max-w-full min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 py-4 sm:px-4"
@@ -583,7 +581,7 @@ export function PlaygroundChat() {
       )}
 
       <div className="shrink-0 px-3 pt-2">
-        <SmartActionBar onRoute={handleSmartRoute} disabled={isThinking} />
+        <details><summary className="min-h-11 cursor-pointer py-2 text-sm text-white/60">Optional image tools</summary><SmartActionBar onRoute={handleSmartRoute} disabled={isThinking} /></details>
       </div>
 
       <div className="max-w-full min-w-0 shrink-0 overflow-x-hidden border-t border-white/[0.06] px-3 pt-2 pb-[max(0.75rem,var(--keyboard-inset,0px))]">
