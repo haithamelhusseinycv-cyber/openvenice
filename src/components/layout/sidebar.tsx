@@ -1,3 +1,4 @@
+import { APP_ROUTES } from '../../lib/app-routes'
 import { useEffect, useState } from 'react'
 import { cn } from '../../lib/utils'
 import { useSettingsStore, type Tab } from '../../stores/settings-store'
@@ -21,6 +22,7 @@ const navGroups: NavGroup[] = [
   {
     label: 'App',
     items: [
+      { id: 'studio', label: 'Studio', Icon: ImageIcon },
       { id: 'playground', label: 'Noor', Icon: AgentIcon },
       { id: 'image', label: 'Create', Icon: ImageIcon },
     ],
@@ -83,9 +85,10 @@ export function Sidebar({ mobileOpen, onMobileClose }: Props) {
               {group.items.map(({ id, label, Icon }) => {
                 const isActive = activeTab === id
                 return (
-                  <button
+                  <a
+                    href={APP_ROUTES[id as keyof typeof APP_ROUTES]}
                     key={id}
-                    onClick={() => { setActiveTab(id); onMobileClose?.() }}
+                    onClick={(event) => { event.preventDefault(); setActiveTab(id); onMobileClose?.() }}
                     aria-current={isActive ? 'page' : undefined}
                     title={!expanded ? label : undefined}
                     className={cn(
@@ -101,7 +104,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: Props) {
                     )}
                     <Icon />
                     {expanded && <span className="font-medium">{label}</span>}
-                  </button>
+                  </a>
                 )
               })}
             </div>

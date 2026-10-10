@@ -29,6 +29,7 @@ const tabLabels: Record<string, string> = {
   embeddings: 'Embeddings',
   workflows: 'Workflows',
   playground: 'Noor',
+  studio: 'Chilli Studio',
 }
 
 const tabSubtitles: Record<string, string> = {
@@ -39,10 +40,11 @@ const tabSubtitles: Record<string, string> = {
   video: 'Generate video clips',
   embeddings: 'Vector representations of text',
   workflows: 'Chain models visually',
-  playground: 'Adult companion · reason and create',
+  playground: 'Conversation and reasoning',
+  studio: 'Intelligent image workflows',
 }
 
-const noModelSelector = new Set(['video', 'workflows', 'playground'])
+const noModelSelector = new Set(['video', 'workflows', 'playground', 'studio'])
 
 interface Props {
   onOpenApiKey: () => void

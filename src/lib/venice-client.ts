@@ -1,5 +1,5 @@
 import type { VeniceError } from '../types/venice'
-import { useAuthStore } from '../stores/auth-store'
+import { MANAGED_SESSION_KEY, useAuthStore } from '../stores/auth-store'
 import { useVoiceStore } from '../stores/voice-store'
 import { isNativeOpenVeniceAndroid } from '../connectors/facefusion/capacitor-facefusion-bridge'
 import { NOUR_TTS_FALLBACK_MODEL, NOUR_TTS_FALLBACK_VOICE } from './nour-character'
@@ -8,6 +8,8 @@ import { getProxyAccessToken, HOST_ORIGIN } from './proxy-access'
 
 const ENV_BASE = (import.meta.env.VITE_VENICE_BASE_URL as string | undefined)?.replace(/\/$/, '')
 const BASE_URL = ENV_BASE || (import.meta.env.DEV ? '/venice/api/v1' : 'https://api.venice.ai/api/v1')
+
+function baseForKey(key: string | null) { return key === MANAGED_SESSION_KEY ? '/api/venice' : BASE_URL }
 
 const RETRY_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504])
 const MAX_RETRIES = 2
@@ -170,7 +172,7 @@ async function veniceFetch(path: string, options: VeniceFetchOptions): Promise<R
   const retryLimit = retries ?? (method === 'GET' || method === 'HEAD' ? MAX_RETRIES : 0)
   const headers = new Headers(fetchOptions.headers)
   const requestKey = noAuth ? null : getApiKey().trim()
-  if (requestKey) headers.set('Authorization', `Bearer ${requestKey}`)
+  if (requestKey && requestKey !== MANAGED_SESSION_KEY) headers.set('Authorization', `Bearer ${requestKey}`)
   if (fetchOptions.body && typeof fetchOptions.body === 'string') {
     headers.set('Content-Type', 'application/json')
   }
@@ -178,7 +180,7 @@ async function veniceFetch(path: string, options: VeniceFetchOptions): Promise<R
   let lastErr: unknown
   for (let attempt = 0; attempt <= retryLimit; attempt++) {
     try {
-      const res = await fetch(`${BASE_URL}${path}`, { ...fetchOptions, headers })
+      const res = await fetch(`${baseForKey(requestKey)}${path}`, { ...fetchOptions, headers, credentials: requestKey === MANAGED_SESSION_KEY ? 'same-origin' : undefined })
       if (res.ok) return res
 
       if (!RETRY_STATUSES.has(res.status) || attempt === retryLimit) {
@@ -495,9 +497,10 @@ export async function veniceBlob(path: string, body: object, init: { signal?: Ab
 async function validateCandidateEndpoint(path: string, key: string, timeoutMs = 8_000): Promise<void> {
   const controller = new AbortController()
   const timeout = globalThis.setTimeout(() => controller.abort(), timeoutMs)
-  const headers = { Authorization: `Bearer ${key.trim()}` }
+  const headers: Record<string, string> = key.trim() === MANAGED_SESSION_KEY ? {} : { Authorization: `Bearer ${key.trim()}` }
   try {
-    const response = await fetch(`${BASE_URL}${path}`, {
+    const response = await fetch(`${baseForKey(key.trim())}${path}`, {
+      credentials: key.trim() === MANAGED_SESSION_KEY ? 'same-origin' : undefined,
       method: 'GET',
       headers,
       signal: controller.signal,

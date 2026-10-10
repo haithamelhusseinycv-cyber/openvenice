@@ -88,7 +88,7 @@ export const ALLOWED_VIDEO_MODEL_IDS = [
 const CHAT_EXTREME_MARKERS = ['heretic', 'abliterat'] as const
 const VIDEO_EXTREME_MARKERS = ['enhanced', 'uncensored', 'heretic', 'abliterat', 'private', 'lustify', 'longcat', 'wan'] as const
 
-export const VISIBLE_TABS = ['playground', 'image'] as const
+export const VISIBLE_TABS = ['studio', 'playground', 'image'] as const
 export type VisibleTab = (typeof VISIBLE_TABS)[number]
 
 function normalized(id?: string) {

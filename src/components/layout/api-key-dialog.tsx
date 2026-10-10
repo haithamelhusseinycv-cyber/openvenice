@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useAuthStore } from '../../stores/auth-store'
+import { MANAGED_SESSION_KEY, useAuthStore } from '../../stores/auth-store'
 import { VeniceLogo } from '../ui/logo'
 import { toast } from '../../stores/toast-store'
 import { formatVeniceError, validateVeniceApiKey } from '../../lib/venice-client'
@@ -158,6 +158,7 @@ export function ApiKeyDialog({ open, onClose }: { open: boolean; onClose: () => 
           </div>
         </div>
 
+        {apiKey === MANAGED_SESSION_KEY && <p role="status" className="mb-4 text-sm text-green-300">Connected with your app session. Your Venice key is managed securely by the app.</p>}
         {isUnlockMode ? (
           <div>
             <label htmlFor="apikey-passphrase" className="sr-only">Passphrase</label>

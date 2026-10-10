@@ -1,6 +1,6 @@
 import { AgentToolRegistry } from './tool-registry'
 import { FaceFusionConnector } from '../connectors/facefusion/facefusion-connector'
-import { CapacitorFaceFusionBridge, isNativeOpenVeniceAndroid } from '../connectors/facefusion/capacitor-facefusion-bridge'
+import { defaultFaceFusionConnector } from '../connectors/facefusion/default-connector'
 import { GithubConnector } from '../connectors/github/github-connector'
 import { GraphConnector } from '../connectors/microsoft-graph/graph-connector'
 import { ResearchConnector } from '../connectors/research/research-connector'
@@ -38,7 +38,7 @@ export function createAgentRuntime(options: AgentRuntimeOptions = {}): AgentRunt
   plugins.register(createGithubPlugin(options.github ?? new GithubConnector()))
   plugins.register(createGraphPlugin(options.graph ?? new GraphConnector()))
   plugins.register(createResearchPlugin(options.research ?? new ResearchConnector()))
-  if (options.faceFusion) plugins.register(createFaceFusionPlugin(options.faceFusion))
+  plugins.register(createFaceFusionPlugin(options.faceFusion ?? defaultFaceFusionConnector()))
   plugins.enableDefaults()
 
   for (const tool of createPluginManagementTools(plugins, registry)) registry.register(tool)
@@ -49,14 +49,9 @@ export function createAgentRegistry(options: AgentRuntimeOptions = {}) {
   return createAgentRuntime(options).registry
 }
 
-function nativeFaceFusionConnector() {
-  if (!isNativeOpenVeniceAndroid()) return undefined
-  return new FaceFusionConnector(new CapacitorFaceFusionBridge())
-}
-
 function getDefaultAgentRuntime() {
   if (!defaultRuntime) {
-    defaultRuntime = createAgentRuntime({ faceFusion: nativeFaceFusionConnector() })
+    defaultRuntime = createAgentRuntime()
   }
   return defaultRuntime
 }
@@ -65,8 +60,7 @@ function getDefaultAgentRuntime() {
  * Local Dream, GitHub, Microsoft Graph, and Research are exposed as enabled
  * built-in plugins in both the PWA and Android shell. Host-side tokens are
  * injected by the OpenVenice proxy; the browser never receives them.
- * FaceFusion is added only inside native OpenVenice Android, where the
- * signature-protected Capacitor plugin can bind to its bridge.
+ * FaceFusion uses signed IPC in Android and the phone-loopback companion in PWA.
  * Plugin-management tools are always available so Qwen can inspect and toggle
  * already-known plugins without downloading or executing arbitrary code.
  */

@@ -1,3 +1,4 @@
+import { APP_ROUTES } from '../lib/app-routes'
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { createSafeStorage } from '../lib/safe-storage'
@@ -9,7 +10,7 @@ import {
   isVisibleTab,
 } from '../lib/allowed-models'
 
-export type Tab = 'chat' | 'image' | 'audio' | 'music' | 'video' | 'embeddings' | 'workflows' | 'playground'
+export type Tab = 'chat' | 'image' | 'audio' | 'music' | 'video' | 'embeddings' | 'workflows' | 'playground' | 'studio'
 
 export function sanitizeSelectedModels(selected: Record<string, string> | undefined): Record<string, string> {
   const next = { ...(selected || {}) }
@@ -37,8 +38,12 @@ interface SettingsState {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      activeTab: 'playground',
-      setActiveTab: (tab) => set({ activeTab: isVisibleTab(tab) ? tab : 'playground' }),
+      activeTab: 'studio',
+      setActiveTab: (tab) => {
+        const next = isVisibleTab(tab) ? tab : 'studio'
+        if (typeof window !== 'undefined' && window.location.pathname !== APP_ROUTES[next]) window.history.pushState({ chilliPage: next }, '', APP_ROUTES[next])
+        set({ activeTab: next })
+      },
       sidebarOpen: true,
       setSidebarOpen: (open: boolean) => set({ sidebarOpen: open }),
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),

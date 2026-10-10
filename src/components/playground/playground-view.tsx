@@ -27,6 +27,7 @@ export function PlaygroundView() {
   const playgroundAgentModel = useSettingsStore((s) => s.playgroundAgentModel)
   const setPlaygroundAgentModel = useSettingsStore((s) => s.setPlaygroundAgentModel)
   const currentAgentModel = playgroundAgentModel || DEFAULT_AGENT_MODEL
+  const [canvasOpen, setCanvasOpen] = useState(false)
   const [saveToast, setSaveToast] = useState<string | null>(null)
   const linkedWorkflow = workflows.find((w) => w.id === linkedWorkflowId)
 
@@ -111,13 +112,14 @@ export function PlaygroundView() {
 
   return (
     <div className="flex h-full max-w-full min-w-0 overflow-hidden">
-      <div className="flex w-full max-w-full min-w-0 shrink-0 flex-col overflow-hidden border-r border-white/[0.06] lg:w-[420px]">
+      <div className={cn('flex h-full min-h-0 w-full max-w-full min-w-0 flex-col overflow-hidden', canvasOpen && 'lg:w-[420px] lg:shrink-0')}>
         <div className="flex min-h-12 min-w-0 shrink-0 items-center justify-between gap-2 border-b border-white/[0.06] bg-[#0a0a0a] px-3">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-[14px] font-medium text-white/65 shrink-0">Playground</span>
+            <span className="text-[14px] font-medium text-white/65 shrink-0">Noor</span>
             <span className="text-[11px] px-1.5 py-0.5 rounded bg-white/[0.06] text-white/45 uppercase tracking-wider shrink-0">Agent</span>
           </div>
           <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5 overflow-hidden">
+            <button className="hidden lg:block min-h-11 text-xs text-white/60" onClick={() => setCanvasOpen(!canvasOpen)}>{canvasOpen ? "Hide workflow" : "Workflow"}</button>
             <AgentModelPicker value={currentAgentModel} onChange={setPlaygroundAgentModel} />
             <button
               onClick={handleReset}
@@ -133,7 +135,7 @@ export function PlaygroundView() {
         </div>
       </div>
 
-      <div className="hidden max-w-full min-w-0 flex-1 flex-col overflow-hidden lg:flex">
+      <div className={cn('hidden max-w-full min-w-0 flex-1 flex-col overflow-hidden', canvasOpen && 'lg:flex')}>
         <div className="flex items-center gap-2 px-3 h-11 border-b border-white/[0.06] bg-[#0a0a0a] shrink-0">
           <div className="flex items-center gap-2 min-w-0 flex-1">
             {linkedWorkflow ? (

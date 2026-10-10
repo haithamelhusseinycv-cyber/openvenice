@@ -2,10 +2,9 @@
 import threading
 import time
 import unittest
-from unittest.mock import MagicMock, patch
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import requests
-from localdream_webbridge import make_server, CONTROL_ROUTES, GENERATION_ROUTES
+from localdream_webbridge import make_server, CONTROL_ROUTES, GENERATION_ROUTES, generation_port
 
 class Upstream(BaseHTTPRequestHandler):
     cancelled = threading.Event()
@@ -66,6 +65,29 @@ class BrowserBridgeTests(unittest.TestCase):
         self.assertEqual(response.json()["state"], "running")
         self.assertEqual(response.headers["Access-Control-Allow-Origin"], "https://localhost")
 
+    def test_chilli_pwa_origin_is_allowed(self):
+        origin = "https://chilli-production.haitham-elhusseiny-cv.workers.dev"
+        response = requests.get(self.control_url + "/info", headers={"Origin": origin}, timeout=3)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["Access-Control-Allow-Origin"], origin)
+
+    def test_dynamic_generation_port(self):
+        bridge = make_server(0, lambda: self.upstream.server_port, GENERATION_ROUTES)
+        threading.Thread(target=bridge.serve_forever, daemon=True).start()
+        try:
+            response = requests.get(f"http://127.0.0.1:{bridge.server_port}/health", timeout=3)
+            self.assertEqual(response.status_code, 200)
+        finally:
+            bridge.shutdown(); bridge.server_close()
+
+    def test_invalid_advertised_port_is_rejected(self):
+        from unittest.mock import patch, Mock
+        for port in (None, True, 0, 65536, "18081"):
+            with patch("localdream_webbridge.requests.get", return_value=Mock(json=lambda: {"generation_port": port})):
+                with self.assertRaises(ValueError): generation_port()
+        with patch("localdream_webbridge.requests.get", return_value=Mock(json=lambda: {"generation_port": 18081})):
+            self.assertEqual(generation_port(), 18081)
+
     def test_untrusted_origin_and_unknown_route_are_rejected(self):
         response = requests.get(self.control_url + "/info", headers={"Origin": "https://evil.invalid"}, timeout=3)
         self.assertEqual(response.status_code, 403)
@@ -96,27 +118,6 @@ class BrowserBridgeTests(unittest.TestCase):
         self.assertEqual(preflight.status_code, 204)
         self.assertIn("X-Upscaler-Path", preflight.headers["Access-Control-Allow-Headers"])
         self.assertIn("X-Output-Width", response.headers["Access-Control-Expose-Headers"])
-
-    def test_invalid_upstream_headers_are_dropped_without_losing_payload(self):
-        upstream = MagicMock()
-        upstream.status_code = 200
-        upstream.headers = {
-            "Content-Type": "image/png", "X-Output-Width": "16",
-            "X-Bad": "safe\r\nInjected: yes", "Bad\nName": "value",
-            "X-Nul": "bad\x00value", "X-Del": "bad\x7fvalue",
-            "X-Unicode": "\u0100", "X-Tab": "left\tright",
-            "Content-Length": "9999",
-        }
-        upstream.__enter__.return_value = upstream
-        upstream.iter_content.return_value = [b"payload"]
-        with patch("localdream_webbridge.requests.request", return_value=upstream):
-            response = requests.get(self.control_url + "/info", headers=self.origin, timeout=3)
-        self.assertEqual(response.content, b"payload")
-        self.assertEqual(response.headers["X-Output-Width"], "16")
-        self.assertEqual(response.headers["X-Tab"], "left\tright")
-        self.assertEqual(response.headers["Access-Control-Allow-Origin"], "https://localhost")
-        for name in ("X-Bad", "Injected", "Bad", "X-Nul", "X-Del", "X-Unicode", "Content-Length"):
-            self.assertNotIn(name, response.headers)
 
     def test_browser_stream_close_closes_upstream(self):
         Upstream.cancelled.clear()

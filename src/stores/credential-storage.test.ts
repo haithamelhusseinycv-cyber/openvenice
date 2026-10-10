@@ -49,6 +49,21 @@ describe('provider credential storage',()=>{
   expect(useAuthStore.getState().apiKey).toBe('native-vault-test-key')
   expect(session.getItem('venice-auth')).toBeNull()
  })
+ it('restores the protected PWA session without exposing a provider key',async()=>{
+  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({authenticated:true}),{headers:{'Content-Type':'application/json'}})))
+  const {useAuthStore,MANAGED_SESSION_KEY}=await import('./auth-store')
+  expect(await useAuthStore.getState().hydrateFromDevice()).toBe(true)
+  expect(useAuthStore.getState().apiKey).toBe(MANAGED_SESSION_KEY)
+  expect(local.setItem).not.toHaveBeenCalled()
+  useAuthStore.getState().clearApiKey()
+  expect(fetch).toHaveBeenLastCalledWith('/venice-auth/logout',expect.objectContaining({method:'POST'}))
+ })
+ it('does not mark an expired PWA session connected',async()=>{
+  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({authenticated:false}))))
+  const {useAuthStore}=await import('./auth-store')
+  expect(await useAuthStore.getState().hydrateFromDevice()).toBe(false)
+  expect(useAuthStore.getState().apiKey).toBeNull()
+ })
  it('migrates Qwen credentials to memory and excludes them from persisted settings',async()=>{
   session.setItem('openvenice-qwen-api-key','legacy-qwen-test-key')
   const {useProviderStore}=await import('./provider-store')

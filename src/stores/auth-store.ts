@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 
+export const MANAGED_SESSION_KEY = 'managed-session'
 const SESSION_KEY = 'venice-auth'
 const ENCRYPTED_KEY = 'venice-auth-enc'
 const DEVICE_MARKER_KEY = 'venice-auth-device'
@@ -118,6 +119,12 @@ async function saveDeviceKey(key: string) {
 async function loadDeviceKey(): Promise<string | null> {
   if (!isNativeAndroid()) return null
   try {
+    const provisioned = await invokeVault<{ found?: boolean; value?: string }>('loadProvisioned').catch(() => null)
+    if (provisioned?.found && provisioned.value) {
+      await saveDeviceKey(provisioned.value)
+      await invokeVault('markProvisioned', { value: provisioned.value })
+      return provisioned.value
+    }
     const result = await invokeVault<{ found?: boolean; value?: string }>('load')
     return result.found && result.value ? result.value : null
   } catch {
@@ -214,6 +221,15 @@ export const useAuthStore = create<AuthState>()((set) => ({
 
   hydrateFromDevice: async () => {
     if (useAuthStore.getState().apiKey) return true
+    if (!isNativeAndroid()) {
+      try {
+        const response = await fetch('/venice-auth/status', { credentials: 'same-origin', cache: 'no-store', signal: AbortSignal.timeout(8000) })
+        if (response.ok && (await response.json()).authenticated === true) {
+          set({ apiKey: MANAGED_SESSION_KEY, deviceRemembered: false })
+          return true
+        }
+      } catch { /* Existing API key connection remains available. */ }
+    }
     const key = await loadDeviceKey()
     if (!key) {
       if (initialDeviceRemembered) {
@@ -228,6 +244,9 @@ export const useAuthStore = create<AuthState>()((set) => ({
   },
 
   clearApiKey: () => {
+    if (useAuthStore.getState().apiKey === MANAGED_SESSION_KEY) {
+      void fetch('/venice-auth/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => undefined)
+    }
     clearPlaintextSessionKey()
     localStorage.removeItem(ENCRYPTED_KEY)
     void clearDeviceKey()

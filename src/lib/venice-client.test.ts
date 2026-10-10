@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { checkVoiceTutHealth, formatVeniceError, validateVeniceApiKey, VeniceAPIError, venice, veniceBlob, voiceTutBlob } from './venice-client'
-import { useAuthStore } from '../stores/auth-store'
+import { MANAGED_SESSION_KEY, useAuthStore } from '../stores/auth-store'
 import { NOUR_TTS_FALLBACK_MODEL, NOUR_TTS_FALLBACK_VOICE } from './nour-character'
 
 function response(status: number, message = `HTTP ${status}`): Response {
@@ -34,6 +34,13 @@ describe('validateVeniceApiKey', () => {
   afterEach(() => {
     vi.useRealTimers()
     vi.unstubAllGlobals()
+  })
+
+  it('validates a managed session without transmitting a provider key', async () => {
+    fetchMock.mockResolvedValueOnce(response(204))
+    await validateVeniceApiKey(MANAGED_SESSION_KEY)
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/venice/api_keys/rate_limits')
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({headers:{},credentials:'same-origin'})
   })
 
   it('rejects an empty or whitespace-only key without making a request', async () => {
